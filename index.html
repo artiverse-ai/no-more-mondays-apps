@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NMM Analytics</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+      html, body { background-color: #020617; color: #e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      .nm-card { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 0.75rem; }
+      .nm-table th { font-weight: 500; color: #94a3b8; text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e293b; cursor: pointer; user-select: none; white-space: nowrap; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+      .nm-table th:hover { color: #e2e8f0; }
+      .nm-table td { padding: 0.625rem 0.75rem; border-bottom: 1px solid #1e293b; font-size: 0.875rem; white-space: nowrap; }
+      .nm-table tr:hover td { background-color: #0b1224; }
+      .nm-table tr.clickable { cursor: pointer; }
+      .nm-pill { display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+      .nm-pill-sun { background-color: rgba(245, 158, 11, 0.12); color: #fbbf24; }
+      .nm-pill-wed { background-color: rgba(99, 102, 241, 0.12); color: #a5b4fc; }
+      .nm-pill-monthly { background-color: rgba(236, 72, 153, 0.12); color: #f9a8d4; }
+      .nm-pill-legacy { background-color: rgba(148, 163, 184, 0.12); color: #94a3b8; }
+      .nm-pill-old { background-color: rgba(148, 163, 184, 0.12); color: #94a3b8; }
+      .nm-pill-new { background-color: rgba(16, 185, 129, 0.12); color: #34d399; }
+      .nm-good { color: #34d399; }
+      .nm-bad { color: #fb7185; }
+      .nm-num { font-variant-numeric: tabular-nums; }
+      input, select { background-color: #0f172a; border: 1px solid #1e293b; color: #e2e8f0; border-radius: 0.5rem; padding: 0.375rem 0.625rem; font-size: 0.875rem; }
+      input:focus, select:focus { outline: none; border-color: #6366f1; }
+      .scroll-x { overflow-x: auto; }
+      .scroll-x::-webkit-scrollbar { height: 8px; }
+      .scroll-x::-webkit-scrollbar-track { background: #0b1224; }
+      .scroll-x::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    </style>
+  </head>
+  <body class="min-h-screen">
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center font-bold text-white">N</div>
+          <div>
+            <h1 class="text-lg font-semibold tracking-tight">NMM Analytics</h1>
+            <p class="text-xs text-slate-400" id="nm-subtitle">Webinar performance</p>
+          </div>
+        </div>
+        <div class="text-xs text-slate-400" id="nm-meta"></div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-6">
+      <div id="nm-app"></div>
+    </main>
+
+    <footer class="max-w-7xl mx-auto px-6 py-8 text-xs text-slate-500">
+      Source: <code class="text-slate-400">no-more-mondays-analytics.dbt_tuddin.mart_webinar_events</code> &middot;
+      Snapshot updated when <code class="text-slate-400">data/*.json</code> is regenerated.
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -16,12 +16,18 @@ the calendar route queries BigQuery live via a service-account key.
 In **Project Settings → Environment Variables**, add these keys for both
 **Production** and **Preview**:
 
-| Key                                    | Value                                              |
-| -------------------------------------- | -------------------------------------------------- |
-| `BQ_PROJECT`                           | `no-more-mondays-analytics`                        |
-| `BQ_DATASET`                           | `nmm_calendar`                                     |
-| `GOOGLE_APPLICATION_CREDENTIALS_JSON`  | Full SA JSON key, pasted as one string             |
-| `CALENDLY_PAT`                         | Admin Calendly Personal Access Token (org-scoped)  |
+| Key                                    | Value                                                              |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| `BQ_PROJECT`                           | `no-more-mondays-analytics`                                        |
+| `BQ_DATASET`                           | `nmm_calendar`                                                     |
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON`  | Full SA JSON key, pasted as one string                             |
+| `CALENDLY_PAT`                         | Admin Calendly Personal Access Token (org-scoped)                  |
+| `CLOUDFLARE_API_TOKEN`                 | CF token: Account → Access: Edit; Zone → DNS: Edit                 |
+| `CF_ACCOUNT_ID`                        | No More Mondays Cloudflare account id                              |
+| `CF_ACCESS_GROUP_ID`                   | UUID of the `nmm-allowed-emails` Cloudflare Access Group           |
+| `ADMIN_EMAILS`                         | Comma-separated emails that can use `/admin`                       |
+| `CUSTOM_DOMAIN`                        | `apps.nomoremondays.io` — the CF-fronted hostname                  |
+| `SKIP_AUTH` (temp)                     | `1` during initial deploys before CF Access is wired; unset later  |
 
 The service account needs:
 

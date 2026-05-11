@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/cf-access";
 
 type Tile = {
   href: string;
@@ -91,20 +92,40 @@ function Section({ title, tiles }: { title: string; tiles: Tile[] }) {
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const user = await getCurrentUser();
+
   return (
     <main className="mx-auto w-full max-w-6xl space-y-10 p-6 md:p-10">
       <header className="space-y-2 border-b border-border pb-8">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
-          No More Mondays
-        </p>
-        <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">
-          Internal apps &amp; dashboards
-        </h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Pick a tool below. Apps are interactive workflows; dashboards are
-          analytics views.
-        </p>
+        <div className="flex items-start justify-between gap-6">
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
+              No More Mondays
+            </p>
+            <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">
+              Internal apps &amp; dashboards
+            </h1>
+            <p className="max-w-2xl text-sm text-muted-foreground">
+              Pick a tool below. Apps are interactive workflows; dashboards are
+              analytics views.
+            </p>
+          </div>
+          {user?.isAdmin ? (
+            <Link
+              href="/admin"
+              className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground shadow-sm hover:border-accent hover:text-accent"
+            >
+              Admin
+            </Link>
+          ) : null}
+        </div>
+        {user ? (
+          <p className="pt-1 text-xs text-muted-foreground">
+            Signed in as{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">{user.email}</code>
+          </p>
+        ) : null}
       </header>
 
       <Section title="Apps" tiles={apps} />

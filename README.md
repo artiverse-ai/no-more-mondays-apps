@@ -20,8 +20,16 @@ Internal apps and dashboards for No More Mondays, deployed as a single Next.js
 │   │       ├── SearchClient.tsx
 │   │       ├── components/
 │   │       └── lib/
+│   ├── admin/                      Access management (add/remove allow-listed users)
+│   │   ├── page.tsx
+│   │   ├── AdminClient.tsx
+│   │   └── actions.ts              Server Actions that hit the Cloudflare API
 │   └── api/
 │       └── calendly/[...path]/     Server-side Calendly proxy (holds PAT)
+├── lib/
+│   ├── cf-access.ts                Read current user from CF Access headers
+│   └── cloudflare.ts               Cloudflare Access Group REST client
+├── proxy.ts                        Next 16 proxy — gates whole site behind CF Access
 ├── components/                     UI + chart components (shadcn-based)
 ├── lib/                            bq client, availability queries, helpers
 ├── public/
@@ -64,12 +72,26 @@ Key BQ views read by the calendar:
 - `busy_intervals` — every event from those 9, with `is_calendly_booking` flag
 - `calendar_timezones` — each closer's preferred TZ
 
+## Access model
+
+The site sits behind **Cloudflare Access** on the custom domain
+`apps.nomoremondays.io`. Cloudflare gates by email; allowed emails live in a
+single Cloudflare Access Group. The `/admin` route (visible only to a
+hard-coded list of `ADMIN_EMAILS`) is the day-to-day control panel — adding
+or removing users there calls the Cloudflare API to update the group, so the
+in-app admin UI and Cloudflare stay in sync.
+
+- `proxy.ts` redirects any request without the `Cf-Access-Authenticated-User-Email`
+  header to the custom domain, forcing it through CF Access.
+- Set `SKIP_AUTH=1` to bypass the gate during initial deploys before CF Access
+  is wired up.
+
 ## Deploy
 
 See [`docs/DEPLOY.md`](./docs/DEPLOY.md). Short version:
 
-1. Push to `main`. Vercel auto-deploys preview/production.
-2. Set three env vars in Vercel: `BQ_PROJECT`, `BQ_DATASET`,
-   `GOOGLE_APPLICATION_CREDENTIALS_JSON` (full SA JSON pasted as a single line).
-3. Turn on Vercel Authentication under Settings → Deployment Protection
-   so only logged-in teammates can view.
+1. Push to `main`. Run `vercel deploy --prod` (latest commit's author must be
+   a Vercel team member of `no-more-mondays`).
+2. Set env vars in Vercel — see `.env.local.example` for the full list.
+3. Visit `https://apps.nomoremondays.io/admin` (after CF Access is set up) to
+   manage who can sign into the site.

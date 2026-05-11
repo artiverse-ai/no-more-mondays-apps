@@ -13,14 +13,15 @@ the calendar route queries BigQuery live via a service-account key.
 
 ## 2. Environment variables
 
-In **Project Settings → Environment Variables**, add three keys for both
+In **Project Settings → Environment Variables**, add these keys for both
 **Production** and **Preview**:
 
-| Key                                    | Value                                  |
-| -------------------------------------- | -------------------------------------- |
-| `BQ_PROJECT`                           | `no-more-mondays-analytics`            |
-| `BQ_DATASET`                           | `nmm_calendar`                         |
-| `GOOGLE_APPLICATION_CREDENTIALS_JSON`  | Full SA JSON key, pasted as one string |
+| Key                                    | Value                                              |
+| -------------------------------------- | -------------------------------------------------- |
+| `BQ_PROJECT`                           | `no-more-mondays-analytics`                        |
+| `BQ_DATASET`                           | `nmm_calendar`                                     |
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON`  | Full SA JSON key, pasted as one string             |
+| `CALENDLY_PAT`                         | Admin Calendly Personal Access Token (org-scoped)  |
 
 The service account needs:
 

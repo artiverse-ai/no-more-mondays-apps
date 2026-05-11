@@ -11,10 +11,17 @@ Internal apps and dashboards for No More Mondays, deployed as a single Next.js
 │   ├── page.tsx                    Home — Apps & Dashboards sections
 │   ├── layout.tsx
 │   ├── globals.css                 NMM palette + Tailwind v4
-│   └── apps/
-│       └── calendar/               Team-availability app (live BigQuery)
-│           ├── page.tsx
-│           └── team/[email]/page.tsx
+│   ├── apps/
+│   │   ├── calendar/               Team-availability app (live BigQuery)
+│   │   │   ├── page.tsx
+│   │   │   └── team/[email]/page.tsx
+│   │   └── calendly-search/        Internal-note search across Calendly events
+│   │       ├── page.tsx
+│   │       ├── SearchClient.tsx
+│   │       ├── components/
+│   │       └── lib/
+│   └── api/
+│       └── calendly/[...path]/     Server-side Calendly proxy (holds PAT)
 ├── components/                     UI + chart components (shadcn-based)
 ├── lib/                            bq client, availability queries, helpers
 ├── public/

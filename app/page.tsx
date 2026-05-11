@@ -15,6 +15,13 @@ const apps: Tile[] = [
       "Booking capacity across closers. Pulls Google Calendar + Calendly via BigQuery.",
     status: "live",
   },
+  {
+    href: "/apps/calendly-search",
+    title: "Calendly Internal Note Search",
+    description:
+      "Find bookings whose event-type internal note matches a query (setter, vip, webinar, …). Live Calendly API.",
+    status: "live",
+  },
 ];
 
 const dashboards: Tile[] = [

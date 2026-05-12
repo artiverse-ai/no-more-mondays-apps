@@ -218,32 +218,35 @@ export default function HowToReadCapacityDashboardSop() {
       <section className="sop-card">
         <div className="sop-card-title">
           <span className="sop-card-num">07</span>
-          <h2 className="sop-h2">The amber calendar coverage warning</h2>
+          <h2 className="sop-h2">The amber calendar hygiene warning</h2>
         </div>
         <p className="sop-why">
           <strong>Why:</strong> The booking system trusts whatever it sees on
-          a closer&rsquo;s calendar. If their calendar is mostly empty, the
-          dashboard reports they&rsquo;re wide open — which means real
-          prospects can be offered into time the closer is actually unavailable.
+          a closer&rsquo;s calendar. If their calendar is thin — too few
+          events, too little blocked time — the dashboard happily offers them
+          for slots they actually can&rsquo;t take.
+        </p>
+        <p>
+          Closers live in different timezones, so the check uses two
+          TZ-independent signals over the visible date range:
         </p>
         <ul>
           <li>
-            The dashboard runs a check on every render: for each closer in the
-            visible range, what percentage of the time is blocked on their
-            calendar?
+            <strong>Events per day</strong> &mdash; a real calendar with a
+            sleep block, lunch, and a few meetings easily clears 3 events/day.
+            Below <strong>3</strong>: thin calendar.
           </li>
           <li>
-            A normal human with a nightly sleep block alone is{" "}
-            <strong>~33% busy</strong>. Add lunch, meetings, gym, family time
-            and a healthy calendar lands at 50%+.
-          </li>
-          <li>
-            Anyone under <strong>25%</strong> coverage in the visible window
-            gets flagged in the amber banner just below the filters. The
-            banner lists each flagged closer with their coverage % and average
-            hours blocked per day.
+            <strong>Coverage</strong> &mdash; busy minutes divided by total
+            range minutes. A nightly sleep block alone covers ~33%. Below{" "}
+            <strong>30%</strong>: structural blocks missing.
           </li>
         </ul>
+        <p>
+          Trip either signal and the closer appears in the amber banner just
+          below the filters. The banner shows their events/day, coverage %,
+          and which signal triggered.
+        </p>
         <p className="sop-callout">
           <strong>Action:</strong> send them the{" "}
           <a className="sop-link" href="/sops/closer-calendar-management">
@@ -254,7 +257,7 @@ export default function HowToReadCapacityDashboardSop() {
             /admin/closers
           </a>{" "}
           (flip <em>Available</em> off) so the dashboard stops offering them
-          until they&rsquo;ve set blockers up.
+          until they&rsquo;ve set things up.
         </p>
       </section>
 

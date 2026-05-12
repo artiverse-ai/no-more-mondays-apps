@@ -8,6 +8,7 @@ import { FiltersBar, StatusFilter, ViewMode } from "./components/FiltersBar";
 import { BookingsTable } from "./components/BookingsTable";
 import { InviteesTable } from "./components/InviteesTable";
 import { HostsTable } from "./components/HostsTable";
+import { CalendarView } from "./components/CalendarView";
 import { JsonModal } from "./components/JsonModal";
 import { runSearch } from "./lib/search";
 import { PresetKey, Row, SearchProgress, SearchResult } from "./lib/types";
@@ -209,7 +210,13 @@ export function SearchClient() {
             onExport={() => exportCsv(filtered)}
           />
 
-          {viewMode === "bookings" ? (
+          {viewMode === "calendar" ? (
+            <CalendarView
+              rows={filtered}
+              matchedEventTypes={result.matchedEventTypes}
+              onInspect={setModalRowId}
+            />
+          ) : viewMode === "bookings" ? (
             <BookingsTable
               rows={filtered}
               total={result.rows.length}

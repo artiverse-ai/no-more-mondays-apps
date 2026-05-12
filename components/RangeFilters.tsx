@@ -55,6 +55,8 @@ export function RangeFilters({
   defaultTz,
   allMembers,
   selectedTeam,
+  flaggedEmails,
+  flaggedReasons,
 }: {
   defaultFrom: string;
   defaultTo: string;
@@ -62,7 +64,10 @@ export function RangeFilters({
   defaultTz: string;
   allMembers: string[];
   selectedTeam: string[];
+  flaggedEmails?: string[];
+  flaggedReasons?: Record<string, string>;
 }) {
+  const flaggedSet = new Set(flaggedEmails ?? []);
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
@@ -275,10 +280,13 @@ export function RangeFilters({
         <ul className="flex flex-wrap gap-1.5">
           {allMembers.map((email) => {
             const isActive = selectedTeam.includes(email);
+            const isFlagged = flaggedSet.has(email);
+            const flagReason = flaggedReasons?.[email];
             return (
               <li key={email}>
                 <button
                   type="button"
+                  title={flagReason}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("interval");
@@ -292,15 +300,38 @@ export function RangeFilters({
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                     isActive
                       ? "border-foreground bg-foreground text-background"
+                      : isFlagged
+                      ? "border-amber-500/60 bg-amber-500/10 text-amber-800 hover:border-amber-500"
                       : "border-border bg-background text-foreground hover:border-foreground/40"
                   }`}
                 >
+                  {isFlagged ? (
+                    <span
+                      aria-label="Calendar hygiene warning"
+                      className={isActive ? "" : "text-amber-600"}
+                    >
+                      ⚠
+                    </span>
+                  ) : null}
                   {shortName(email)}
                 </button>
               </li>
             );
           })}
         </ul>
+        {flaggedEmails && flaggedEmails.length > 0 ? (
+          <p className="text-[11px] text-muted-foreground">
+            <span className="text-amber-700">⚠</span> = thin calendar for this
+            date range — hover for detail, see{" "}
+            <a
+              href="/sops/how-to-read-capacity-dashboard"
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              how to read this
+            </a>
+            .
+          </p>
+        ) : null}
       </div>
     </div>
   );

@@ -218,7 +218,7 @@ export default function HowToReadCapacityDashboardSop() {
       <section className="sop-card">
         <div className="sop-card-title">
           <span className="sop-card-num">07</span>
-          <h2 className="sop-h2">The amber calendar hygiene warning</h2>
+          <h2 className="sop-h2">The ⚠ on a closer pill</h2>
         </div>
         <p className="sop-why">
           <strong>Why:</strong> The booking system trusts whatever it sees on
@@ -227,8 +227,12 @@ export default function HowToReadCapacityDashboardSop() {
           for slots they actually can&rsquo;t take.
         </p>
         <p>
-          Closers live in different timezones, so the check uses two
-          TZ-independent signals over the visible date range:
+          In the <strong>Filter by closer</strong> row, a closer pill turns{" "}
+          <span style={{ color: "#a05a00", fontWeight: 600 }}>amber with a{" "}
+          ⚠ icon</span> when their calendar looks thin for the visible date
+          range. Hover the pill to see their numbers. Closers live in
+          different timezones, so the check uses signals that don&rsquo;t
+          depend on a specific TZ:
         </p>
         <ul>
           <li>
@@ -242,11 +246,6 @@ export default function HowToReadCapacityDashboardSop() {
             <strong>30%</strong>: structural blocks missing.
           </li>
         </ul>
-        <p>
-          Trip either signal and the closer appears in the amber banner just
-          below the filters. The banner shows their events/day, coverage %,
-          and which signal triggered.
-        </p>
         <p className="sop-callout">
           <strong>Action:</strong> send them the{" "}
           <a className="sop-link" href="/sops/closer-calendar-management">

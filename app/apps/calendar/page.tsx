@@ -10,7 +10,6 @@ import { SlotMatrix } from "@/components/SlotMatrix";
 import { RangeDayChart } from "@/components/RangeDayChart";
 import { RangePerCloserChart } from "@/components/RangePerCloserChart";
 import { HeadlineKPIs } from "@/components/HeadlineKPIs";
-import { CalendarHygieneBanner } from "@/components/CalendarHygieneBanner";
 
 const todayInTz = (tz: string): string => {
   const fmt = new Intl.DateTimeFormat("en-CA", {
@@ -126,6 +125,17 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
   const totalSlots = slots.length;
   const bookableSlots = slots.filter((s) => s.available_count > 0).length;
 
+  // Per-closer calendar hygiene. Surface as a ⚠ on each flagged closer's
+  // filter pill — no top-level banner, the warning is per-closer.
+  const flaggedHygiene = hygiene.filter((h) => h.reasons.length > 0);
+  const flaggedEmails = flaggedHygiene.map((h) => h.email);
+  const flaggedReasons: Record<string, string> = Object.fromEntries(
+    flaggedHygiene.map((h) => [
+      h.email,
+      `Thin calendar — ${h.events_per_day.toFixed(1)} events/day, ${Math.round(h.coverage_pct * 100)}% coverage`,
+    ]),
+  );
+
   return (
     <main className="mx-auto max-w-[1600px] space-y-8 p-4 md:p-8 lg:p-10">
       {/* Hero */}
@@ -171,6 +181,8 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
           defaultTz={tz}
           allMembers={members}
           selectedTeam={selectedTeam}
+          flaggedEmails={flaggedEmails}
+          flaggedReasons={flaggedReasons}
         />
         <p className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
           Showing <span className="font-semibold text-foreground">{duration}-minute</span>{" "}
@@ -182,9 +194,6 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
           for <span className="font-semibold text-foreground">{effectiveTeamSize} closer{effectiveTeamSize === 1 ? "" : "s"}</span>.
         </p>
       </section>
-
-      {/* Calendar hygiene warning — only renders if any closer is flagged */}
-      <CalendarHygieneBanner hygiene={hygiene} />
 
       {/* Headline KPIs — click for detail dialogs */}
       <section className="space-y-3">

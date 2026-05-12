@@ -86,21 +86,38 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     path: string,
     params: Record<string, string | number | undefined> = {},
   ): Promise<T[]> => {
+    // Pagination uses pagination.next_page (a full URL) rather than just
+    // next_page_token. The token is tied to Calendly's internal
+    // microsecond-precision normalization of the filter params, so
+    // reconstructing the request ourselves (even with the same params we
+    // sent on page 1) yields "page_token: is invalid". The next_page URL
+    // contains the canonical params Calendly expects — including
+    // microsecond-precision timestamps — so we just follow it.
     const all: T[] = [];
-    let nextToken: string | null = null;
-    let firstPage = true;
-    do {
-      // Calendly's page_token already encodes the filter set. Re-sending
-      // the original params on subsequent pages produces
-      // "page_token: is invalid" — drop everything except count + token.
-      const p: Record<string, string | number | undefined> = firstPage
-        ? { ...params, count: 100 }
-        : { count: 100, page_token: nextToken ?? undefined };
-      const data: { collection?: T[]; pagination?: { next_page_token?: string | null } } = await apiFetch(path, p);
+    let nextPath: string = path;
+    let nextParams: Record<string, string | number | undefined> = { ...params, count: 100 };
+    let nextPageUrl: string | null = null;
+    while (true) {
+      const data: {
+        collection?: T[];
+        pagination?: { next_page?: string | null; next_page_token?: string | null };
+      } = await apiFetch(nextPath, nextParams);
       all.push(...(data.collection || []));
-      nextToken = data.pagination?.next_page_token || null;
-      firstPage = false;
-    } while (nextToken);
+      nextPageUrl = data.pagination?.next_page || null;
+      if (!nextPageUrl) break;
+      // Parse the next_page URL into (path, params) for the next call.
+      try {
+        const u = new URL(nextPageUrl);
+        nextPath = u.pathname; // e.g. /scheduled_events
+        const np: Record<string, string> = {};
+        u.searchParams.forEach((v, k) => {
+          np[k] = v;
+        });
+        nextParams = np;
+      } catch {
+        break;
+      }
+    }
     return all;
   };
 

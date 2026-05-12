@@ -42,14 +42,9 @@ export default function NewCloserJoinsSop() {
         <ol>
           <li>
             Send them this link:{" "}
-            <a
-              className="sop-link"
-              href="https://nmm-closer-sop.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              nmm-closer-sop.vercel.app ↗
-            </a>
+            <Link className="sop-link" href="/sops/closer-calendar-management">
+              /sops/closer-calendar-management
+            </Link>
           </li>
           <li>
             Highlight section <strong>01 — Share your calendar with
@@ -169,14 +164,9 @@ export default function NewCloserJoinsSop() {
             If the matrix is completely empty: their calendar has zero events
             in the visible window. Either no recurring blockers set up yet (a
             problem — they need to do steps 02–05 of the{" "}
-            <a
-              className="sop-link"
-              href="https://nmm-closer-sop.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              closer SOP ↗
-            </a>
+            <Link className="sop-link" href="/sops/closer-calendar-management">
+              closer SOP
+            </Link>
             ), or the calendar share permission is wrong (recheck step 02
             above).
           </li>
@@ -212,14 +202,9 @@ export default function NewCloserJoinsSop() {
           </li>
           <li>
             Bookmark the{" "}
-            <a
-              className="sop-link"
-              href="https://nmm-closer-sop.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              closer SOP ↗
-            </a>{" "}
+            <Link className="sop-link" href="/sops/closer-calendar-management">
+              closer SOP
+            </Link>{" "}
             for them. Encourage the 3-minute weekly check from section 08 of
             that doc.
           </li>

@@ -18,12 +18,12 @@ const SOPS: SopEntry[] = [
       "What each chart and number on the team-availability dashboard means, how to filter, and what to do when something looks off.",
   },
   {
-    href: "https://nmm-closer-sop.vercel.app/",
-    external: true,
+    href: "/sops/closer-calendar-management",
+    external: false,
     title: "Calendar management for closers",
     audience: "Closers",
     description:
-      "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week. Hosted at nmm-closer-sop.vercel.app.",
+      "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week.",
   },
   {
     href: "/sops/new-closer-joins",

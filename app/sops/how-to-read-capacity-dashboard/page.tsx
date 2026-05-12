@@ -257,14 +257,9 @@ export default function HowToReadCapacityDashboardSop() {
         </div>
         <ul>
           <li>
-            <a
-              className="sop-link"
-              href="https://nmm-closer-sop.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Calendar management for closers ↗
-            </a>{" "}
+            <Link className="sop-link" href="/sops/closer-calendar-management">
+              Calendar management for closers
+            </Link>{" "}
             — what every closer is supposed to be doing on their end. Read it
             once so you know what to ask a closer to fix when the dashboard
             shows something weird.

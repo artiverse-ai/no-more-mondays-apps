@@ -45,12 +45,11 @@ const sops: Tile[] = [
     status: "live",
   },
   {
-    href: "https://nmm-closer-sop.vercel.app/",
+    href: "/sops/closer-calendar-management",
     title: "Calendar management for closers",
     description:
-      "Share your calendar, block your busy time, set the right timezone — for new closers and as a reference. Hosted at nmm-closer-sop.vercel.app.",
+      "Share your calendar, block your busy time, set the right timezone — for new closers and as a reference.",
     status: "live",
-    external: true,
   },
   {
     href: "/sops/new-closer-joins",

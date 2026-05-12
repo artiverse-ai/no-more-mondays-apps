@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { CalendlyEventType, DebugStats, Row } from "../lib/types";
 import { fmtDate, normHostValue } from "../lib/format";
 
@@ -50,83 +51,148 @@ export function Metrics({ rows, allRows, hostFilter, debug, window }: Props) {
     if (activeBookings.length >= 2 && uniqueHosts.size >= 2) doubleBookings++;
   }
 
-  const pct = (n: number) => (total === 0 ? "" : `${Math.round((n / total) * 100)}% of calls`);
-
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2 text-xs text-foreground">
-        <span>
-          <span className="font-medium uppercase tracking-[0.14em] text-accent/80">
+    <section className="space-y-3">
+      {/* Window + headline stats — one tight row */}
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Window
-          </span>{" "}
-          <span className="font-mono text-muted-foreground">
-            {fmtDate(window.start)} → {fmtDate(window.end)}
           </span>
-        </span>
-        <span className="text-muted-foreground">
-          Call time (Calendly{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">start_time</code>)
-        </span>
+          <span className="font-mono text-sm text-foreground">
+            {fmtDate(window.start)} <span className="text-muted-foreground">→</span>{" "}
+            {fmtDate(window.end)}
+          </span>
+          <span className="ml-auto flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <Stat label="Calls" value={total} tone="accent" />
+            <Stat label="Prospects" value={uniqueInvitees} tone="indigo" />
+            <Stat label="Active" value={active} tone="green" />
+            <Stat label="Canceled" value={canceled} tone={canceled > 0 ? "rose" : "muted"} />
+          </span>
+        </div>
+
+        {(doubleBookings > 0 || canceledOnly > 0) && (
+          <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3 text-xs">
+            {doubleBookings > 0 && (
+              <Flag tone="rose">
+                ⚠ {doubleBookings} double-booked{" "}
+                <span className="text-rose-700/70">(multi-host conflict)</span>
+              </Flag>
+            )}
+            {canceledOnly > 0 && (
+              <Flag tone="amber">
+                {canceledOnly} canceled prospect{canceledOnly === 1 ? "" : "s"}{" "}
+                <span className="text-amber-700/70">(no active booking)</span>
+              </Flag>
+            )}
+          </div>
+        )}
       </div>
-      <DebugStrip debug={debug} />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <Card label="Matched Calls" value={total} valueClass="text-accent" />
-        <Card label="Unique Prospects" value={uniqueInvitees} valueClass="text-indigo-600" />
-        <Card label="Active Calls" value={active} valueClass="text-emerald-600" sub={pct(active)} />
-        <Card label="Canceled Calls" value={canceled} valueClass="text-rose-600" sub={pct(canceled)} />
-        <Card
-          label="Canceled Prospects"
-          value={canceledOnly}
-          valueClass="text-rose-600"
-          sub="without active booking"
-        />
-        <Card
-          label="Double Bookings"
-          value={doubleBookings}
-          valueClass={doubleBookings > 0 ? "text-rose-600" : "text-foreground"}
-          sub={doubleBookings > 0 ? "active multi-host conflict" : undefined}
-        />
-      </div>
+
+      {debug.windowsFailed > 0 && (
+        <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-xs text-rose-800">
+          <p className="font-medium">
+            ⚠ {debug.windowsFailed} of {debug.windowsTotal} time windows failed
+            to load. Results may be incomplete — try again, or use a shorter
+            range.
+          </p>
+          <details className="mt-1.5">
+            <summary className="cursor-pointer text-rose-700/80 hover:text-rose-700">
+              Show errors
+            </summary>
+            <ul className="mt-1 list-disc pl-4 font-mono text-[11px]">
+              {debug.fetchErrors.slice(0, 5).map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      )}
+
+      <TechnicalDetails debug={debug} />
     </section>
   );
 }
 
-function Card({
+function Stat({
   label,
   value,
-  valueClass,
-  sub,
+  tone,
 }: {
   label: string;
   value: number;
-  valueClass: string;
-  sub?: string;
+  tone: "accent" | "indigo" | "green" | "rose" | "muted";
 }) {
+  const toneCls =
+    tone === "accent"
+      ? "text-accent"
+      : tone === "indigo"
+      ? "text-indigo-600"
+      : tone === "green"
+      ? "text-emerald-600"
+      : tone === "rose"
+      ? "text-rose-600"
+      : "text-foreground/60";
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className={"font-mono text-xl font-semibold leading-none " + toneCls}>
+        {value}
+      </span>
+      <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
         {label}
-      </p>
-      <p className={"mt-2 font-mono text-3xl font-semibold leading-none " + valueClass}>{value}</p>
-      {sub ? <p className="mt-2 text-[11px] text-muted-foreground">{sub}</p> : null}
-    </div>
+      </span>
+    </span>
   );
 }
 
-function DebugStrip({ debug }: { debug: DebugStats }) {
+function Flag({
+  tone,
+  children,
+}: {
+  tone: "rose" | "amber";
+  children: React.ReactNode;
+}) {
+  const cls =
+    tone === "rose"
+      ? "border-rose-500/40 bg-rose-500/10 text-rose-700"
+      : "border-amber-500/40 bg-amber-500/10 text-amber-700";
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-2 font-mono text-[11px] text-muted-foreground">
-      <Step n={debug.eventTypesScanned}>event types scanned</Step>
-      <Arrow />
-      <Step n={debug.matchedTypes}>matched note</Step>
-      <Arrow />
-      <span>
-        <Num n={debug.eventsFetched} /> events{" "}
-        <span className="text-emerald-700">({debug.activeFetched} active</span>{" "}
-        <span className="text-rose-700">/ {debug.canceledFetched} canceled)</span>
-      </span>
-      <Arrow />
-      <Step n={debug.finalRows}>final bookings</Step>
+    <span className={"inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 " + cls}>
+      {children}
+    </span>
+  );
+}
+
+function TechnicalDetails({ debug }: { debug: DebugStats }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="text-[11px] text-muted-foreground">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="font-mono text-muted-foreground hover:text-foreground"
+      >
+        {open ? "▾" : "▸"} pipeline details
+      </button>
+      {open && (
+        <div className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-2 font-mono">
+          <Step n={debug.eventTypesScanned}>event types scanned</Step>
+          <Arrow />
+          <Step n={debug.matchedTypes}>matched funnel</Step>
+          <Arrow />
+          <Step n={debug.windowsTotal - debug.windowsFailed}>
+            of {debug.windowsTotal} windows ok
+          </Step>
+          <Arrow />
+          <span>
+            <Num n={debug.eventsFetched} /> events{" "}
+            <span className="text-emerald-700">({debug.activeFetched} active</span>{" "}
+            <span className="text-rose-700">/ {debug.canceledFetched} canceled)</span>
+          </span>
+          <Arrow />
+          <Step n={debug.finalRows}>final bookings</Step>
+        </div>
+      )}
     </div>
   );
 }

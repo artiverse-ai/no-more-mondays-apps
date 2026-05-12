@@ -1,7 +1,6 @@
 "use client";
 
 import { Row } from "../lib/types";
-import { normHostValue } from "../lib/format";
 
 export type ViewMode = "bookings" | "invitees" | "hosts";
 export type StatusFilter = "all" | "active" | "canceled";
@@ -31,7 +30,7 @@ export function FiltersBar(props: Props) {
     onExport,
   } = props;
 
-  const hostHostFiltered = allRows.filter((r) => hostMatches(r, hostFilter));
+  const uniqueInvitees = new Set(allRows.map((r) => r.inviteeEmail || r.id)).size;
   const allHosts = [
     ...new Set(
       allRows
@@ -40,73 +39,88 @@ export function FiltersBar(props: Props) {
     ),
   ].sort();
 
-  const uniqueInvitees = new Set(allRows.map((r) => r.inviteeEmail || r.id)).size;
-
   return (
-    <section className="space-y-3">
+    <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          View
-        </span>
+        {/* Tabs: bookings / by invitee / by host */}
         <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
-          <ToggleBtn on={viewMode === "bookings"} onClick={() => setViewMode("bookings")}>
-            Bookings ({filteredCount})
-          </ToggleBtn>
-          <ToggleBtn on={viewMode === "invitees"} onClick={() => setViewMode("invitees")}>
-            Group by Invitee ({uniqueInvitees})
-          </ToggleBtn>
-          <ToggleBtn on={viewMode === "hosts"} onClick={() => setViewMode("hosts")}>
-            Group by Host ({allHosts.length})
-          </ToggleBtn>
+          <Tab on={viewMode === "bookings"} onClick={() => setViewMode("bookings")}>
+            Bookings <Count n={filteredCount} />
+          </Tab>
+          <Tab on={viewMode === "invitees"} onClick={() => setViewMode("invitees")}>
+            By Invitee <Count n={uniqueInvitees} />
+          </Tab>
+          <Tab on={viewMode === "hosts"} onClick={() => setViewMode("hosts")}>
+            By Host <Count n={allHosts.length} />
+          </Tab>
         </div>
-        <div className="ml-auto">
-          <button
-            type="button"
-            onClick={onExport}
-            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:border-accent/40"
-          >
-            Export CSV ({filteredCount})
-          </button>
+
+        <div className="h-5 w-px bg-border" />
+
+        {/* Status chips — compact */}
+        <div className="inline-flex items-center gap-1.5">
+          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Status
+          </span>
+          <Chip on={statusFilter === "all"} tone="neutral" onClick={() => setStatusFilter("all")}>
+            All
+          </Chip>
+          <Chip on={statusFilter === "active"} tone="green" onClick={() => setStatusFilter("active")}>
+            Active
+          </Chip>
+          <Chip on={statusFilter === "canceled"} tone="red" onClick={() => setStatusFilter("canceled")}>
+            Canceled
+          </Chip>
         </div>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterLabel>Status</FilterLabel>
-        <Chip on={statusFilter === "all"} tone="neutral" onClick={() => setStatusFilter("all")}>
-          All ({hostHostFiltered.length})
-        </Chip>
-        <Chip on={statusFilter === "active"} tone="green" onClick={() => setStatusFilter("active")}>
-          Active
-        </Chip>
-        <Chip on={statusFilter === "canceled"} tone="red" onClick={() => setStatusFilter("canceled")}>
-          Canceled
-        </Chip>
-
-        {allHosts.length > 0 ? (
+        {/* Host dropdown — replaces the long row of host chips */}
+        {allHosts.length > 0 && (
           <>
-            <Divider />
-            <FilterLabel>Host</FilterLabel>
-            <Chip on={hostFilter === "all"} tone="neutral" onClick={() => setHostFilter("all")}>
-              All Hosts
-            </Chip>
-            {allHosts.map((h) => (
-              <Chip
-                key={h}
-                on={normHostValue(hostFilter) === normHostValue(h)}
-                tone="amber"
-                onClick={() => setHostFilter(h)}
+            <div className="h-5 w-px bg-border" />
+            <div className="inline-flex items-center gap-2">
+              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Host
+              </span>
+              <select
+                value={hostFilter}
+                onChange={(e) => setHostFilter(e.target.value)}
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground outline-none transition hover:border-accent/40 focus:border-accent focus:ring-2 focus:ring-accent/20"
               >
-                {h}
-              </Chip>
-            ))}
+                <option value="all">All hosts ({allHosts.length})</option>
+                {allHosts.map((h) => (
+                  <option key={h} value={h}>
+                    {h}
+                  </option>
+                ))}
+              </select>
+              {hostFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setHostFilter("all")}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  aria-label="Clear host filter"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </>
-        ) : null}
+        )}
+
+        {/* Export */}
+        <button
+          type="button"
+          onClick={onExport}
+          className="ml-auto rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-accent/40"
+        >
+          Export CSV ({filteredCount})
+        </button>
       </div>
     </section>
   );
 }
 
-function ToggleBtn({
+function Tab({
   on,
   onClick,
   children,
@@ -129,6 +143,10 @@ function ToggleBtn({
   );
 }
 
+function Count({ n }: { n: number }) {
+  return <span className="ml-1 opacity-70">({n})</span>;
+}
+
 function Chip({
   on,
   tone,
@@ -136,7 +154,7 @@ function Chip({
   children,
 }: {
   on: boolean;
-  tone: "neutral" | "green" | "red" | "amber";
+  tone: "neutral" | "green" | "red";
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -145,8 +163,6 @@ function Chip({
       ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700"
       : tone === "red"
       ? "border-rose-500/50 bg-rose-500/10 text-rose-700"
-      : tone === "amber"
-      ? "border-amber-500/50 bg-amber-500/10 text-amber-700"
       : "border-primary bg-primary/10 text-primary";
   const offStyles =
     "border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground";
@@ -154,37 +170,10 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={"rounded-full border px-3 py-1 text-xs font-medium transition " + (on ? onStyles : offStyles)}
+      className={"rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition " + (on ? onStyles : offStyles)}
     >
       {children}
     </button>
   );
 }
 
-function FilterLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-      {children}
-    </span>
-  );
-}
-
-function Divider() {
-  return <span className="mx-1 h-4 w-px bg-border" />;
-}
-
-function hostMatches(r: Row, selectedHost: string): boolean {
-  if (!selectedHost || selectedHost === "all") return true;
-  const selected = normHostValue(selectedHost);
-  const vals = [
-    ...r.hostNames,
-    ...r.hostEmails,
-    r.hostName,
-    r.hostEmail,
-    r.allHosts,
-    r.allHostEmails,
-  ]
-    .filter(Boolean)
-    .map(normHostValue);
-  return vals.some((h) => h === selected || h.includes(selected));
-}

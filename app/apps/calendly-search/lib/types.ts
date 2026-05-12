@@ -116,6 +116,9 @@ export type DebugStats = {
   activeFetched: number;
   canceledFetched: number;
   finalRows: number;
+  windowsTotal: number;
+  windowsFailed: number;
+  fetchErrors: string[];
 };
 
 export type SearchProgress = {

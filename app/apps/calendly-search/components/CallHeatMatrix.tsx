@@ -44,6 +44,8 @@ const fmtDialogDay = new Intl.DateTimeFormat("en-US", {
 type CellKey = string; // `${date}|${hour}`
 const cellKey = (date: string, hour: string): CellKey => `${date}|${hour}`;
 
+type StatusSplit = { active: number; canceled: number };
+
 type StatusFilter = "all" | "active" | "canceled";
 
 // Heatmap of call volume by date × hour-of-day (Eastern Time). Each cell is
@@ -70,7 +72,7 @@ export function CallHeatMatrix({
     rows: Row[];
   } | null>(null);
 
-  const { dateCols, hourRows, cellMap, rowTotals, colTotals, max, truncated } = useMemo(() => {
+  const { dateCols, hourRows, cellMap, rowTotals, colTotals, grandActive, grandCanceled, max, truncated } = useMemo(() => {
     const byCell = new Map<CellKey, Row[]>();
     const allDates = new Set<string>();
     const allHours = new Set<string>();
@@ -99,13 +101,25 @@ export function CallHeatMatrix({
       if (colsSet.has(date)) cellMap.set(k, v);
     }
 
-    const rowTotals = new Map<string, number>();
-    const colTotals = new Map<string, number>();
+    const rowTotals = new Map<string, StatusSplit>();
+    const colTotals = new Map<string, StatusSplit>();
+    let grandActive = 0;
+    let grandCanceled = 0;
     let max = 0;
     for (const [k, v] of cellMap) {
       const [date, hour] = k.split("|");
-      rowTotals.set(hour, (rowTotals.get(hour) ?? 0) + v.length);
-      colTotals.set(date, (colTotals.get(date) ?? 0) + v.length);
+      const a = v.filter((r) => r.status === "active").length;
+      const c = v.length - a;
+      const rT = rowTotals.get(hour) ?? { active: 0, canceled: 0 };
+      rT.active += a;
+      rT.canceled += c;
+      rowTotals.set(hour, rT);
+      const cT = colTotals.get(date) ?? { active: 0, canceled: 0 };
+      cT.active += a;
+      cT.canceled += c;
+      colTotals.set(date, cT);
+      grandActive += a;
+      grandCanceled += c;
       if (v.length > max) max = v.length;
     }
 
@@ -115,6 +129,8 @@ export function CallHeatMatrix({
       cellMap,
       rowTotals,
       colTotals,
+      grandActive,
+      grandCanceled,
       max,
       truncated,
     };
@@ -196,16 +212,16 @@ export function CallHeatMatrix({
               <div className="flex items-center justify-end border-r border-border px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.14em]">
                 Total
               </div>
-              {dateCols.map((d) => (
-                <div
-                  key={d}
-                  className="flex items-center justify-center border-l border-border py-2 font-heading text-sm font-semibold tabular-nums"
-                >
-                  {colTotals.get(d) ?? 0}
-                </div>
-              ))}
-              <div className="flex items-center justify-center border-l-2 border-foreground/30 bg-accent/15 py-2 font-heading text-base font-semibold tabular-nums text-accent">
-                {rows.length}
+              {dateCols.map((d) => {
+                const t = colTotals.get(d) ?? { active: 0, canceled: 0 };
+                return (
+                  <div key={d} className="border-l border-border p-0">
+                    <TotalSplit active={t.active} canceled={t.canceled} emphasis="md" />
+                  </div>
+                );
+              })}
+              <div className="border-l-2 border-foreground/30 bg-accent/10 p-0">
+                <TotalSplit active={grandActive} canceled={grandCanceled} emphasis="lg" />
               </div>
             </div>
 
@@ -250,8 +266,11 @@ export function CallHeatMatrix({
                     />
                   );
                 })}
-                <div className="flex items-center justify-center border-l-2 border-foreground/30 bg-secondary/40 py-2 text-sm font-semibold tabular-nums">
-                  {rowTotals.get(hour) ?? 0}
+                <div className="border-l-2 border-foreground/30 bg-secondary/30 p-0">
+                  {(() => {
+                    const t = rowTotals.get(hour) ?? { active: 0, canceled: 0 };
+                    return <TotalSplit active={t.active} canceled={t.canceled} emphasis="sm" />;
+                  })()}
                 </div>
               </div>
             ))}
@@ -300,21 +319,23 @@ function HeatCell({
   const canceledBg = `rgba(220, 38, 38, ${alpha})`; // red-600
 
   return (
-    <div className="relative flex min-h-[40px] flex-row border-l border-border">
+    <div className="flex min-h-[40px] flex-row border-l border-border">
       {activeCount > 0 ? (
         <button
           type="button"
           onClick={() => onClickStatus("active")}
           style={{ flex: activeCount, backgroundColor: activeBg }}
           className={
-            "h-full transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
+            "flex h-full items-center justify-center overflow-hidden font-mono text-[11px] font-semibold tabular-nums text-emerald-950 transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
             (statusFilter === "active"
               ? "ring-1 ring-inset ring-emerald-900/40"
               : "")
           }
           title={`${activeCount} active · click to filter`}
           aria-label={`${activeCount} active calls`}
-        />
+        >
+          {activeCount}
+        </button>
       ) : null}
       {canceledCount > 0 ? (
         <button
@@ -322,29 +343,66 @@ function HeatCell({
           onClick={() => onClickStatus("canceled")}
           style={{ flex: canceledCount, backgroundColor: canceledBg }}
           className={
-            "h-full transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
+            "flex h-full items-center justify-center overflow-hidden font-mono text-[11px] font-semibold tabular-nums text-rose-950 transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
             (statusFilter === "canceled"
               ? "ring-1 ring-inset ring-rose-900/40"
               : "")
           }
           title={`${canceledCount} canceled · click to filter`}
           aria-label={`${canceledCount} canceled calls`}
-        />
+        >
+          {canceledCount}
+        </button>
       ) : null}
-      <span
-        className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[11px] font-semibold tabular-nums text-foreground"
-        style={{ textShadow: "0 0 3px rgba(255,255,255,0.85)" }}
-      >
-        {activeCount > 0 && canceledCount > 0 ? (
-          <>
-            <span className="text-emerald-900">{activeCount}</span>
-            <span className="mx-0.5 opacity-50">·</span>
-            <span className="text-rose-900">{canceledCount}</span>
-          </>
-        ) : (
-          total
-        )}
-      </span>
+    </div>
+  );
+}
+
+// Same active/canceled split treatment as HeatCell, but used in the column-
+// and row-total rows. Non-interactive (no click handlers), no intensity
+// scaling — totals always show full saturation so they read as headline
+// numbers vs. the body cells.
+function TotalSplit({
+  active,
+  canceled,
+  emphasis,
+}: {
+  active: number;
+  canceled: number;
+  emphasis: "sm" | "md" | "lg";
+}) {
+  const total = active + canceled;
+  if (total === 0) {
+    return (
+      <div className="flex h-full items-center justify-center py-2 text-muted-foreground/40">
+        —
+      </div>
+    );
+  }
+  const sizeCls =
+    emphasis === "lg"
+      ? "text-base font-heading font-semibold py-2"
+      : emphasis === "md"
+      ? "text-sm font-heading font-semibold py-2"
+      : "text-xs font-mono font-semibold py-2";
+  return (
+    <div className="flex h-full min-h-[36px] flex-row">
+      {active > 0 ? (
+        <div
+          style={{ flex: active, backgroundColor: "rgba(22, 163, 74, 0.8)" }}
+          className={`flex items-center justify-center text-emerald-950 tabular-nums ${sizeCls}`}
+        >
+          {active}
+        </div>
+      ) : null}
+      {canceled > 0 ? (
+        <div
+          style={{ flex: canceled, backgroundColor: "rgba(220, 38, 38, 0.8)" }}
+          className={`flex items-center justify-center text-rose-950 tabular-nums ${sizeCls}`}
+        >
+          {canceled}
+        </div>
+      ) : null}
     </div>
   );
 }

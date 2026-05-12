@@ -11,7 +11,11 @@ const isPublic = createRouteMatcher([
 ]);
 
 const handler = clerkMiddleware(async (auth, req) => {
-  if (!isPublic(req)) await auth.protect();
+  if (isPublic(req)) return;
+  // `auth.protect()` returns 404 by default for unauth'd requests. For UI
+  // routes we want the visitor sent to the sign-in page instead.
+  const { userId, redirectToSignIn } = await auth();
+  if (!userId) return redirectToSignIn();
 });
 
 export default function proxy(req: NextRequest, event: NextFetchEvent) {

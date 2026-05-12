@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/cf-access";
+import { SopsRail, type SopRailEntry } from "./SopsRail";
 
 type Tile = {
   href: string;
@@ -36,34 +37,30 @@ const dashboards: Tile[] = [
   },
 ];
 
-const sops: Tile[] = [
+const sops: SopRailEntry[] = [
   {
     href: "/sops/how-to-read-capacity-dashboard",
     title: "How to read the capacity dashboard",
     description:
       "What every chart, KPI, and matrix cell means on the team-availability dashboard.",
-    status: "live",
   },
   {
     href: "/sops/closer-calendar-management",
     title: "Calendar management for closers",
     description:
-      "Share your calendar, block your busy time, set the right timezone — for new closers and as a reference.",
-    status: "live",
+      "Share your calendar, block your busy time, set the right timezone.",
   },
   {
     href: "/sops/new-closer-joins",
     title: "When a new closer joins",
     description:
-      "Ops walkthrough for onboarding a closer end-to-end: calendar share, active list, verification.",
-    status: "live",
+      "Ops walkthrough for onboarding a closer end-to-end.",
   },
   {
     href: "/sops/closer-removed",
     title: "When a closer is removed",
     description:
-      "Cleanly remove a closer without breaking attribution or stranding their in-flight calls.",
-    status: "live",
+      "Cleanly remove a closer without breaking attribution.",
   },
 ];
 
@@ -145,41 +142,48 @@ export default async function HomePage() {
   const user = await getCurrentUser();
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-10 p-6 md:p-10">
-      <header className="space-y-2 border-b border-border pb-8">
-        <div className="flex items-start justify-between gap-6">
-          <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
-              No More Mondays
-            </p>
-            <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">
-              Internal apps &amp; dashboards
-            </h1>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              Pick a tool below. Apps are interactive workflows; dashboards are
-              analytics views.
-            </p>
-          </div>
-          {user?.isAdmin ? (
-            <Link
-              href="/admin"
-              className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground shadow-sm hover:border-accent hover:text-accent"
-            >
-              Admin
-            </Link>
-          ) : null}
-        </div>
-        {user ? (
-          <p className="pt-1 text-xs text-muted-foreground">
-            Signed in as{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5">{user.email}</code>
-          </p>
-        ) : null}
-      </header>
+    <main className="mx-auto w-full max-w-7xl p-6 md:p-10">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="flex min-w-0 flex-1 flex-col space-y-10">
+          <header className="space-y-2 border-b border-border pb-8">
+            <div className="flex items-start justify-between gap-6">
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
+                  No More Mondays
+                </p>
+                <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">
+                  Internal apps &amp; dashboards
+                </h1>
+                <p className="max-w-2xl text-sm text-muted-foreground">
+                  Pick a tool below. Apps are interactive workflows; dashboards
+                  are analytics views.
+                </p>
+              </div>
+              {user?.isAdmin ? (
+                <Link
+                  href="/admin"
+                  className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground shadow-sm hover:border-accent hover:text-accent"
+                >
+                  Admin
+                </Link>
+              ) : null}
+            </div>
+            {user ? (
+              <p className="pt-1 text-xs text-muted-foreground">
+                Signed in as{" "}
+                <code className="rounded bg-muted px-1.5 py-0.5">
+                  {user.email}
+                </code>
+              </p>
+            ) : null}
+          </header>
 
-      <Section title="Apps" tiles={apps} />
-      <Section title="Dashboards" tiles={dashboards} />
-      <Section title="SOPs" tiles={sops} />
+          <Section title="Apps" tiles={apps} />
+          <Section title="Dashboards" tiles={dashboards} />
+        </div>
+
+        <SopsRail sops={sops} />
+      </div>
     </main>
   );
 }

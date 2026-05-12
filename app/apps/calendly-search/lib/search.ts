@@ -181,7 +181,14 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
   const matchedTypeByUri = new Map(matchedTypes.map((t) => [t.uri, t]));
 
   if (matchedTypes.length === 0) {
-    return { rows: [], matchedEventTypes: [], debug, rawById };
+    const earlyRange = getUserDateRange(opts);
+    return {
+      rows: [],
+      matchedEventTypes: [],
+      debug,
+      window: { start: earlyRange.start.toISOString(), end: earlyRange.end.toISOString() },
+      rawById,
+    };
   }
 
   tick(
@@ -189,8 +196,13 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     25,
   );
 
-  // Phase 5 — fetch scheduled events org-wide, filter locally by event_type
+  // Phase 5 — fetch scheduled events org-wide, filter locally by event_type.
+  // Calendly's /scheduled_events caps the (min_start_time, max_start_time)
+  // window at 1 year per request, so we chunk longer horizons (e.g. the
+  // "Future" preset) into 365-day pieces and fan them out together with the
+  // active/canceled status fan-out.
   const userRange = getUserDateRange(opts);
+  const windows = chunkWindow(userRange.start, userRange.end);
 
   type Candidate = {
     event: CalendlyScheduledEvent;
@@ -198,15 +210,22 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
   };
   const eventMap = new Map<string, Candidate>();
 
-  const statuses: ("active" | "canceled")[] = ["active", "canceled"];
+  type Task = {
+    status: "active" | "canceled";
+    window: { min: Date; max: Date };
+  };
+  const tasks: Task[] = [];
+  for (const status of ["active", "canceled"] as const) {
+    for (const window of windows) tasks.push({ status, window });
+  }
 
   await runWithConcurrency(
-    statuses,
-    async (status) => {
+    tasks,
+    async ({ status, window }) => {
       const events = await fetchAllPages<CalendlyScheduledEvent>("/scheduled_events", {
         organization: orgUri,
-        min_start_time: userRange.start.toISOString(),
-        max_start_time: userRange.end.toISOString(),
+        min_start_time: window.min.toISOString(),
+        max_start_time: window.max.toISOString(),
         status,
         sort: "start_time:desc",
       });
@@ -221,16 +240,20 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
         eventMap.set(ev.uri, { event: ev, eventType: et });
       }
     },
-    (done, total, status) => {
+    (done, total) => {
       const pct = 25 + Math.round((done / total) * 30);
-      tick(`Fetching ${status} events (${done}/${total})`, pct);
+      tick(`Fetching events (${done}/${total} windows)`, pct);
     },
   );
 
   const candidates = Array.from(eventMap.values());
   debug.eventsFetched = candidates.length;
+  const windowOut = {
+    start: userRange.start.toISOString(),
+    end: userRange.end.toISOString(),
+  };
   if (candidates.length === 0) {
-    return { rows: [], matchedEventTypes: matchedTypes, debug, rawById };
+    return { rows: [], matchedEventTypes: matchedTypes, debug, window: windowOut, rawById };
   }
 
   // Phase 6 — invitees per event in parallel
@@ -297,7 +320,26 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
   debug.finalRows = rows.length;
 
   tick("Done", 100);
-  return { rows, matchedEventTypes: matchedTypes, debug, rawById };
+  return { rows, matchedEventTypes: matchedTypes, debug, window: windowOut, rawById };
+}
+
+// Calendly's /scheduled_events caps the time-range per request at 1 year.
+// We chunk to be safe — pick 360d to leave a small margin under whatever
+// the exact upstream limit is.
+const MAX_WINDOW_DAYS = 360;
+
+function chunkWindow(start: Date, end: Date): { min: Date; max: Date }[] {
+  const out: { min: Date; max: Date }[] = [];
+  const chunkMs = MAX_WINDOW_DAYS * 86400000;
+  let cur = start.getTime();
+  const stop = end.getTime();
+  while (cur < stop) {
+    const next = Math.min(cur + chunkMs, stop);
+    out.push({ min: new Date(cur), max: new Date(next) });
+    cur = next;
+  }
+  if (out.length === 0) out.push({ min: start, max: end });
+  return out;
 }
 
 function getActivePreset(presetKey: PresetKey): Preset {
@@ -306,6 +348,7 @@ function getActivePreset(presetKey: PresetKey): Preset {
 
 // 5 years out — Calendly requires a max_start_time, so "future" still needs
 // an upper bound. Bookings further out than 5 years aren't a realistic case.
+// chunkWindow() splits this into Calendly's 1-year-per-request limit.
 const FUTURE_HORIZON_MS = 5 * 365 * 86400000;
 
 function getUserDateRange(opts: SearchOptions): { start: Date; end: Date } {

@@ -130,6 +130,9 @@ export type SearchResult = {
   rows: Row[];
   matchedEventTypes: CalendlyEventType[];
   debug: DebugStats;
+  // The actual call-time window that was queried. Surfaced in the UI so the
+  // user can verify "Future" really did cover their range.
+  window: { start: string; end: string };
   // event_uri/invitee uri → original API payloads, used by JsonModal.
   rawById: Map<
     string,

@@ -42,26 +42,29 @@ export function SearchForm(props: Props) {
     <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="space-y-5">
         <div>
-          <Label>Internal Note</Label>
+          <Label>Funnel (Calendly Internal Notes)</Label>
           <MultiSelect
             options={availableNotes}
             value={notes}
             onChange={setNotes}
             loading={notesLoading}
-            placeholder="Pick one or more internal notes…"
+            placeholder="Pick one or more funnels…"
             emptyMessage={
               notesError
-                ? "Couldn't load options — check CALENDLY_PAT"
-                : "No internal notes set on any event type"
+                ? "Couldn't load funnels — check CALENDLY_PAT"
+                : "No funnels set on any event type"
             }
-            searchPlaceholder="Search notes…"
+            searchPlaceholder="Search funnels…"
           />
           {notesError ? (
             <p className="mt-1.5 text-xs text-destructive">{notesError}</p>
           ) : (
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Pulled from every active event type across the org. Pick any
-              subset, or <em>Select all</em> to query the whole tagged universe.
+              Funnels are pulled from every event type&apos;s
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[10px]">
+                internal_note
+              </code>
+              field. Defaults to all selected — clear any you don&apos;t want.
             </p>
           )}
         </div>

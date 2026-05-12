@@ -9,7 +9,7 @@ export function exportCsv(rows: Row[]) {
     "Event Type",
     "Event Type Kind",
     "Pooling Type",
-    "Internal Note",
+    "Funnel",
     "Host",
     "Host Email",
     "All Hosts",

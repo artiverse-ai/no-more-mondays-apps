@@ -19,7 +19,7 @@ const COLS: [SortField, string][] = [
   ["inviteeEmail", "Email"],
   ["status", "Status"],
   ["eventTypeName", "Event Type"],
-  ["internalNote", "Internal Note"],
+  ["internalNote", "Funnel"],
   ["hostName", "Host"],
   ["startTime", "Call Time"],
   ["createdAt", "Booked At"],

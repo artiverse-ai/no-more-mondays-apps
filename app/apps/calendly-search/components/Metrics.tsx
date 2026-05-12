@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendlyEventType, DebugStats, Row } from "../lib/types";
-import { normHostValue } from "../lib/format";
+import { fmtDate, normHostValue } from "../lib/format";
 
 type Props = {
   rows: Row[];
@@ -9,9 +9,10 @@ type Props = {
   hostFilter: string;
   matchedEventTypes: CalendlyEventType[];
   debug: DebugStats;
+  window: { start: string; end: string };
 };
 
-export function Metrics({ rows, allRows, hostFilter, debug }: Props) {
+export function Metrics({ rows, allRows, hostFilter, debug, window }: Props) {
   const total = rows.length;
   const active = rows.filter((r) => r.status === "active").length;
   const canceled = rows.filter((r) => r.status === "canceled").length;
@@ -53,6 +54,20 @@ export function Metrics({ rows, allRows, hostFilter, debug }: Props) {
 
   return (
     <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-accent/30 bg-accent/5 px-4 py-2 text-xs text-foreground">
+        <span>
+          <span className="font-medium uppercase tracking-[0.14em] text-accent/80">
+            Window
+          </span>{" "}
+          <span className="font-mono text-muted-foreground">
+            {fmtDate(window.start)} → {fmtDate(window.end)}
+          </span>
+        </span>
+        <span className="text-muted-foreground">
+          Call time (Calendly{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">start_time</code>)
+        </span>
+      </div>
       <DebugStrip debug={debug} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <Card label="Matched Calls" value={total} valueClass="text-accent" />

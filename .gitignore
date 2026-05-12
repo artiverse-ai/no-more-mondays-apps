@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Claude Code session state
 .claude/
+
+# clerk configuration (can include secrets)
+/.clerk/

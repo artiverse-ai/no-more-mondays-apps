@@ -3,14 +3,15 @@
 import { Row } from "../lib/types";
 import { normHostValue } from "../lib/format";
 
+export type ViewMode = "bookings" | "invitees" | "hosts";
+export type StatusFilter = "all" | "active" | "canceled";
+
 type Props = {
   allRows: Row[];
-  viewMode: "bookings" | "invitees";
-  setViewMode: (m: "bookings" | "invitees") => void;
-  statusFilter: "all" | "active" | "canceled";
-  setStatusFilter: (s: "all" | "active" | "canceled") => void;
-  funnelFilter: "all" | "on-funnel" | "off-funnel";
-  setFunnelFilter: (f: "all" | "on-funnel" | "off-funnel") => void;
+  viewMode: ViewMode;
+  setViewMode: (m: ViewMode) => void;
+  statusFilter: StatusFilter;
+  setStatusFilter: (s: StatusFilter) => void;
   hostFilter: string;
   setHostFilter: (h: string) => void;
   filteredCount: number;
@@ -24,8 +25,6 @@ export function FiltersBar(props: Props) {
     setViewMode,
     statusFilter,
     setStatusFilter,
-    funnelFilter,
-    setFunnelFilter,
     hostFilter,
     setHostFilter,
     filteredCount,
@@ -33,8 +32,6 @@ export function FiltersBar(props: Props) {
   } = props;
 
   const hostHostFiltered = allRows.filter((r) => hostMatches(r, hostFilter));
-  const offFunnelInResults = allRows.filter((r) => r.isOffFunnel).length;
-  const onFunnelInResults = allRows.length - offFunnelInResults;
   const allHosts = [
     ...new Set(
       allRows
@@ -57,6 +54,9 @@ export function FiltersBar(props: Props) {
           </ToggleBtn>
           <ToggleBtn on={viewMode === "invitees"} onClick={() => setViewMode("invitees")}>
             Group by Invitee ({uniqueInvitees})
+          </ToggleBtn>
+          <ToggleBtn on={viewMode === "hosts"} onClick={() => setViewMode("hosts")}>
+            Group by Host ({allHosts.length})
           </ToggleBtn>
         </div>
         <div className="ml-auto">
@@ -81,22 +81,6 @@ export function FiltersBar(props: Props) {
         <Chip on={statusFilter === "canceled"} tone="red" onClick={() => setStatusFilter("canceled")}>
           Canceled
         </Chip>
-
-        {offFunnelInResults > 0 && onFunnelInResults > 0 ? (
-          <>
-            <Divider />
-            <FilterLabel>Funnel</FilterLabel>
-            <Chip on={funnelFilter === "all"} tone="neutral" onClick={() => setFunnelFilter("all")}>
-              All
-            </Chip>
-            <Chip on={funnelFilter === "on-funnel"} tone="green" onClick={() => setFunnelFilter("on-funnel")}>
-              On-funnel ({onFunnelInResults})
-            </Chip>
-            <Chip on={funnelFilter === "off-funnel"} tone="amber" onClick={() => setFunnelFilter("off-funnel")}>
-              Rescheduled away ({offFunnelInResults})
-            </Chip>
-          </>
-        ) : null}
 
         {allHosts.length > 0 ? (
           <>

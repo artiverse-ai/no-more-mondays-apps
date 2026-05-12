@@ -1,27 +1,19 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SearchForm } from "./components/SearchForm";
 import { ProgressStrip } from "./components/ProgressStrip";
 import { Metrics } from "./components/Metrics";
-import { FiltersBar } from "./components/FiltersBar";
+import { FiltersBar, StatusFilter, ViewMode } from "./components/FiltersBar";
 import { BookingsTable } from "./components/BookingsTable";
 import { InviteesTable } from "./components/InviteesTable";
+import { HostsTable } from "./components/HostsTable";
 import { JsonModal } from "./components/JsonModal";
 import { runSearch } from "./lib/search";
-import {
-  DateFilterMode,
-  PresetKey,
-  Row,
-  SearchProgress,
-  SearchResult,
-} from "./lib/types";
+import { PresetKey, Row, SearchProgress, SearchResult } from "./lib/types";
 import { exportCsv } from "./lib/csv";
 import { normHostValue } from "./lib/format";
 
-type ViewMode = "bookings" | "invitees";
-type StatusFilter = "all" | "active" | "canceled";
-type FunnelFilter = "all" | "on-funnel" | "off-funnel";
 type SortField =
   | "inviteeName"
   | "inviteeEmail"
@@ -34,11 +26,41 @@ type SortField =
 
 export function SearchClient() {
   // ---- search inputs ----
-  const [note, setNote] = useState("");
-  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("booked");
+  const [notes, setNotes] = useState<string[]>([]);
+  const [availableNotes, setAvailableNotes] = useState<string[]>([]);
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [notesError, setNotesError] = useState<string | null>(null);
   const [presetKey, setPresetKey] = useState<PresetKey>("last7d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
+
+  // Pull the discrete set of internal_note values on mount. Cached for 5 min
+  // server-side, so revisiting the page is instant.
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch("/api/calendly/internal-notes", {
+          signal: controller.signal,
+        });
+        const data: { notes?: string[]; error?: string } = await res
+          .json()
+          .catch(() => ({}));
+        if (!res.ok) {
+          setNotesError(data.error || `Failed to load options (${res.status})`);
+        } else {
+          setAvailableNotes(data.notes ?? []);
+        }
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          setNotesError((e as Error).message);
+        }
+      } finally {
+        setNotesLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, []);
 
   // ---- pipeline state ----
   const [loading, setLoading] = useState(false);
@@ -50,17 +72,16 @@ export function SearchClient() {
   // ---- view + filters ----
   const [viewMode, setViewMode] = useState<ViewMode>("bookings");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [funnelFilter, setFunnelFilter] = useState<FunnelFilter>("all");
   const [hostFilter, setHostFilter] = useState<string>("all");
-  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortField, setSortField] = useState<SortField>("startTime");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   // ---- modal ----
   const [modalRowId, setModalRowId] = useState<string | null>(null);
 
   const onSearch = async () => {
-    if (!note.trim()) {
-      setError("Enter internal note text to search for.");
+    if (notes.length === 0) {
+      setError("Pick at least one internal note to search for.");
       return;
     }
     if (presetKey === "custom" && (!customStart || !customEnd)) {
@@ -75,8 +96,7 @@ export function SearchClient() {
     abortRef.current = controller;
     try {
       const res = await runSearch({
-        note: note.trim(),
-        dateFilterMode,
+        notes,
         presetKey,
         customStart,
         customEnd,
@@ -105,16 +125,13 @@ export function SearchClient() {
     return result.rows
       .filter((r) => statusFilter === "all" || r.status === statusFilter)
       .filter((r) => hostMatches(r, hostFilter))
-      .filter((r) =>
-        funnelFilter === "all" ? true : funnelFilter === "on-funnel" ? !r.isOffFunnel : r.isOffFunnel,
-      )
       .sort((a, b) => {
         const va = (a[sortField] ?? "") as string | number;
         const vb = (b[sortField] ?? "") as string | number;
         const cmp = va < vb ? -1 : va > vb ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [result, statusFilter, hostFilter, funnelFilter, sortField, sortDir]);
+  }, [result, statusFilter, hostFilter, sortField, sortDir]);
 
   const onSort = (field: SortField) => {
     if (sortField === field) {
@@ -130,10 +147,11 @@ export function SearchClient() {
   return (
     <div className="space-y-6">
       <SearchForm
-        note={note}
-        setNote={setNote}
-        dateFilterMode={dateFilterMode}
-        setDateFilterMode={setDateFilterMode}
+        notes={notes}
+        setNotes={setNotes}
+        availableNotes={availableNotes}
+        notesLoading={notesLoading}
+        notesError={notesError}
         presetKey={presetKey}
         setPresetKey={setPresetKey}
         customStart={customStart}
@@ -159,10 +177,8 @@ export function SearchClient() {
             rows={filtered}
             allRows={result.rows}
             hostFilter={hostFilter}
-            funnelFilter={funnelFilter}
             matchedEventTypes={result.matchedEventTypes}
             debug={result.debug}
-            dateFilterMode={dateFilterMode}
           />
 
           <FiltersBar
@@ -171,12 +187,10 @@ export function SearchClient() {
             setViewMode={setViewMode}
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
-            funnelFilter={funnelFilter}
-            setFunnelFilter={setFunnelFilter}
             hostFilter={hostFilter}
             setHostFilter={setHostFilter}
             filteredCount={filtered.length}
-            onExport={() => exportCsv(filtered, dateFilterMode)}
+            onExport={() => exportCsv(filtered)}
           />
 
           {viewMode === "bookings" ? (
@@ -189,8 +203,15 @@ export function SearchClient() {
               matchedEventTypes={result.matchedEventTypes}
               onInspect={setModalRowId}
             />
-          ) : (
+          ) : viewMode === "invitees" ? (
             <InviteesTable
+              rows={filtered}
+              totalRows={result.rows.length}
+              matchedEventTypes={result.matchedEventTypes}
+              onInspect={setModalRowId}
+            />
+          ) : (
+            <HostsTable
               rows={filtered}
               totalRows={result.rows.length}
               matchedEventTypes={result.matchedEventTypes}

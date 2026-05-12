@@ -1,36 +1,25 @@
 "use client";
 
-import {
-  CalendlyEventType,
-  DateFilterMode,
-  DebugStats,
-  Row,
-} from "../lib/types";
+import { CalendlyEventType, DebugStats, Row } from "../lib/types";
 import { normHostValue } from "../lib/format";
 
 type Props = {
   rows: Row[];
   allRows: Row[];
   hostFilter: string;
-  funnelFilter: "all" | "on-funnel" | "off-funnel";
   matchedEventTypes: CalendlyEventType[];
   debug: DebugStats;
-  dateFilterMode: DateFilterMode;
 };
 
-export function Metrics({ rows, allRows, hostFilter, funnelFilter, debug, dateFilterMode }: Props) {
+export function Metrics({ rows, allRows, hostFilter, debug }: Props) {
   const total = rows.length;
   const active = rows.filter((r) => r.status === "active").length;
   const canceled = rows.filter((r) => r.status === "canceled").length;
   const uniqueInvitees = new Set(rows.map((r) => r.inviteeEmail || r.id)).size;
 
-  // Prospects who canceled and have no active booking (host/funnel scope only;
+  // Prospects who canceled and have no active booking (host scope only;
   // ignore the Status chip so toggling it doesn't change this count).
-  const scope = allRows
-    .filter((r) => hostMatches(r, hostFilter))
-    .filter((r) =>
-      funnelFilter === "all" ? true : funnelFilter === "on-funnel" ? !r.isOffFunnel : r.isOffFunnel,
-    );
+  const scope = allRows.filter((r) => hostMatches(r, hostFilter));
   const prospect = new Map<string, { active: boolean; canceled: boolean }>();
   for (const r of scope) {
     const key = r.inviteeEmail || r.id;
@@ -64,7 +53,7 @@ export function Metrics({ rows, allRows, hostFilter, funnelFilter, debug, dateFi
 
   return (
     <section className="space-y-4">
-      <DebugStrip debug={debug} dateFilterMode={dateFilterMode} />
+      <DebugStrip debug={debug} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <Card label="Matched Calls" value={total} valueClass="text-accent" />
         <Card label="Unique Prospects" value={uniqueInvitees} valueClass="text-indigo-600" />
@@ -109,7 +98,7 @@ function Card({
   );
 }
 
-function DebugStrip({ debug, dateFilterMode }: { debug: DebugStats; dateFilterMode: DateFilterMode }) {
+function DebugStrip({ debug }: { debug: DebugStats }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-2 font-mono text-[11px] text-muted-foreground">
       <Step n={debug.eventTypesScanned}>event types scanned</Step>
@@ -121,20 +110,6 @@ function DebugStrip({ debug, dateFilterMode }: { debug: DebugStats; dateFilterMo
         <span className="text-emerald-700">({debug.activeFetched} active</span>{" "}
         <span className="text-rose-700">/ {debug.canceledFetched} canceled)</span>
       </span>
-      {debug.offFunnelCount > 0 ? (
-        <>
-          <Sep />
-          <span className="text-amber-700">
-            <Num n={debug.offFunnelCount} className="text-amber-700" /> off-funnel (rescheduled away)
-          </span>
-        </>
-      ) : null}
-      {dateFilterMode === "booked" ? (
-        <>
-          <Arrow />
-          <Step n={debug.afterBookedFilter}>after booked-at filter</Step>
-        </>
-      ) : null}
       <Arrow />
       <Step n={debug.finalRows}>final bookings</Step>
     </div>
@@ -153,9 +128,6 @@ function Num({ n, className = "text-foreground" }: { n: number; className?: stri
 }
 function Arrow() {
   return <span className="text-border">→</span>;
-}
-function Sep() {
-  return <span className="text-border">·</span>;
 }
 
 function hostMatches(r: Row, selectedHost: string): boolean {

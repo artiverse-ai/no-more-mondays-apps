@@ -54,9 +54,6 @@ export type Row = {
   eventTypeKind: string;
   eventTypePooling: string | null;
   internalNote: string;
-  isOffFunnel: boolean;
-  possibleOffFunnel: boolean;
-  funnelEventTypeName: string;
   hostName: string;
   hostEmail: string;
   hostNames: string[];
@@ -77,11 +74,7 @@ export type Row = {
   _event: CalendlyScheduledEvent;
   _invitee: CalendlyInvitee;
   _eventType: CalendlyEventType;
-  _matchedEventType: CalendlyEventType | null;
-  _actualEventType: CalendlyEventType | null;
 };
-
-export type DateFilterMode = "booked" | "appointment";
 
 export type PresetKey =
   | "last4h"
@@ -92,27 +85,28 @@ export type PresetKey =
   | "next4d"
   | "next7d"
   | "next14d"
+  | "future"
   | "custom";
 
 export type Preset = {
   key: PresetKey;
   label: string;
-  direction: "past" | "future" | "custom";
+  direction: "past" | "future" | "all-future" | "custom";
   amount: number | null;
   unit: "hours" | "days" | null;
-  modes: DateFilterMode[];
 };
 
 export const PRESETS: Preset[] = [
-  { key: "last4h", label: "Last 4h", direction: "past", amount: 4, unit: "hours", modes: ["booked", "appointment"] },
-  { key: "last24h", label: "Last 24h", direction: "past", amount: 24, unit: "hours", modes: ["booked", "appointment"] },
-  { key: "last2d", label: "Last 2 Days", direction: "past", amount: 2, unit: "days", modes: ["booked", "appointment"] },
-  { key: "last7d", label: "Last 7 Days", direction: "past", amount: 7, unit: "days", modes: ["booked", "appointment"] },
-  { key: "last30d", label: "Last 30 Days", direction: "past", amount: 30, unit: "days", modes: ["booked", "appointment"] },
-  { key: "next4d", label: "Next 4 Days", direction: "future", amount: 4, unit: "days", modes: ["appointment"] },
-  { key: "next7d", label: "Next 7 Days", direction: "future", amount: 7, unit: "days", modes: ["appointment"] },
-  { key: "next14d", label: "Next 14 Days", direction: "future", amount: 14, unit: "days", modes: ["appointment"] },
-  { key: "custom", label: "Custom Range", direction: "custom", amount: null, unit: null, modes: ["booked", "appointment"] },
+  { key: "last4h", label: "Last 4h", direction: "past", amount: 4, unit: "hours" },
+  { key: "last24h", label: "Last 24h", direction: "past", amount: 24, unit: "hours" },
+  { key: "last2d", label: "Last 2 Days", direction: "past", amount: 2, unit: "days" },
+  { key: "last7d", label: "Last 7 Days", direction: "past", amount: 7, unit: "days" },
+  { key: "last30d", label: "Last 30 Days", direction: "past", amount: 30, unit: "days" },
+  { key: "next4d", label: "Next 4 Days", direction: "future", amount: 4, unit: "days" },
+  { key: "next7d", label: "Next 7 Days", direction: "future", amount: 7, unit: "days" },
+  { key: "next14d", label: "Next 14 Days", direction: "future", amount: 14, unit: "days" },
+  { key: "future", label: "Future", direction: "all-future", amount: null, unit: null },
+  { key: "custom", label: "Custom Range", direction: "custom", amount: null, unit: null },
 ];
 
 export type DebugStats = {
@@ -121,8 +115,6 @@ export type DebugStats = {
   eventsFetched: number;
   activeFetched: number;
   canceledFetched: number;
-  offFunnelCount: number;
-  afterBookedFilter: number;
   finalRows: number;
 };
 
@@ -145,8 +137,6 @@ export type SearchResult = {
       event: CalendlyScheduledEvent;
       invitee: CalendlyInvitee;
       eventType: CalendlyEventType;
-      matchedEventType: CalendlyEventType | null;
-      actualEventType: CalendlyEventType | null;
     }
   >;
 };

@@ -1,22 +1,21 @@
-// The full search pipeline, ported from calendly_internal_note_search_v5.html.
-//
-// runSearch() drives 7 phases:
+// The search pipeline. Booking-time mode and rescheduled-link reconciliation
+// were removed when the UI consolidated on call-time semantics. runSearch()
+// now drives 6 phases:
 //   1. /users/me                                      → org URI
 //   2. /organization_memberships                      → all user URIs
 //   3. /event_types?user=<each> (parallel)            → all event types
-//   4. local filter by internal_note substring        → matched types
-//   5. /scheduled_events?status=active,canceled       → events (org-wide)
-//   6. /scheduled_events/<uuid>/invitees (parallel)   → invitees
-//   7. local date + rescheduled-link reconciliation   → final rows
+//   4. local filter: internal_note ∈ wanted set       → matched types
+//   5. /scheduled_events?status=active,canceled       → events (org-wide,
+//                                                       windowed by start_time)
+//   6. /scheduled_events/<uuid>/invitees (parallel)   → invitee rows
 //
-// The pipeline is identical to the original; only the language and the API base
-// changed. We use /api/calendly as the proxy instead of a Cloudflare Worker.
+// All fan-outs use a shared-cursor pool of 8 workers. The proxy at
+// /api/calendly forwards the CALENDLY_PAT — the browser never sees it.
 
 import {
   CalendlyEventType,
   CalendlyInvitee,
   CalendlyScheduledEvent,
-  DateFilterMode,
   DebugStats,
   Preset,
   PRESETS,
@@ -30,8 +29,7 @@ const CONCURRENCY = 8;
 const API_BASE = "/api/calendly";
 
 export type SearchOptions = {
-  note: string;
-  dateFilterMode: DateFilterMode;
+  notes: string[];
   presetKey: PresetKey;
   customStart?: string;
   customEnd?: string;
@@ -120,8 +118,6 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     eventsFetched: 0,
     activeFetched: 0,
     canceledFetched: 0,
-    offFunnelCount: 0,
-    afterBookedFilter: 0,
     finalRows: 0,
   };
   const rawById: SearchResult["rawById"] = new Map();
@@ -146,7 +142,7 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     .filter((u): u is string => Boolean(u));
   if (userUris.length === 0) throw new Error("No users found in organization.");
 
-  // Phase 3 — per-user event types in parallel (shared types fix)
+  // Phase 3 — per-user event types in parallel
   tick(`Scanning event types across ${userUris.length} users...`, 8);
   const seenUris = new Set<string>();
   const allEventTypes: CalendlyEventType[] = [];
@@ -173,16 +169,16 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     },
   );
 
-  // Phase 4 — match by internal_note
-  const query = opts.note.toLowerCase();
-  const matchedTypes = allEventTypes.filter((et) =>
-    (et.internal_note || "").toLowerCase().includes(query),
-  );
+  // Phase 4 — match by internal_note. Discrete set from the picker.
+  const wanted = new Set(opts.notes.map((n) => n.trim().toLowerCase()));
+  const matchedTypes = allEventTypes.filter((et) => {
+    const n = (et.internal_note ?? "").trim().toLowerCase();
+    return n.length > 0 && wanted.has(n);
+  });
   debug.eventTypesScanned = allEventTypes.length;
   debug.matchedTypes = matchedTypes.length;
 
   const matchedTypeByUri = new Map(matchedTypes.map((t) => [t.uri, t]));
-  const allEventTypeByUri = new Map(allEventTypes.map((t) => [t.uri, t]));
 
   if (matchedTypes.length === 0) {
     return { rows: [], matchedEventTypes: [], debug, rawById };
@@ -195,14 +191,10 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
 
   // Phase 5 — fetch scheduled events org-wide, filter locally by event_type
   const userRange = getUserDateRange(opts);
-  const stWindow = getStartTimeWindow(opts, userRange);
 
   type Candidate = {
     event: CalendlyScheduledEvent;
-    matchedEventType: CalendlyEventType | null;
-    actualEventType: CalendlyEventType | null;
-    isOffFunnel: boolean;
-    possibleOffFunnel: boolean;
+    eventType: CalendlyEventType;
   };
   const eventMap = new Map<string, Candidate>();
 
@@ -213,29 +205,20 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     async (status) => {
       const events = await fetchAllPages<CalendlyScheduledEvent>("/scheduled_events", {
         organization: orgUri,
-        min_start_time: stWindow.min,
-        max_start_time: stWindow.max,
+        min_start_time: userRange.start.toISOString(),
+        max_start_time: userRange.end.toISOString(),
         status,
         sort: "start_time:desc",
       });
       for (const ev of events) {
         if (eventMap.has(ev.uri)) continue;
-        const directMatch = matchedTypeByUri.get(ev.event_type) || null;
-        const actualEt = allEventTypeByUri.get(ev.event_type) || directMatch || null;
-        const possibleOffFunnel =
-          opts.dateFilterMode === "booked" && !directMatch && ev.status === "active";
-        if (!directMatch && !possibleOffFunnel) continue;
+        const et = matchedTypeByUri.get(ev.event_type);
+        if (!et) continue;
 
         if (ev.status === "canceled") debug.canceledFetched++;
         else debug.activeFetched++;
 
-        eventMap.set(ev.uri, {
-          event: ev,
-          matchedEventType: directMatch,
-          actualEventType: actualEt,
-          isOffFunnel: !directMatch,
-          possibleOffFunnel,
-        });
+        eventMap.set(ev.uri, { event: ev, eventType: et });
       }
     },
     (done, total, status) => {
@@ -244,7 +227,7 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     },
   );
 
-  let candidates = Array.from(eventMap.values());
+  const candidates = Array.from(eventMap.values());
   debug.eventsFetched = candidates.length;
   if (candidates.length === 0) {
     return { rows: [], matchedEventTypes: matchedTypes, debug, rawById };
@@ -252,11 +235,11 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
 
   // Phase 6 — invitees per event in parallel
   tick(`Resolving ${candidates.length} bookings...`, 56);
-  const tempRows: Row[] = [];
+  const rows: Row[] = [];
 
   await runWithConcurrency(
     candidates,
-    async ({ event, matchedEventType, actualEventType, isOffFunnel, possibleOffFunnel }) => {
+    async ({ event, eventType }) => {
       const path = event.uri.replace("https://api.calendly.com", "");
       const invitees = await fetchAllPages<CalendlyInvitee>(path + "/invitees");
 
@@ -266,10 +249,9 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
       const hostEmails = memberships.map((m) => m.user_email).filter((x): x is string => Boolean(x));
       const allHostNames = hostNames.join(", ");
       const allHostEmails = hostEmails.join(", ");
-      const displayEt = actualEventType || matchedEventType || ({} as CalendlyEventType);
 
       for (const inv of invitees) {
-        tempRows.push({
+        const row: Row = {
           id: inv.uri,
           eventUri: event.uri,
           inviteeName: inv.name || "—",
@@ -278,13 +260,10 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
           status:
             inv.status === "canceled" || event.status === "canceled" ? "canceled" : "active",
           eventName: event.name || "—",
-          eventTypeName: displayEt.name || "—",
-          eventTypeKind: displayEt.kind || "—",
-          eventTypePooling: displayEt.pooling_type || null,
-          internalNote: matchedEventType?.internal_note || "",
-          isOffFunnel,
-          possibleOffFunnel,
-          funnelEventTypeName: matchedEventType?.name || "—",
+          eventTypeName: eventType.name || "—",
+          eventTypeKind: eventType.kind || "—",
+          eventTypePooling: eventType.pooling_type || null,
+          internalNote: eventType.internal_note || "",
           hostName: primary.user_name || "—",
           hostEmail: primary.user_email || "",
           hostNames,
@@ -303,90 +282,31 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
           rescheduled: Boolean(inv.rescheduled),
           _event: event,
           _invitee: inv,
-          _eventType: displayEt,
-          _matchedEventType: matchedEventType,
-          _actualEventType: actualEventType,
-        });
+          _eventType: eventType,
+        };
+        rows.push(row);
+        rawById.set(row.id, { event, invitee: inv, eventType });
       }
     },
     (done, total) => {
-      const pct = 56 + Math.round((done / total) * 34);
+      const pct = 56 + Math.round((done / total) * 44);
       tick(`Resolving bookings (${done}/${total})`, pct);
     },
   );
 
-  // Phase 7 — date filter + rescheduled-link reconciliation
-  const minMs = userRange.start.getTime();
-  const maxMs = userRange.end.getTime();
-  const inUserRange = (dt: string | null | undefined) => {
-    const t = new Date(dt || "").getTime();
-    return Number.isFinite(t) && t >= minMs && t <= maxMs;
-  };
-
-  const directRows = tempRows.filter((r) => !r.possibleOffFunnel);
-  const directByInviteeUri = new Map(directRows.map((r) => [r.id, r]));
-  const directByEmail = new Map<string, Row[]>();
-  for (const r of directRows) {
-    if (!r.inviteeEmail) continue;
-    const arr = directByEmail.get(r.inviteeEmail) ?? [];
-    arr.push(r);
-    directByEmail.set(r.inviteeEmail, arr);
-  }
-  const activeUriToFunnelRow = new Map<string, Row>();
-  for (const r of directRows) {
-    if (r.newInvitee) activeUriToFunnelRow.set(r.newInvitee, r);
-  }
-
-  const matched: Row[] = [];
-  for (const r of tempRows) {
-    let include = false;
-    let funnelContext: Row | null = r._matchedEventType ? r : null;
-
-    if (opts.dateFilterMode === "appointment") {
-      include = !r.possibleOffFunnel && inUserRange(r.startTime);
-    } else if (!r.possibleOffFunnel) {
-      include = inUserRange(r.createdAt);
-    } else {
-      const oldRow = r.oldInvitee ? directByInviteeUri.get(r.oldInvitee) ?? null : null;
-      const newLinkedRow = activeUriToFunnelRow.get(r.id) || null;
-      const emailLinkedRow =
-        (directByEmail.get(r.inviteeEmail) || []).find(
-          (x) =>
-            x._matchedEventType &&
-            (inUserRange(x.createdAt) || x.newInvitee || x.rescheduled || x.status === "canceled"),
-        ) || null;
-      funnelContext = oldRow || newLinkedRow || emailLinkedRow;
-      include = Boolean(funnelContext) && (inUserRange(r.createdAt) || inUserRange(funnelContext!.createdAt));
-
-      if (include && funnelContext?._matchedEventType) {
-        r.internalNote = funnelContext._matchedEventType.internal_note || "";
-        r.funnelEventTypeName = funnelContext._matchedEventType.name || "—";
-        r.isOffFunnel = true;
-        debug.offFunnelCount++;
-      }
-    }
-
-    if (!include) continue;
-    matched.push(r);
-    rawById.set(r.id, {
-      event: r._event,
-      invitee: r._invitee,
-      eventType: r._eventType,
-      matchedEventType: r._matchedEventType || funnelContext?._matchedEventType || null,
-      actualEventType: r._actualEventType || r._eventType,
-    });
-  }
-
-  debug.afterBookedFilter = matched.length;
-  debug.finalRows = matched.length;
+  debug.finalRows = rows.length;
 
   tick("Done", 100);
-  return { rows: matched, matchedEventTypes: matchedTypes, debug, rawById };
+  return { rows, matchedEventTypes: matchedTypes, debug, rawById };
 }
 
 function getActivePreset(presetKey: PresetKey): Preset {
   return PRESETS.find((p) => p.key === presetKey) || PRESETS.find((p) => p.key === "last7d")!;
 }
+
+// 5 years out — Calendly requires a max_start_time, so "future" still needs
+// an upper bound. Bookings further out than 5 years aren't a realistic case.
+const FUTURE_HORIZON_MS = 5 * 365 * 86400000;
 
 function getUserDateRange(opts: SearchOptions): { start: Date; end: Date } {
   const preset = getActivePreset(opts.presetKey);
@@ -397,23 +317,12 @@ function getUserDateRange(opts: SearchOptions): { start: Date; end: Date } {
     };
   }
   const now = new Date();
+  if (preset.direction === "all-future") {
+    return { start: now, end: new Date(now.getTime() + FUTURE_HORIZON_MS) };
+  }
   const ms = (preset.amount ?? 0) * (preset.unit === "hours" ? 3600000 : 86400000);
   if (preset.direction === "future") {
     return { start: now, end: new Date(now.getTime() + ms) };
   }
   return { start: new Date(now.getTime() - ms), end: now };
-}
-
-function getStartTimeWindow(
-  opts: SearchOptions,
-  userRange: { start: Date; end: Date },
-): { min: string; max: string } {
-  if (opts.dateFilterMode === "appointment") {
-    return { min: userRange.start.toISOString(), max: userRange.end.toISOString() };
-  }
-  // booked-at mode: bookings made in user's range may have start times far in
-  // the future. Use ±365d to catch long-lead bookings.
-  const past = new Date(userRange.start.getTime() - 1 * 86400000);
-  const future = new Date(Date.now() + 365 * 86400000);
-  return { min: past.toISOString(), max: future.toISOString() };
 }

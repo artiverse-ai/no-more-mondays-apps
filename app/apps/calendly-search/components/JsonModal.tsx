@@ -15,10 +15,6 @@ export function JsonModal({ data, onClose }: { data: Data; onClose: () => void }
   }, [onClose]);
 
   const memberships = data.event.event_memberships || [];
-  const isOff =
-    data.matchedEventType &&
-    data.actualEventType &&
-    data.matchedEventType.uri !== data.actualEventType.uri;
 
   return (
     <div
@@ -41,23 +37,15 @@ export function JsonModal({ data, onClose }: { data: Data; onClose: () => void }
           </button>
         </div>
         <div className="flex-1 overflow-auto p-5">
-          <Section title="funnel match · current state">
+          <Section title="event type">
             <div className="space-y-1 rounded-md border border-border bg-background p-3 font-mono text-[11px] leading-relaxed text-foreground/80">
               <div>
-                <span className="text-muted-foreground">Funnel queried:</span>{" "}
-                {data.matchedEventType?.name || "—"}{" "}
-                <span className="text-muted-foreground">
-                  ({data.matchedEventType?.internal_note || "no note"})
-                </span>
+                <span className="text-muted-foreground">Name:</span>{" "}
+                {data.eventType.name || "—"}
               </div>
               <div>
-                <span className="text-muted-foreground">Currently on:</span>{" "}
-                {data.actualEventType?.name || "—"}{" "}
-                {isOff ? (
-                  <span className="text-rose-700">⚠ off-funnel (rescheduled away)</span>
-                ) : (
-                  <span className="text-emerald-700">✓ on-funnel</span>
-                )}
+                <span className="text-muted-foreground">Internal note:</span>{" "}
+                {data.eventType.internal_note || "—"}
               </div>
               <div className="pt-2">
                 <span className="text-muted-foreground">Hosts (event_memberships):</span>
@@ -81,8 +69,8 @@ export function JsonModal({ data, onClose }: { data: Data; onClose: () => void }
           <Section title="invitee">
             <Pre>{JSON.stringify(data.invitee, null, 2)}</Pre>
           </Section>
-          <Section title="event_type (current)">
-            <Pre>{JSON.stringify(data.actualEventType ?? data.matchedEventType, null, 2)}</Pre>
+          <Section title="event_type">
+            <Pre>{JSON.stringify(data.eventType, null, 2)}</Pre>
           </Section>
         </div>
       </div>

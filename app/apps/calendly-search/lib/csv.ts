@@ -1,7 +1,7 @@
-import { Row, DateFilterMode } from "./types";
+import { Row } from "./types";
 import { fmtDate } from "./format";
 
-export function exportCsv(rows: Row[], mode: DateFilterMode) {
+export function exportCsv(rows: Row[]) {
   const headers = [
     "Invitee Name",
     "Email",
@@ -44,7 +44,7 @@ export function exportCsv(rows: Row[], mode: DateFilterMode) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `calendly-${mode}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `calendly-calls-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

@@ -1,12 +1,14 @@
 "use client";
 
-import { DateFilterMode, PRESETS, PresetKey } from "../lib/types";
+import { MultiSelect } from "@/components/MultiSelect";
+import { PRESETS, PresetKey } from "../lib/types";
 
 type Props = {
-  note: string;
-  setNote: (v: string) => void;
-  dateFilterMode: DateFilterMode;
-  setDateFilterMode: (m: DateFilterMode) => void;
+  notes: string[];
+  setNotes: (v: string[]) => void;
+  availableNotes: string[];
+  notesLoading: boolean;
+  notesError: string | null;
   presetKey: PresetKey;
   setPresetKey: (k: PresetKey) => void;
   customStart: string;
@@ -20,10 +22,11 @@ type Props = {
 
 export function SearchForm(props: Props) {
   const {
-    note,
-    setNote,
-    dateFilterMode,
-    setDateFilterMode,
+    notes,
+    setNotes,
+    availableNotes,
+    notesLoading,
+    notesError,
     presetKey,
     setPresetKey,
     customStart,
@@ -35,50 +38,38 @@ export function SearchForm(props: Props) {
     onCancel,
   } = props;
 
-  const visiblePresets = PRESETS.filter((p) => p.modes.includes(dateFilterMode));
-  if (!visiblePresets.some((p) => p.key === presetKey)) {
-    // narrow to a sensible default if mode change invalidated the preset
-    Promise.resolve().then(() => props.setPresetKey("last7d"));
-  }
-
   return (
     <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="space-y-5">
         <div>
-          <Label>Internal Note Contains</Label>
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !loading) onSearch();
-            }}
-            placeholder="e.g. setter, vip, webinar, affiliate, skool..."
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+          <Label>Internal Note</Label>
+          <MultiSelect
+            options={availableNotes}
+            value={notes}
+            onChange={setNotes}
+            loading={notesLoading}
+            placeholder="Pick one or more internal notes…"
+            emptyMessage={
+              notesError
+                ? "Couldn't load options — check CALENDLY_PAT"
+                : "No internal notes set on any event type"
+            }
+            searchPlaceholder="Search notes…"
           />
+          {notesError ? (
+            <p className="mt-1.5 text-xs text-destructive">{notesError}</p>
+          ) : (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Pulled from every active event type across the org. Pick any
+              subset, or <em>Select all</em> to query the whole tagged universe.
+            </p>
+          )}
         </div>
 
         <div>
-          <Label>Filter Date By</Label>
-          <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
-            <ToggleButton on={dateFilterMode === "booked"} onClick={() => setDateFilterMode("booked")}>
-              Booking Time
-            </ToggleButton>
-            <ToggleButton on={dateFilterMode === "appointment"} onClick={() => setDateFilterMode("appointment")}>
-              Call Time
-            </ToggleButton>
-          </div>
-          <span className="ml-3 text-xs text-muted-foreground">
-            {dateFilterMode === "booked"
-              ? "When the call was booked (created_at), regardless of when scheduled"
-              : "When the call is scheduled to take place (start_time). Future windows enabled."}
-          </span>
-        </div>
-
-        <div>
-          <Label>Date Range</Label>
+          <Label>Call Time</Label>
           <div className="flex flex-wrap items-center gap-2">
-            {visiblePresets.map((p) => (
+            {PRESETS.map((p) => (
               <button
                 key={p.key}
                 type="button"
@@ -111,6 +102,11 @@ export function SearchForm(props: Props) {
               />
             </div>
           ) : null}
+          <p className="mt-2 text-xs text-muted-foreground">
+            When the call is scheduled to take place (Calendly{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">start_time</code>).{" "}
+            <em>Future</em> covers everything from now until the end of the booking window.
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -130,9 +126,7 @@ export function SearchForm(props: Props) {
             >
               Cancel
             </button>
-          ) : (
-            <span className="text-xs text-muted-foreground">↵ Enter to run</span>
-          )}
+          ) : null}
         </div>
       </div>
     </section>
@@ -144,30 +138,5 @@ function Label({ children }: { children: React.ReactNode }) {
     <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
       {children}
     </label>
-  );
-}
-
-function ToggleButton({
-  on,
-  onClick,
-  children,
-}: {
-  on: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        "rounded-md px-4 py-1.5 text-xs font-medium transition " +
-        (on
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:text-foreground")
-      }
-    >
-      {children}
-    </button>
   );
 }

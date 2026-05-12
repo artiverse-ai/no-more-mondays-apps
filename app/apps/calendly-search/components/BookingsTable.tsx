@@ -103,13 +103,9 @@ export function BookingsTable({
                 </td>
                 <td
                   className="max-w-[220px] truncate px-3 py-2.5 text-muted-foreground"
-                  title={
-                    r.eventTypeName +
-                    (r.isOffFunnel ? ` — rescheduled away from ${r.funnelEventTypeName}` : "")
-                  }
+                  title={r.eventTypeName}
                 >
                   {r.eventTypeName}
-                  {r.isOffFunnel ? <RescheduledBadge from={r.funnelEventTypeName} /> : null}
                 </td>
                 <td
                   className="max-w-[240px] truncate px-3 py-2.5 font-mono text-xs text-amber-700"
@@ -164,13 +160,3 @@ function StatusBadge({ status }: { status: "active" | "canceled" }) {
   );
 }
 
-function RescheduledBadge({ from }: { from: string }) {
-  return (
-    <span
-      className="ml-1 inline-flex items-center rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0 text-[10px] font-semibold uppercase tracking-[0.05em] text-amber-700"
-      title={`Rescheduled away from ${from}`}
-    >
-      ↪
-    </span>
-  );
-}

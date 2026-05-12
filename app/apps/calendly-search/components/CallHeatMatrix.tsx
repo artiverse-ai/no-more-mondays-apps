@@ -44,15 +44,24 @@ const fmtDialogDay = new Intl.DateTimeFormat("en-US", {
 type CellKey = string; // `${date}|${hour}`
 const cellKey = (date: string, hour: string): CellKey => `${date}|${hour}`;
 
-// Heatmap of call volume by date × hour-of-day (Eastern Time). Only dates
-// and hours that actually have bookings are shown — for a sparse 2-year
-// horizon this collapses thousands of empty cells down to a useful grid.
-// Click any cell to see the calls in that bucket.
+type StatusFilter = "all" | "active" | "canceled";
+
+// Heatmap of call volume by date × hour-of-day (Eastern Time). Each cell is
+// split vertically into active (green, top) and canceled (red, bottom),
+// proportional to the bucket's mix. Clicking a colored part:
+//   1. Filters the whole dashboard to that status (so the other color
+//      vanishes from every cell since the upstream filter removes those rows)
+//   2. Opens the detail modal with the clicked status's calls in that bucket
+// Clicking the same colored part again toggles the filter back to "all".
 export function CallHeatMatrix({
   rows,
+  statusFilter,
+  setStatusFilter,
   onInspect,
 }: {
   rows: Row[];
+  statusFilter: StatusFilter;
+  setStatusFilter: (s: StatusFilter) => void;
   onInspect: (id: string) => void;
 }) {
   const [openCell, setOpenCell] = useState<{
@@ -131,9 +140,19 @@ export function CallHeatMatrix({
               Call volume by day &amp; hour (ET)
             </h3>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Click a cell to see the calls in that hour.
-          </p>
+          <div className="flex flex-col items-end gap-1 text-[10px] text-muted-foreground">
+            <p>Click <span className="text-emerald-700">green</span> to filter to Active · <span className="text-rose-700">red</span> to Canceled</p>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-3 rounded-sm bg-emerald-500/80" />
+                Active
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block h-2 w-3 rounded-sm bg-rose-500/80" />
+                Canceled
+              </span>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -211,12 +230,23 @@ export function CallHeatMatrix({
                       />
                     );
                   }
+                  const activeCount = bucket.filter((r) => r.status === "active").length;
+                  const canceledCount = bucket.length - activeCount;
                   return (
                     <HeatCell
                       key={d}
-                      count={bucket.length}
+                      activeCount={activeCount}
+                      canceledCount={canceledCount}
                       max={max}
-                      onClick={() => setOpenCell({ date: d, hour, rows: bucket })}
+                      statusFilter={statusFilter}
+                      onClickStatus={(status) => {
+                        // Toggle: clicking the currently-active status restores "all".
+                        setStatusFilter(statusFilter === status ? "all" : status);
+                        const subset = bucket.filter((r) => r.status === status);
+                        if (subset.length > 0) {
+                          setOpenCell({ date: d, hour, rows: subset });
+                        }
+                      }}
                     />
                   );
                 })}
@@ -249,44 +279,73 @@ export function CallHeatMatrix({
 }
 
 function HeatCell({
-  count,
+  activeCount,
+  canceledCount,
   max,
-  onClick,
+  statusFilter,
+  onClickStatus,
 }: {
-  count: number;
+  activeCount: number;
+  canceledCount: number;
   max: number;
-  onClick: () => void;
+  statusFilter: StatusFilter;
+  onClickStatus: (status: "active" | "canceled") => void;
 }) {
-  // Tint cells by relative density. Single-shade ramp using accent so it
-  // reads as one calendar instead of red-vs-green which would suggest good
-  // vs bad (volume is just volume).
-  const intensity = max > 0 ? count / max : 0;
-  let bg: string;
-  let fg: string;
-  if (intensity >= 0.8) {
-    bg = "bg-accent text-background";
-    fg = "";
-  } else if (intensity >= 0.55) {
-    bg = "bg-accent/75 text-background";
-    fg = "";
-  } else if (intensity >= 0.3) {
-    bg = "bg-accent/55 text-background";
-    fg = "";
-  } else if (intensity >= 0.15) {
-    bg = "bg-accent/30 text-foreground";
-    fg = "";
-  } else {
-    bg = "bg-accent/15 text-foreground";
-    fg = "";
-  }
+  const total = activeCount + canceledCount;
+  const intensity = max > 0 ? total / max : 0;
+  // Lower-volume cells fade; busy cells stay vivid. Same idea as the prior
+  // single-color ramp, but on the active/canceled colors.
+  const alpha = 0.45 + 0.55 * Math.min(intensity, 1);
+  const activeBg = `rgba(22, 163, 74, ${alpha})`; // emerald-600
+  const canceledBg = `rgba(220, 38, 38, ${alpha})`; // red-600
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center justify-center border-l border-border py-2 text-sm transition hover:opacity-80 ${bg} ${fg}`}
-    >
-      <span className="font-semibold tabular-nums">{count}</span>
-    </button>
+    <div className="relative flex min-h-[40px] flex-col border-l border-border">
+      {activeCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => onClickStatus("active")}
+          style={{ flex: activeCount, backgroundColor: activeBg }}
+          className={
+            "transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
+            (statusFilter === "active"
+              ? "ring-1 ring-inset ring-emerald-900/40"
+              : "")
+          }
+          title={`${activeCount} active · click to filter`}
+          aria-label={`${activeCount} active calls`}
+        />
+      ) : null}
+      {canceledCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => onClickStatus("canceled")}
+          style={{ flex: canceledCount, backgroundColor: canceledBg }}
+          className={
+            "transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
+            (statusFilter === "canceled"
+              ? "ring-1 ring-inset ring-rose-900/40"
+              : "")
+          }
+          title={`${canceledCount} canceled · click to filter`}
+          aria-label={`${canceledCount} canceled calls`}
+        />
+      ) : null}
+      <span
+        className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[11px] font-semibold tabular-nums text-foreground"
+        style={{ textShadow: "0 0 3px rgba(255,255,255,0.85)" }}
+      >
+        {activeCount > 0 && canceledCount > 0 ? (
+          <>
+            <span className="text-emerald-900">{activeCount}</span>
+            <span className="mx-0.5 opacity-50">·</span>
+            <span className="text-rose-900">{canceledCount}</span>
+          </>
+        ) : (
+          total
+        )}
+      </span>
+    </div>
   );
 }
 

@@ -279,7 +279,12 @@ export function SearchClient() {
           />
 
           {viewMode === "calendar" ? (
-            <CallHeatMatrix rows={filtered} onInspect={setModalRowId} />
+            <CallHeatMatrix
+              rows={filtered}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              onInspect={setModalRowId}
+            />
           ) : viewMode === "bookings" ? (
             <BookingsTable
               rows={filtered}

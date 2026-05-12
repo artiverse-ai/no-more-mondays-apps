@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
@@ -43,14 +42,9 @@ export default async function WebinarDetailPage(
         <p className="text-sm text-muted-foreground">
           Nothing in{" "}
           <code className="rounded bg-muted px-1.5 py-0.5">mart_webinar_events</code>{" "}
-          for <code className="rounded bg-muted px-1.5 py-0.5">{date}</code>.
+          for <code className="rounded bg-muted px-1.5 py-0.5">{date}</code>. Pick
+          another from the breadcrumb above.
         </p>
-        <Link
-          href="/dashboards/webinar"
-          className="inline-block text-sm font-medium text-accent underline"
-        >
-          ← All webinars
-        </Link>
       </main>
     );
   }
@@ -68,13 +62,7 @@ export default async function WebinarDetailPage(
   return (
     <main className="mx-auto max-w-6xl space-y-8 p-4 md:p-8 lg:p-10">
       {/* Header */}
-      <header className="space-y-3 border-b border-border pb-6">
-        <Link
-          href="/dashboards/webinar"
-          className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground hover:text-accent"
-        >
-          ← All webinars
-        </Link>
+      <header className="border-b border-border pb-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">

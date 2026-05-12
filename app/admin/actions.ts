@@ -18,7 +18,11 @@ import {
 
 export async function addAllowedAction(
   email: string,
-): Promise<{ id: string; identifier: string }> {
+): Promise<{
+  id: string;
+  identifier: string;
+  status: "accepted" | "pending" | "allowed";
+}> {
   await requireAdmin();
   await addAllowed(email, true);
   // Clerk's create-endpoint doesn't return the new row consistently; re-fetch.
@@ -28,7 +32,11 @@ export async function addAllowedAction(
   );
   if (!created) throw new Error("Created but could not re-fetch the entry");
   revalidatePath("/admin/access");
-  return { id: created.id, identifier: created.identifier };
+  return {
+    id: created.id,
+    identifier: created.identifier,
+    status: created.status,
+  };
 }
 
 export async function removeAllowedAction(id: string): Promise<void> {

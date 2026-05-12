@@ -3,10 +3,28 @@
 import { useState, useTransition } from "react";
 import { addAllowedAction, removeAllowedAction } from "./actions";
 
+type AllowedStatus = "accepted" | "pending" | "allowed";
+
 type Allowed = {
   id: string;
   identifier: string;
+  status: AllowedStatus;
   invitationId?: string | null;
+};
+
+const STATUS_STYLE: Record<AllowedStatus, { label: string; cls: string }> = {
+  accepted: {
+    label: "Active",
+    cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700",
+  },
+  pending: {
+    label: "Pending invite",
+    cls: "border-amber-500/40 bg-amber-500/10 text-amber-800",
+  },
+  allowed: {
+    label: "Allowlisted",
+    cls: "border-border bg-muted text-muted-foreground",
+  },
 };
 
 type Props = {
@@ -146,6 +164,14 @@ export function AccessClient({ initial, adminEmail }: Props) {
                         you
                       </span>
                     ) : null}
+                    <span
+                      className={
+                        "rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] " +
+                        STATUS_STYLE[entry.status].cls
+                      }
+                    >
+                      {STATUS_STYLE[entry.status].label}
+                    </span>
                   </div>
                   <button
                     type="button"

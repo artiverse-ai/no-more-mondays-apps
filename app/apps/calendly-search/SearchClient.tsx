@@ -179,7 +179,11 @@ export function SearchClient() {
         </div>
       ) : null}
 
-      {loading && progress ? <ProgressStrip progress={progress} /> : null}
+      {notesLoading ? (
+        <ProgressStrip progress={null} initialMessage="Loading funnels…" />
+      ) : loading ? (
+        <ProgressStrip progress={progress} initialMessage="Starting search…" />
+      ) : null}
 
       {result ? (
         <>

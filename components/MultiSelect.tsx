@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDownIcon, CheckIcon, SearchIcon } from "lucide-react";
+import { ChevronDownIcon, CheckIcon, MinusIcon, SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -127,34 +127,39 @@ export function MultiSelect({
               className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
             />
           </div>
-          <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              {filtered.length} of {options.length}
-              {someSelected || allSelected
-                ? ` · ${value.length} picked`
-                : ""}
-            </span>
-            <div className="flex items-center gap-2 text-[11px] font-medium">
-              <button
-                type="button"
-                onClick={selectAll}
-                disabled={allSelected}
-                className="text-accent transition hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Select all
-              </button>
-              <span className="text-border">|</span>
-              <button
-                type="button"
-                onClick={clear}
-                disabled={value.length === 0}
-                className="text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Clear
-              </button>
-            </div>
+          <div className="border-b border-border bg-muted/40 px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            {filtered.length} of {options.length}
+            {someSelected || allSelected ? ` · ${value.length} picked` : ""}
           </div>
           <ul className="max-h-60 overflow-y-auto py-1">
+            {/* "All" pseudo-option — checked when every option is picked,
+                 indeterminate when some are. Clicking it flips between
+                 select-all and clear-all. */}
+            {options.length > 0 && query.trim() === "" ? (
+              <li className="border-b border-border/60">
+                <button
+                  type="button"
+                  onClick={allSelected ? clear : selectAll}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition hover:bg-muted/60"
+                >
+                  <span
+                    className={cn(
+                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition",
+                      allSelected || someSelected
+                        ? "border-accent bg-accent text-background"
+                        : "border-border bg-background",
+                    )}
+                  >
+                    {allSelected ? (
+                      <CheckIcon className="h-3 w-3" />
+                    ) : someSelected ? (
+                      <MinusIcon className="h-3 w-3" />
+                    ) : null}
+                  </span>
+                  <span>All ({options.length})</span>
+                </button>
+              </li>
+            ) : null}
             {filtered.length === 0 ? (
               <li className="px-3 py-2 text-xs text-muted-foreground">
                 No matches

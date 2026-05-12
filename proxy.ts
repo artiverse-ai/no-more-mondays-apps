@@ -8,8 +8,21 @@ import { NextRequest, NextResponse } from "next/server";
 
 const CF_HEADER = "cf-access-authenticated-user-email";
 
+// Paths that stay public even when Cloudflare Access is enabled. The closer
+// SOP is read by every closer in onboarding — most of them aren't going to be
+// on the CF Access allow-list (which is scoped to ops + admins).
+const PUBLIC_PATH_PREFIXES = ["/sops/closer-calendar-management"];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATH_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
+}
+
 export function proxy(req: NextRequest) {
   if (process.env.SKIP_AUTH === "1") return NextResponse.next();
+
+  if (isPublicPath(req.nextUrl.pathname)) return NextResponse.next();
 
   const email = req.headers.get(CF_HEADER);
   if (email) return NextResponse.next();

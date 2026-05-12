@@ -374,7 +374,13 @@ function CellDialog({
                 <p className="truncate text-xs text-muted-foreground">
                   {r.inviteeEmailDisplay}
                 </p>
-                <p className="mt-1 text-xs">
+                <p
+                  className="mt-1 truncate text-xs text-foreground/80"
+                  title={r.eventTypeName}
+                >
+                  {r.eventTypeName}
+                </p>
+                <p className="mt-0.5 text-xs">
                   <span className="text-muted-foreground">Host:</span>{" "}
                   <span className="font-medium">{r.hostName}</span>
                   <span className="mx-1.5 text-border">·</span>
@@ -383,6 +389,11 @@ function CellDialog({
                     {r.internalNote || "—"}
                   </span>
                 </p>
+                {r.cancelReason ? (
+                  <p className="mt-1 text-[10px] text-rose-700">
+                    ↳ {r.cancelReason}
+                  </p>
+                ) : null}
               </div>
               <div className="shrink-0 text-right">
                 <p className="font-mono text-xs font-medium text-foreground">

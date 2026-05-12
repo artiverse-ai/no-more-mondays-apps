@@ -58,7 +58,7 @@ export function SearchClient() {
   const abortRef = useRef<AbortController | null>(null);
 
   // ---- view + filters ----
-  const [viewMode, setViewMode] = useState<ViewMode>("bookings");
+  const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [closerScope, setCloserScope] = useState<CloserScope>("all");
   const [hostFilter, setHostFilter] = useState<string>("all");
@@ -249,9 +249,9 @@ export function SearchClient() {
             window={result.window}
           />
 
-          {/* Charts now live right under the scorecard — always visible,
-              not gated behind a tab. They reflect the current filter set. */}
-          <CallHeatMatrix rows={filtered} onInspect={setModalRowId} />
+          {/* Bar charts — always visible right under the scorecard,
+              regardless of which view tab is active. They give the
+              aggregate view; the Calendar tab below gives the drill-down. */}
           <div className="grid gap-4 lg:grid-cols-2">
             <DailyVolumeChart rows={filtered} />
             <HostDistributionChart rows={filtered} />
@@ -272,7 +272,9 @@ export function SearchClient() {
             onExport={() => exportCsv(filtered)}
           />
 
-          {viewMode === "bookings" ? (
+          {viewMode === "calendar" ? (
+            <CallHeatMatrix rows={filtered} onInspect={setModalRowId} />
+          ) : viewMode === "bookings" ? (
             <BookingsTable
               rows={filtered}
               total={result.rows.length}

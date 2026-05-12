@@ -122,7 +122,7 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
             No More Mondays &middot; Sales Ops
           </p>
           <h1 className="font-heading text-4xl font-semibold tracking-tight md:text-5xl">
-            Booking capacity
+            Calendar Capacity
           </h1>
         </div>
         <div className="flex flex-col items-end gap-2">

@@ -13,7 +13,7 @@ type Tile = {
 const apps: Tile[] = [
   {
     href: "/apps/calendar",
-    title: "Team Calendar",
+    title: "Calendar Capacity",
     description:
       "Booking capacity across closers. Pulls Google Calendar + Calendly via BigQuery.",
     status: "live",

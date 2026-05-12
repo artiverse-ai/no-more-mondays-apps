@@ -256,12 +256,12 @@ export function CallHeatMatrix({
                       max={max}
                       statusFilter={statusFilter}
                       onClickStatus={(status) => {
-                        // Toggle: clicking the currently-active status restores "all".
+                        // Toggle the filter (so the other color "vanishes"
+                        // across the heatmap), AND always open the cell
+                        // modal with the FULL bucket so the user gets
+                        // call-by-call detail just like before.
                         setStatusFilter(statusFilter === status ? "all" : status);
-                        const subset = bucket.filter((r) => r.status === status);
-                        if (subset.length > 0) {
-                          setOpenCell({ date: d, hour, rows: subset });
-                        }
+                        setOpenCell({ date: d, hour, rows: bucket });
                       }}
                     />
                   );

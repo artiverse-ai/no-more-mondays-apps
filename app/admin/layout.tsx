@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { AdminTabs } from "./AdminTabs";
 
@@ -26,12 +25,6 @@ export default async function AdminLayout({
           <code className="rounded bg-muted px-1.5 py-0.5">{user.email}</code>,
           but only admins can manage this page.
         </p>
-        <Link
-          href="/"
-          className="inline-block text-sm font-medium text-accent underline"
-        >
-          &larr; Back to home
-        </Link>
       </main>
     );
   }
@@ -39,29 +32,17 @@ export default async function AdminLayout({
   return (
     <main className="mx-auto w-full max-w-4xl p-6 md:p-10">
       <div className="space-y-8">
-        <header className="space-y-3">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
-                No More Mondays &middot; Admin
-              </p>
-              <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">
-                Admin
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Signed in as{" "}
-                <code className="rounded bg-muted px-1.5 py-0.5">
-                  {user.email}
-                </code>
-              </p>
-            </div>
-            <Link
-              href="/"
-              className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground hover:text-accent"
-            >
-              &larr; Home
-            </Link>
-          </div>
+        <header className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
+            No More Mondays &middot; Admin
+          </p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">
+            Admin
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            Signed in as{" "}
+            <code className="rounded bg-muted px-1.5 py-0.5">{user.email}</code>
+          </p>
         </header>
 
         <AdminTabs />

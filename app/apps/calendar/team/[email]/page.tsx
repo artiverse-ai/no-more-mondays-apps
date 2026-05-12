@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getIntervalsForUserWeek, getCloserTimezone } from "@/lib/availability";
 import { WeekTimeline } from "@/components/WeekTimeline";
 import { TeamFilters } from "@/components/TeamFilters";
@@ -57,21 +56,12 @@ export default async function PersonPage(props: PageProps<"/apps/calendar/team/[
     tz,
   });
 
-  // Back to the calendar root with NO carried params — team-page filter
-  // changes must not bleed into the main dashboard's filter state.
-  const backHref = "/apps/calendar";
   const shortName = email.split("@")[0];
 
   return (
     <main className="mx-auto max-w-7xl space-y-4 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-        <div className="flex items-center gap-4">
-          <Link
-            href={backHref}
-            className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground hover:text-accent"
-          >
-            ← Back
-          </Link>
+        <div className="flex items-baseline gap-3">
           <h1 className="font-heading text-2xl font-semibold tracking-tight md:text-3xl">
             {shortName}
           </h1>

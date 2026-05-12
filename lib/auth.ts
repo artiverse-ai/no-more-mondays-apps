@@ -6,6 +6,7 @@
 // admin no matter what state Clerk is in. Anyone else gets admin only when
 // an existing admin promotes them.
 
+import { cache } from "react";
 import { currentUser } from "@clerk/nextjs/server";
 
 export type CurrentUser = {
@@ -30,26 +31,28 @@ function syntheticAdmin(): CurrentUser | null {
   return { email: admins[0], isAdmin: true };
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
-  // Bypass while wiring up Clerk: every visitor becomes the first admin.
-  // Once CLERK_SECRET_KEY is set and SKIP_AUTH is removed, the real Clerk
-  // session is used.
-  if (process.env.SKIP_AUTH === "1") return syntheticAdmin();
-  if (!isClerkConfigured()) return syntheticAdmin();
+// `cache()` dedupes the call within a single request. Layouts + pages both
+// call getCurrentUser; without cache that's 2-3 Clerk round-trips per page
+// render. With cache it's exactly one.
+export const getCurrentUser = cache(
+  async (): Promise<CurrentUser | null> => {
+    if (process.env.SKIP_AUTH === "1") return syntheticAdmin();
+    if (!isClerkConfigured()) return syntheticAdmin();
 
-  try {
-    const u = await currentUser();
-    if (!u) return null;
-    const email = u.primaryEmailAddress?.emailAddress?.toLowerCase() ?? "";
-    if (!email) return null;
-    const meta = (u.publicMetadata ?? {}) as { role?: string };
-    const isAdmin =
-      bootstrapAdminEmails().includes(email) || meta.role === "admin";
-    return { email, isAdmin };
-  } catch {
-    return null;
-  }
-}
+    try {
+      const u = await currentUser();
+      if (!u) return null;
+      const email = u.primaryEmailAddress?.emailAddress?.toLowerCase() ?? "";
+      if (!email) return null;
+      const meta = (u.publicMetadata ?? {}) as { role?: string };
+      const isAdmin =
+        bootstrapAdminEmails().includes(email) || meta.role === "admin";
+      return { email, isAdmin };
+    } catch {
+      return null;
+    }
+  },
+);
 
 export async function requireAdmin(): Promise<CurrentUser> {
   const u = await getCurrentUser();

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Suspense } from "react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { NavProgress } from "@/components/NavProgress";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,6 +37,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <body className="min-h-full flex flex-col">
+          <Suspense fallback={null}>
+            <NavProgress />
+          </Suspense>
           <Breadcrumbs />
           {children}
         </body>

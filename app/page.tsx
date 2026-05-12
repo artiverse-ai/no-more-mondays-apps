@@ -35,6 +35,37 @@ const dashboards: Tile[] = [
   },
 ];
 
+const sops: Tile[] = [
+  {
+    href: "/sops/how-to-read-capacity-dashboard",
+    title: "How to read the capacity dashboard",
+    description:
+      "What every chart, KPI, and matrix cell means on the team-availability dashboard.",
+    status: "live",
+  },
+  {
+    href: "/sops/closer-calendar-management",
+    title: "Calendar management for closers",
+    description:
+      "Share your calendar, block your busy time, set the right timezone — for new closers and as a reference.",
+    status: "live",
+  },
+  {
+    href: "/sops/new-closer-joins",
+    title: "When a new closer joins",
+    description:
+      "Ops walkthrough for onboarding a closer end-to-end: calendar share, active list, verification.",
+    status: "live",
+  },
+  {
+    href: "/sops/closer-removed",
+    title: "When a closer is removed",
+    description:
+      "Cleanly remove a closer without breaking attribution or stranding their in-flight calls.",
+    status: "live",
+  },
+];
+
 function TileCard({ tile }: { tile: Tile }) {
   const isLive = tile.status === "live";
   const inner = (
@@ -130,6 +161,7 @@ export default async function HomePage() {
 
       <Section title="Apps" tiles={apps} />
       <Section title="Dashboards" tiles={dashboards} />
+      <Section title="SOPs" tiles={sops} />
     </main>
   );
 }

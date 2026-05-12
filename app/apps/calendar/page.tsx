@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getRangeSlots, getTeamMembers } from "@/lib/availability";
 import { RangeFilters } from "@/components/RangeFilters";
 import { SlotMatrix } from "@/components/SlotMatrix";
@@ -39,11 +40,21 @@ const shiftDay = (iso: string, days: number): string => {
 };
 
 function defaultRange(tz: string): { from: string; to: string } {
-  // Tomorrow + 4 more days (5-day window starting tomorrow). Today is
-  // usually too late to book — webinars happen Sun/Wed and bookings
-  // typically need at least one day's notice.
-  const tomorrow = shiftDay(todayInTz(tz), 1);
-  return { from: tomorrow, to: shiftDay(tomorrow, 4) };
+  // Default to the upcoming Monday-through-Friday workweek in the selected
+  // timezone. If today is Mon-Thu we still jump to NEXT Monday — bookings
+  // typically need at least a day's notice and aiming the dashboard at a
+  // fresh week is the most common ops question.
+  const today = todayInTz(tz);
+  const [y, m, d] = today.split("-").map((n) => parseInt(n, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  // 0 = Sun, 1 = Mon, ..., 6 = Sat. Days until the *next* Monday (today if
+  // today is already Monday wraps to next Monday for the same reason: avoid
+  // showing the week we're already inside).
+  const dow = dt.getUTCDay();
+  const daysUntilNextMonday = ((8 - dow) % 7) || 7;
+  dt.setUTCDate(dt.getUTCDate() + daysUntilNextMonday);
+  const monday = dt.toISOString().slice(0, 10);
+  return { from: monday, to: shiftDay(monday, 4) };
 }
 
 export default async function Page(props: PageProps<"/apps/calendar">) {
@@ -114,9 +125,18 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
             Booking capacity
           </h1>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {members.length} active &amp; available closer{members.length === 1 ? "" : "s"} &middot; {tz}
-        </p>
+        <div className="flex flex-col items-end gap-2">
+          <p className="text-sm text-muted-foreground">
+            {members.length} active &amp; available closer
+            {members.length === 1 ? "" : "s"} &middot; {tz}
+          </p>
+          <Link
+            href="/sops/how-to-read-capacity-dashboard"
+            className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground hover:text-accent"
+          >
+            How to read this →
+          </Link>
+        </div>
       </header>
 
       {/* Filters */}

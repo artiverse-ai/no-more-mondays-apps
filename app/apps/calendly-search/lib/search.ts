@@ -58,7 +58,21 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
     }
-    const res = await fetch(url.toString(), { signal: opts.signal });
+    // 30s per-request timeout — without this a single slow/hung Calendly
+    // response keeps a runWithConcurrency worker blocked forever (e.g. the
+    // search stalled at "21/23 users" because two event_types fetches
+    // hung).
+    const timeoutSig = AbortSignal.timeout(30_000);
+    const sig = AbortSignal.any([opts.signal, timeoutSig]);
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), { signal: sig });
+    } catch (e) {
+      if (timeoutSig.aborted && !opts.signal.aborted) {
+        throw new Error(`Timeout after 30s [${url.search.slice(1)}]`);
+      }
+      throw e;
+    }
     if (!res.ok) {
       // Calendly returns { title, message, details: [{ parameter, message }] }.
       // Surface all of it so we know exactly which param it rejected.
@@ -201,8 +215,11 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
             allEventTypes.push(et);
           }
         }
-      } catch {
-        /* per-user failures are tolerated */
+      } catch (e) {
+        // Per-user failures are tolerated, but surface them so the user can
+        // see which users hung if it happens (e.g. a Calendly outage on one
+        // user's account no longer mysteriously stalls progress at 21/23).
+        debug.fetchErrors.push(`event_types ${userUri.slice(-12)}: ${(e as Error).message}`);
       }
     },
     (done, total) => {

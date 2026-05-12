@@ -125,14 +125,14 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
   const totalSlots = slots.length;
   const bookableSlots = slots.filter((s) => s.available_count > 0).length;
 
-  // Per-closer calendar hygiene. Surface as a ⚠ on each flagged closer's
-  // filter pill — no top-level banner, the warning is per-closer.
-  const flaggedHygiene = hygiene.filter((h) => h.reasons.length > 0);
+  // Per-closer calendar hygiene. Surface as an (i) badge on each flagged
+  // closer's filter pill — no top-level banner, the warning is per-closer.
+  const flaggedHygiene = hygiene.filter((h) => h.is_low_blocked);
   const flaggedEmails = flaggedHygiene.map((h) => h.email);
   const flaggedReasons: Record<string, string> = Object.fromEntries(
     flaggedHygiene.map((h) => [
       h.email,
-      `Thin calendar — ${h.events_per_day.toFixed(1)} events/day, ${Math.round(h.coverage_pct * 100)}% coverage`,
+      `Only ${h.hours_per_day.toFixed(1)}h blocked per day — a healthy calendar with a sleep block alone clears 8h+.`,
     ]),
   );
 

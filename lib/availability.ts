@@ -682,24 +682,16 @@ export async function getPersonDayStats(args: {
 }
 
 // =====================================================================
-// CALENDAR HYGIENE — flag closers whose calendars look suspiciously thin
+// CALENDAR HYGIENE — flag closers with too few hours blocked per day
 // =====================================================================
 //
-// Two TZ-independent signals (closers live in many timezones):
-//
-//   events_per_day   — average raw event count per visible day. A real
-//                      calendar with sleep block + lunch + meetings easily
-//                      clears 3/day. Below 3 → thin calendar.
-//
-//   coverage_pct     — busy minutes (merged overlaps) / total range minutes.
-//                      Below 30% means a basic sleep block is missing
-//                      (sleep alone covers ~33%).
-//
-// A closer is flagged when EITHER signal trips. Re-tune later if false
-// positives become annoying — current thresholds are based on the
-// 7-closer baseline (median 3.6 events/day, 70% coverage).
-export const HYGIENE_MIN_EVENTS_PER_DAY = 3;
-export const HYGIENE_MIN_COVERAGE_PCT = 0.3;
+// One TZ-independent signal: average hours blocked per day. Any real
+// calendar will have at minimum a nightly sleep block (~8h). Anything
+// below this threshold almost certainly means structural blocks are
+// missing. OOO and all-day events count as legitimate blocked time —
+// raw event count is a misleading signal (some closers have a few long
+// OOO events that cover most of the day, that's fine).
+export const HYGIENE_MIN_HOURS_PER_DAY = 8;
 
 const SQL_HYGIENE = `
 WITH params AS (
@@ -768,17 +760,14 @@ LEFT JOIN events ev ON ev.host_email = m.email
 ORDER BY events_count ASC
 `;
 
-export type HygieneReason = "sparse_events" | "low_coverage";
-
 export type CloserHygiene = {
   email: string;
   busy_min: number;
   events_count: number;
   range_total_min: number;
   days_in_range: number;
-  events_per_day: number;
-  coverage_pct: number; // 0..1
-  reasons: HygieneReason[]; // empty array = healthy
+  hours_per_day: number; // total blocked hours / days_in_range
+  is_low_blocked: boolean; // hours_per_day < HYGIENE_MIN_HOURS_PER_DAY
 };
 
 export async function getCalendarHygiene(args: {
@@ -812,16 +801,8 @@ export async function getCalendarHygiene(args: {
     const events_count = Number(r.events_count);
     const range_total_min = Number(r.range_total_min);
     const days_in_range = range_total_min / 1440;
-    const events_per_day =
-      days_in_range > 0 ? events_count / days_in_range : 0;
-    const coverage_pct =
-      range_total_min > 0 ? busy_min / range_total_min : 0;
-
-    const reasons: HygieneReason[] = [];
-    if (events_per_day < HYGIENE_MIN_EVENTS_PER_DAY)
-      reasons.push("sparse_events");
-    if (coverage_pct < HYGIENE_MIN_COVERAGE_PCT)
-      reasons.push("low_coverage");
+    const hours_per_day =
+      days_in_range > 0 ? busy_min / 60 / days_in_range : 0;
 
     return {
       email: r.email,
@@ -829,9 +810,8 @@ export async function getCalendarHygiene(args: {
       events_count,
       range_total_min,
       days_in_range,
-      events_per_day,
-      coverage_pct,
-      reasons,
+      hours_per_day,
+      is_low_blocked: hours_per_day < HYGIENE_MIN_HOURS_PER_DAY,
     };
   });
 }

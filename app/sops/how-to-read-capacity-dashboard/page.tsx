@@ -229,22 +229,24 @@ export default function HowToReadCapacityDashboardSop() {
         <p>
           In the <strong>Filter by closer</strong> row, a closer pill turns{" "}
           <span style={{ color: "#a05a00", fontWeight: 600 }}>amber</span>{" "}
-          when their calendar looks thin for the visible date range, and a
-          small <code>(i)</code> info badge appears next to the pill. Hover
-          the <code>(i)</code> to see the exact reason. Closers live in
-          different timezones, so the check uses signals that don&rsquo;t
-          depend on a specific TZ:
+          when their calendar has too little blocked time for the visible
+          date range, and a small <code>(i)</code> info badge appears next to
+          the pill. Hover the <code>(i)</code> to see the exact reason.
+        </p>
+        <p>
+          One TZ-independent signal — the team lives in many timezones:
         </p>
         <ul>
           <li>
-            <strong>Events per day</strong> &mdash; a real calendar with a
-            sleep block, lunch, and a few meetings easily clears 3 events/day.
-            Below <strong>3</strong>: thin calendar.
+            <strong>Hours blocked per day</strong> &mdash; total busy minutes
+            in the visible range, divided by days. Even a single nightly
+            sleep block clears 8 hours. Below <strong>8h/day</strong>:
+            something structural is missing.
           </li>
           <li>
-            <strong>Coverage</strong> &mdash; busy minutes divided by total
-            range minutes. A nightly sleep block alone covers ~33%. Below{" "}
-            <strong>30%</strong>: structural blocks missing.
+            OOO events, all-day blockers, and long meetings all count as
+            blocked time — raw event count isn&rsquo;t used, since some
+            healthy calendars have one big OOO covering most of the day.
           </li>
         </ul>
         <p className="sop-callout">

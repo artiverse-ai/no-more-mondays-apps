@@ -88,12 +88,18 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
   ): Promise<T[]> => {
     const all: T[] = [];
     let nextToken: string | null = null;
+    let firstPage = true;
     do {
-      const p: Record<string, string | number | undefined> = { ...params, count: 100 };
-      if (nextToken) p.page_token = nextToken;
+      // Calendly's page_token already encodes the filter set. Re-sending
+      // the original params on subsequent pages produces
+      // "page_token: is invalid" — drop everything except count + token.
+      const p: Record<string, string | number | undefined> = firstPage
+        ? { ...params, count: 100 }
+        : { count: 100, page_token: nextToken ?? undefined };
       const data: { collection?: T[]; pagination?: { next_page_token?: string | null } } = await apiFetch(path, p);
       all.push(...(data.collection || []));
       nextToken = data.pagination?.next_page_token || null;
+      firstPage = false;
     } while (nextToken);
     return all;
   };

@@ -300,14 +300,14 @@ function HeatCell({
   const canceledBg = `rgba(220, 38, 38, ${alpha})`; // red-600
 
   return (
-    <div className="relative flex min-h-[40px] flex-col border-l border-border">
+    <div className="relative flex min-h-[40px] flex-row border-l border-border">
       {activeCount > 0 ? (
         <button
           type="button"
           onClick={() => onClickStatus("active")}
           style={{ flex: activeCount, backgroundColor: activeBg }}
           className={
-            "transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
+            "h-full transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
             (statusFilter === "active"
               ? "ring-1 ring-inset ring-emerald-900/40"
               : "")
@@ -322,7 +322,7 @@ function HeatCell({
           onClick={() => onClickStatus("canceled")}
           style={{ flex: canceledCount, backgroundColor: canceledBg }}
           className={
-            "transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
+            "h-full transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
             (statusFilter === "canceled"
               ? "ring-1 ring-inset ring-rose-900/40"
               : "")

@@ -42,20 +42,25 @@ export default function CloserRemovedSop() {
         <ol>
           <li>
             Open the{" "}
-            <Link className="sop-link" href="/admin">
-              admin page
+            <Link className="sop-link" href="/admin/closers">
+              Closers tab
             </Link>{" "}
-            and find them under the <strong>Closers</strong> section.
+            on the admin page and find their row.
           </li>
           <li>
-            Flip <strong>Active</strong> off. They drop out of the dashboard
-            on the next sync.
+            Flip <strong>Active</strong> off (the green pill turns grey).
+            They drop out of the dashboard on the next sync.
           </li>
           <li>
-            Don&rsquo;t click <strong>Remove</strong>. Removing wipes the row
-            and breaks historical attribution. <em>Inactive</em> is the
-            soft-delete you want; <em>Remove</em> is for cleaning up typos
-            and never-onboarded entries.
+            <strong>Don&rsquo;t click Remove.</strong> Removing wipes the row
+            and breaks historical attribution on any past bookings.
+            <em> Active = off</em> is the soft-delete you want. The{" "}
+            <strong>Remove</strong> button is for cleaning up typos and
+            never-onboarded entries only.
+          </li>
+          <li>
+            The row moves out of <strong>In dashboard</strong> and into
+            <strong> Off-roster</strong> in the counters at the top of the page.
           </li>
         </ol>
       </section>

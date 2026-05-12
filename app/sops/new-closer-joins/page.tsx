@@ -103,25 +103,39 @@ export default function NewCloserJoinsSop() {
         <ol>
           <li>
             Open the{" "}
-            <Link className="sop-link" href="/admin">
-              admin page
+            <Link className="sop-link" href="/admin/closers">
+              Closers tab on the admin page
             </Link>{" "}
-            (top-right of the calendar dashboard).
+            (the <em>Admin</em> link is top-right of the calendar dashboard, or
+            on the home page header for admins).
           </li>
           <li>
-            Under the <strong>Closers</strong> section, type their Google
-            Workspace email in the &ldquo;Add closer by email&rdquo; box and
-            press <strong>Add</strong>.
+            In the <strong>Add closer by email</strong> box, type their Google
+            Workspace email and press <strong>Add</strong>. The roster updates
+            instantly.
           </li>
           <li>
-            New closers come in with both flags <strong>on</strong> (Active +
-            Available), so they appear in the dashboard immediately after the
-            next 5-minute sync.
+            New closers come in with both toggles <strong>on</strong>:
+            <ul style={{ marginTop: 4 }}>
+              <li>
+                <strong>Active</strong> — they exist in the system. Off-roster
+                otherwise.
+              </li>
+              <li>
+                <strong>Available</strong> — they can take calls. Use this for
+                short-term pauses (vacation, training, ramp-up).
+              </li>
+            </ul>
           </li>
           <li>
-            If they aren&rsquo;t ready to take calls yet (training, ramp-up),
-            flip <strong>Available</strong> off and turn it back on when they
-            are.
+            They appear in the booking dashboard on the next 5-minute sync.
+            Check the <strong>In dashboard</strong> counter on the same page —
+            it should tick up by 1.
+          </li>
+          <li>
+            If they aren&rsquo;t ready to take calls yet, flip{" "}
+            <strong>Available</strong> off. Their row stays on the roster but
+            they don&rsquo;t get offered for bookings until you flip it back.
           </li>
         </ol>
       </section>

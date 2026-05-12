@@ -4,6 +4,7 @@ import { Row } from "../lib/types";
 
 export type ViewMode = "calendar" | "bookings" | "invitees" | "hosts";
 export type StatusFilter = "all" | "active" | "canceled";
+export type CloserScope = "all" | "active" | "inactive";
 
 type Props = {
   allRows: Row[];
@@ -11,6 +12,9 @@ type Props = {
   setViewMode: (m: ViewMode) => void;
   statusFilter: StatusFilter;
   setStatusFilter: (s: StatusFilter) => void;
+  closerScope: CloserScope;
+  setCloserScope: (s: CloserScope) => void;
+  closersLoading: boolean;
   hostFilter: string;
   setHostFilter: (h: string) => void;
   filteredCount: number;
@@ -24,6 +28,9 @@ export function FiltersBar(props: Props) {
     setViewMode,
     statusFilter,
     setStatusFilter,
+    closerScope,
+    setCloserScope,
+    closersLoading,
     hostFilter,
     setHostFilter,
     filteredCount,
@@ -40,9 +47,40 @@ export function FiltersBar(props: Props) {
   ].sort();
 
   return (
-    <section className="rounded-xl border border-border bg-card p-3 shadow-sm">
+    <section className="space-y-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+      {/* Closer scope — sits at the top because it's the primary semantic
+          filter for this dashboard ("show me closer calls only"). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterLabel>Closer</FilterLabel>
+        <Chip on={closerScope === "all"} tone="neutral" onClick={() => setCloserScope("all")}>
+          All hosts
+        </Chip>
+        <Chip
+          on={closerScope === "active"}
+          tone="green"
+          onClick={() => setCloserScope("active")}
+          disabled={closersLoading}
+        >
+          Active closers
+        </Chip>
+        <Chip
+          on={closerScope === "inactive"}
+          tone="amber"
+          onClick={() => setCloserScope("inactive")}
+          disabled={closersLoading}
+        >
+          Inactive closers
+        </Chip>
+        {closersLoading && (
+          <span className="text-[10px] text-muted-foreground">
+            loading roster…
+          </span>
+        )}
+      </div>
+
+      <div className="h-px bg-border" />
+
       <div className="flex flex-wrap items-center gap-3">
-        {/* Tabs: calendar / bookings / by invitee / by host */}
         <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
           <Tab on={viewMode === "calendar"} onClick={() => setViewMode("calendar")}>
             Calendar
@@ -60,11 +98,8 @@ export function FiltersBar(props: Props) {
 
         <div className="h-5 w-px bg-border" />
 
-        {/* Status chips — compact */}
         <div className="inline-flex items-center gap-1.5">
-          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Status
-          </span>
+          <FilterLabel>Status</FilterLabel>
           <Chip on={statusFilter === "all"} tone="neutral" onClick={() => setStatusFilter("all")}>
             All
           </Chip>
@@ -76,14 +111,11 @@ export function FiltersBar(props: Props) {
           </Chip>
         </div>
 
-        {/* Host dropdown — replaces the long row of host chips */}
         {allHosts.length > 0 && (
           <>
             <div className="h-5 w-px bg-border" />
             <div className="inline-flex items-center gap-2">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                Host
-              </span>
+              <FilterLabel>Host</FilterLabel>
               <select
                 value={hostFilter}
                 onChange={(e) => setHostFilter(e.target.value)}
@@ -110,7 +142,6 @@ export function FiltersBar(props: Props) {
           </>
         )}
 
-        {/* Export */}
         <button
           type="button"
           onClick={onExport}
@@ -154,11 +185,13 @@ function Chip({
   on,
   tone,
   onClick,
+  disabled,
   children,
 }: {
   on: boolean;
-  tone: "neutral" | "green" | "red";
+  tone: "neutral" | "green" | "red" | "amber";
   onClick: () => void;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   const onStyles =
@@ -166,6 +199,8 @@ function Chip({
       ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700"
       : tone === "red"
       ? "border-rose-500/50 bg-rose-500/10 text-rose-700"
+      : tone === "amber"
+      ? "border-amber-500/50 bg-amber-500/10 text-amber-700"
       : "border-primary bg-primary/10 text-primary";
   const offStyles =
     "border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground";
@@ -173,10 +208,21 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={"rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition " + (on ? onStyles : offStyles)}
+      disabled={disabled}
+      className={
+        "rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50 " +
+        (on ? onStyles : offStyles)
+      }
     >
       {children}
     </button>
   );
 }
 
+function FilterLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+      {children}
+    </span>
+  );
+}

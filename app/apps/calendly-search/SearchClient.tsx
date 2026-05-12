@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { SearchForm } from "./components/SearchForm";
 import { ProgressStrip } from "./components/ProgressStrip";
 import { Metrics } from "./components/Metrics";
-import { FiltersBar, StatusFilter, ViewMode } from "./components/FiltersBar";
+import {
+  CloserScope,
+  FiltersBar,
+  StatusFilter,
+  ViewMode,
+} from "./components/FiltersBar";
 import { BookingsTable } from "./components/BookingsTable";
 import { InviteesTable } from "./components/InviteesTable";
 import { HostsTable } from "./components/HostsTable";
@@ -14,6 +19,8 @@ import { runSearch } from "./lib/search";
 import { PresetKey, Row, SearchProgress, SearchResult } from "./lib/types";
 import { exportCsv } from "./lib/csv";
 import { normHostValue } from "./lib/format";
+
+const TITLE_PREFIX = "Strategy";
 
 type SortField =
   | "inviteeName"
@@ -26,11 +33,13 @@ type SortField =
   | "createdAt";
 
 export function SearchClient() {
+  // ---- closer roster ----
+  const [activeClosers, setActiveClosers] = useState<Set<string>>(new Set());
+  const [inactiveClosers, setInactiveClosers] = useState<Set<string>>(new Set());
+  const [closersLoading, setClosersLoading] = useState(true);
+  const [closersError, setClosersError] = useState<string | null>(null);
+
   // ---- search inputs ----
-  const [notes, setNotes] = useState<string[]>([]);
-  const [availableNotes, setAvailableNotes] = useState<string[]>([]);
-  const [notesLoading, setNotesLoading] = useState(true);
-  const [notesError, setNotesError] = useState<string | null>(null);
   const [presetKey, setPresetKey] = useState<PresetKey>("future");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -43,8 +52,9 @@ export function SearchClient() {
   const abortRef = useRef<AbortController | null>(null);
 
   // ---- view + filters ----
-  const [viewMode, setViewMode] = useState<ViewMode>("bookings");
+  const [viewMode, setViewMode] = useState<ViewMode>("calendar");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [closerScope, setCloserScope] = useState<CloserScope>("all");
   const [hostFilter, setHostFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("startTime");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -52,12 +62,8 @@ export function SearchClient() {
   // ---- modal ----
   const [modalRowId, setModalRowId] = useState<string | null>(null);
 
-  const runSearchWith = async (notesToUse: string[]) => {
-    if (notesToUse.length === 0) {
-      setError("Pick at least one funnel to search for.");
-      return;
-    }
-    if (presetKey === "custom" && (!customStart || !customEnd)) {
+  const runSearchWithPreset = async (presetForRun: PresetKey) => {
+    if (presetForRun === "custom" && (!customStart || !customEnd)) {
       setError("Select both start and end dates for custom range.");
       return;
     }
@@ -69,8 +75,8 @@ export function SearchClient() {
     abortRef.current = controller;
     try {
       const res = await runSearch({
-        notes: notesToUse,
-        presetKey,
+        titlePrefix: TITLE_PREFIX,
+        presetKey: presetForRun,
         customStart,
         customEnd,
         signal: controller.signal,
@@ -87,46 +93,46 @@ export function SearchClient() {
     }
   };
 
-  const onSearch = () => runSearchWith(notes);
+  const onSearch = () => runSearchWithPreset(presetKey);
 
   const onCancel = () => {
     abortRef.current?.abort();
     setLoading(false);
   };
 
-  // Pull the discrete set of internal_note values on mount. No caching —
-  // we hit Calendly fresh every time so newly-added funnels show up
-  // immediately. Once the list lands we default-select all and kick off a
-  // search so the user lands on populated data instead of an empty form.
+  // Pull the closer roster + kick off the default Strategy search on mount.
+  // Both happen in parallel — search doesn't depend on closer data (it's
+  // applied as a post-filter), so we don't block the slow search on the
+  // fast BQ lookup.
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
       try {
-        const res = await fetch("/api/calendly/internal-notes", {
+        const res = await fetch("/api/closers", {
           signal: controller.signal,
           cache: "no-store",
         });
-        const data: { notes?: string[]; error?: string } = await res
-          .json()
-          .catch(() => ({}));
+        const data: { active?: string[]; inactive?: string[]; error?: string } =
+          await res.json().catch(() => ({}));
         if (controller.signal.aborted) return;
         if (!res.ok) {
-          setNotesError(data.error || `Failed to load funnels (${res.status})`);
-          setNotesLoading(false);
-          return;
+          setClosersError(data.error || `Failed to load closers (${res.status})`);
+        } else {
+          setActiveClosers(new Set((data.active ?? []).map((e) => e.toLowerCase())));
+          setInactiveClosers(new Set((data.inactive ?? []).map((e) => e.toLowerCase())));
         }
-        const all = data.notes ?? [];
-        setAvailableNotes(all);
-        setNotes(all);
-        setNotesLoading(false);
-        if (all.length > 0) void runSearchWith(all);
       } catch (e) {
         if ((e as Error).name !== "AbortError") {
-          setNotesError((e as Error).message);
-          setNotesLoading(false);
+          setClosersError((e as Error).message);
         }
+      } finally {
+        setClosersLoading(false);
       }
     })();
+    // Defer the auto-search by a microtask so the closers fetch and the
+    // search-pipeline state updates land in separate ticks (avoids the
+    // cascading-render lint).
+    queueMicrotask(() => void runSearchWithPreset(presetKey));
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -136,6 +142,7 @@ export function SearchClient() {
     if (!result) return [] as Row[];
     return result.rows
       .filter((r) => statusFilter === "all" || r.status === statusFilter)
+      .filter((r) => closerScopeMatches(r, closerScope, activeClosers, inactiveClosers))
       .filter((r) => hostMatches(r, hostFilter))
       .sort((a, b) => {
         const va = (a[sortField] ?? "") as string | number;
@@ -143,7 +150,7 @@ export function SearchClient() {
         const cmp = va < vb ? -1 : va > vb ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [result, statusFilter, hostFilter, sortField, sortDir]);
+  }, [result, statusFilter, closerScope, activeClosers, inactiveClosers, hostFilter, sortField, sortDir]);
 
   const onSort = (field: SortField) => {
     if (sortField === field) {
@@ -159,11 +166,6 @@ export function SearchClient() {
   return (
     <div className="space-y-6">
       <SearchForm
-        notes={notes}
-        setNotes={setNotes}
-        availableNotes={availableNotes}
-        notesLoading={notesLoading}
-        notesError={notesError}
         presetKey={presetKey}
         setPresetKey={setPresetKey}
         customStart={customStart}
@@ -181,9 +183,14 @@ export function SearchClient() {
         </div>
       ) : null}
 
-      {notesLoading ? (
-        <ProgressStrip progress={null} initialMessage="Loading funnels…" />
-      ) : loading ? (
+      {closersError ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-800">
+          Couldn&apos;t load the closer roster: {closersError}. Closer-scope
+          filtering will fall back to All.
+        </div>
+      ) : null}
+
+      {loading ? (
         <ProgressStrip progress={progress} initialMessage="Starting search…" />
       ) : null}
 
@@ -191,7 +198,9 @@ export function SearchClient() {
         <>
           <Metrics
             rows={filtered}
-            allRows={result.rows}
+            allRows={result.rows.filter((r) =>
+              closerScopeMatches(r, closerScope, activeClosers, inactiveClosers),
+            )}
             hostFilter={hostFilter}
             matchedEventTypes={result.matchedEventTypes}
             debug={result.debug}
@@ -199,11 +208,16 @@ export function SearchClient() {
           />
 
           <FiltersBar
-            allRows={result.rows}
+            allRows={result.rows.filter((r) =>
+              closerScopeMatches(r, closerScope, activeClosers, inactiveClosers),
+            )}
             viewMode={viewMode}
             setViewMode={setViewMode}
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
+            closerScope={closerScope}
+            setCloserScope={setCloserScope}
+            closersLoading={closersLoading}
             hostFilter={hostFilter}
             setHostFilter={setHostFilter}
             filteredCount={filtered.length}
@@ -249,6 +263,26 @@ export function SearchClient() {
       ) : null}
     </div>
   );
+}
+
+function closerScopeMatches(
+  r: Row,
+  scope: CloserScope,
+  active: Set<string>,
+  inactive: Set<string>,
+): boolean {
+  if (scope === "all") return true;
+  const hostEmails = [r.hostEmail, ...r.hostEmails]
+    .map((e) => (e || "").trim().toLowerCase())
+    .filter(Boolean);
+  if (hostEmails.length === 0) return false;
+  if (scope === "active") return hostEmails.some((e) => active.has(e));
+  // scope === "inactive" — host is in the roster but NOT currently active.
+  // We require at least one inactive match and no active match, otherwise an
+  // event hosted by both an inactive and an active closer would double-count.
+  const anyInactive = hostEmails.some((e) => inactive.has(e));
+  const anyActive = hostEmails.some((e) => active.has(e));
+  return anyInactive && !anyActive;
 }
 
 function hostMatches(r: Row, selectedHost: string): boolean {

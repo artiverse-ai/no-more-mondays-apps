@@ -29,8 +29,7 @@ const CONCURRENCY = 8;
 const API_BASE = "/api/calendly";
 
 export type SearchOptions = {
-  /** Case-insensitive prefix the event_type.name must start with. */
-  titlePrefix: string;
+  notes: string[];
   presetKey: PresetKey;
   customStart?: string;
   customEnd?: string;
@@ -212,17 +211,12 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     },
   );
 
-  // Phase 4 — match event types whose name starts with the configured
-  // prefix (e.g. "Strategy"). This replaced the internal_note filter
-  // because >75% of event types weren't tagged with a funnel note, and
-  // the title prefix gives us reliable "sales call" detection without
-  // depending on Calendly admin hygiene.
-  const prefix = opts.titlePrefix.trim().toLowerCase();
-  const matchedTypes = prefix
-    ? allEventTypes.filter((et) =>
-        (et.name ?? "").trim().toLowerCase().startsWith(prefix),
-      )
-    : [];
+  // Phase 4 — match event types by internal_note ∈ picked set.
+  const wanted = new Set(opts.notes.map((n) => n.trim().toLowerCase()));
+  const matchedTypes = allEventTypes.filter((et) => {
+    const n = (et.internal_note ?? "").trim().toLowerCase();
+    return n.length > 0 && wanted.has(n);
+  });
   debug.eventTypesScanned = allEventTypes.length;
   debug.matchedTypes = matchedTypes.length;
 

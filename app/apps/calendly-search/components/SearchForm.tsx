@@ -1,8 +1,14 @@
 "use client";
 
+import { MultiSelect } from "@/components/MultiSelect";
 import { PRESETS, PresetKey } from "../lib/types";
 
 type Props = {
+  notes: string[];
+  setNotes: (v: string[]) => void;
+  availableNotes: string[];
+  notesLoading: boolean;
+  notesError: string | null;
   presetKey: PresetKey;
   setPresetKey: (k: PresetKey) => void;
   customStart: string;
@@ -16,6 +22,11 @@ type Props = {
 
 export function SearchForm(props: Props) {
   const {
+    notes,
+    setNotes,
+    availableNotes,
+    notesLoading,
+    notesError,
     presetKey,
     setPresetKey,
     customStart,
@@ -30,6 +41,34 @@ export function SearchForm(props: Props) {
   return (
     <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="space-y-5">
+        <div>
+          <Label>Internal Note (Funnel)</Label>
+          <MultiSelect
+            options={availableNotes}
+            value={notes}
+            onChange={setNotes}
+            loading={notesLoading}
+            placeholder="Pick one or more funnels…"
+            emptyMessage={
+              notesError
+                ? "Couldn't load funnels — check CALENDLY_PAT"
+                : "No funnels set on any event type"
+            }
+            searchPlaceholder="Search funnels…"
+          />
+          {notesError ? (
+            <p className="mt-1.5 text-xs text-destructive">{notesError}</p>
+          ) : (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Pulled from every event type&apos;s
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-[10px]">
+                internal_note
+              </code>
+              field. Defaults to all selected — uncheck All to pick specific funnels.
+            </p>
+          )}
+        </div>
+
         <div>
           <Label>Call Time</Label>
           <div className="flex flex-wrap items-center gap-2">
@@ -66,12 +105,6 @@ export function SearchForm(props: Props) {
               />
             </div>
           ) : null}
-          <p className="mt-2 text-xs text-muted-foreground">
-            Scopes to event types whose name starts with{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">Strategy</code>{" "}
-            (case-insensitive). Closer scope filter is below — narrow further to
-            active or inactive closer hosts.
-          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -81,7 +114,7 @@ export function SearchForm(props: Props) {
             disabled={loading}
             className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Searching…" : "Search Strategy Calls"}
+            {loading ? "Searching…" : "Search"}
           </button>
           {loading ? (
             <button

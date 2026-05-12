@@ -2,7 +2,7 @@
 
 import { Row } from "../lib/types";
 
-export type ViewMode = "calendar" | "bookings" | "invitees" | "hosts";
+export type ViewMode = "bookings" | "invitees" | "hosts";
 export type StatusFilter = "all" | "active" | "canceled";
 export type CloserScope = "all" | "active" | "inactive";
 
@@ -82,9 +82,6 @@ export function FiltersBar(props: Props) {
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-lg border border-border bg-background p-0.5">
-          <Tab on={viewMode === "calendar"} onClick={() => setViewMode("calendar")}>
-            Calendar
-          </Tab>
           <Tab on={viewMode === "bookings"} onClick={() => setViewMode("bookings")}>
             Bookings <Count n={filteredCount} />
           </Tab>

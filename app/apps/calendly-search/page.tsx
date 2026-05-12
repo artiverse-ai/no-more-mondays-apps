@@ -1,7 +1,7 @@
 import { SearchClient } from "./SearchClient";
 
 export const metadata = {
-  title: "Strategy Calls · No More Mondays",
+  title: "Funnel Search · No More Mondays",
 };
 
 export default function Page() {
@@ -12,11 +12,11 @@ export default function Page() {
           No More Mondays &middot; Sales Ops
         </p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">
-          Strategy Calls
+          Funnel Search
         </h1>
         <p className="text-sm text-muted-foreground">
-          Every Calendly booking on a Strategy-titled event type. Filter by
-          closer scope to narrow to active or inactive closer hosts.
+          Find Calendly bookings by funnel tag, then narrow further by closer
+          scope, host, or status.
         </p>
       </header>
 

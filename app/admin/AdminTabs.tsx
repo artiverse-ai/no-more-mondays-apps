@@ -6,20 +6,11 @@ import { usePathname } from "next/navigation";
 type Tab = {
   href: string;
   label: string;
-  description: string;
 };
 
 const TABS: Tab[] = [
-  {
-    href: "/admin/closers",
-    label: "Closers",
-    description: "Active roster for the booking dashboard.",
-  },
-  {
-    href: "/admin/access",
-    label: "Site access",
-    description: "Emails allowed to sign into this site.",
-  },
+  { href: "/admin/closers", label: "Closers" },
+  { href: "/admin/access", label: "Site access" },
 ];
 
 export function AdminTabs() {
@@ -54,10 +45,4 @@ export function AdminTabs() {
       })}
     </nav>
   );
-}
-
-export function TabDescription({ href }: { href: string }) {
-  const tab = TABS.find((t) => t.href === href);
-  if (!tab) return null;
-  return <p className="text-sm text-muted-foreground">{tab.description}</p>;
 }

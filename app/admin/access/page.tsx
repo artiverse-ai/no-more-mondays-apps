@@ -1,6 +1,6 @@
-import { getCurrentUser } from "@/lib/cf-access";
-import { getAllowedEmails } from "@/lib/cloudflare";
-import { AdminClient } from "../AdminClient";
+import { getCurrentUser } from "@/lib/auth";
+import { getAllowed } from "@/lib/clerk-allowlist";
+import { AccessClient } from "../AccessClient";
 
 export const metadata = {
   title: "Site access · Admin · No More Mondays",
@@ -8,13 +8,12 @@ export const metadata = {
 
 export default async function AdminAccessPage() {
   const user = await getCurrentUser();
-  // Layout already gated this, but keep the assertion for the email below.
   const adminEmail = user?.email ?? "";
 
-  let emails: string[] = [];
+  let allowed: Awaited<ReturnType<typeof getAllowed>> = [];
   let error: string | null = null;
   try {
-    emails = await getAllowedEmails();
+    allowed = await getAllowed();
   } catch (e) {
     error = (e as Error).message;
   }
@@ -26,28 +25,25 @@ export default async function AdminAccessPage() {
           Site access
         </h2>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Emails added here can sign into this site once Cloudflare Access is
-          enabled. The site is currently open (
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-            SKIP_AUTH=1
-          </code>
-          ), so this list isn&rsquo;t enforced yet.
+          Emails allowed to sign in via Clerk. Adding here writes to
+          Clerk&rsquo;s allowlist and emails them a sign-up link. Once they
+          create an account they can access the site.
         </p>
       </div>
       {error ? (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
           <p className="font-medium">
-            Cloudflare Access integration not configured yet.
+            Could not load the Clerk allowlist.
           </p>
           <p className="mt-1 text-xs opacity-90">{error}</p>
           <p className="mt-2 text-xs opacity-90">
-            Set <code>CLOUDFLARE_API_TOKEN</code>, <code>CF_ACCOUNT_ID</code>,
-            and <code>CF_ACCESS_GROUP_ID</code> in Vercel env vars to enable.
-            See <code>docs/DEPLOY.md</code>.
+            Make sure <code>CLERK_SECRET_KEY</code> is set in Vercel env vars
+            and that Restrictions → Allowlist is enabled in the Clerk
+            dashboard.
           </p>
         </div>
       ) : (
-        <AdminClient initialEmails={emails} adminEmail={adminEmail} />
+        <AccessClient initial={allowed} adminEmail={adminEmail} />
       )}
     </section>
   );

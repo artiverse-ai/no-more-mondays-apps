@@ -1,9 +1,10 @@
-// Current-user helpers. Sources identity from Clerk in production; falls
-// back to a synthetic admin in SKIP_AUTH mode or when Clerk isn't yet
-// configured (so /admin remains reachable during initial setup).
+// Current-user helpers. Identity from Clerk; admin-ness from either the
+// ADMIN_EMAILS env var (the bootstrap admins, baked at deploy time) OR
+// Clerk's user publicMetadata.role === "admin" (set via /admin/access).
 //
-// This replaces the old lib/cf-access.ts. ADMIN_EMAILS still drives the
-// isAdmin flag — same env var, same semantics, different identity source.
+// Bootstrap admins are immutable from the UI — they're who you trust to be
+// admin no matter what state Clerk is in. Anyone else gets admin only when
+// an existing admin promotes them.
 
 import { currentUser } from "@clerk/nextjs/server";
 
@@ -12,7 +13,7 @@ export type CurrentUser = {
   isAdmin: boolean;
 };
 
-function adminEmails(): string[] {
+function bootstrapAdminEmails(): string[] {
   return (process.env.ADMIN_EMAILS || "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
@@ -24,7 +25,7 @@ function isClerkConfigured(): boolean {
 }
 
 function syntheticAdmin(): CurrentUser | null {
-  const admins = adminEmails();
+  const admins = bootstrapAdminEmails();
   if (admins.length === 0) return null;
   return { email: admins[0], isAdmin: true };
 }
@@ -41,7 +42,10 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     if (!u) return null;
     const email = u.primaryEmailAddress?.emailAddress?.toLowerCase() ?? "";
     if (!email) return null;
-    return { email, isAdmin: adminEmails().includes(email) };
+    const meta = (u.publicMetadata ?? {}) as { role?: string };
+    const isAdmin =
+      bootstrapAdminEmails().includes(email) || meta.role === "admin";
+    return { email, isAdmin };
   } catch {
     return null;
   }

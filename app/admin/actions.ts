@@ -12,19 +12,24 @@ import {
   addAllowed,
   getAllowed,
   removeAllowed,
+  setRole,
+  type Role,
 } from "@/lib/clerk-allowlist";
 
 // ---- Site access (Clerk allowlist) ----
 
 export async function addAllowedAction(
   email: string,
+  role: Role = "user",
 ): Promise<{
   id: string;
   identifier: string;
   status: "accepted" | "pending" | "allowed";
+  role: Role;
+  isBootstrapAdmin: boolean;
 }> {
   await requireAdmin();
-  await addAllowed(email, true);
+  await addAllowed(email, { notify: true, role });
   // Clerk's create-endpoint doesn't return the new row consistently; re-fetch.
   const list = await getAllowed();
   const created = list.find(
@@ -36,12 +41,20 @@ export async function addAllowedAction(
     id: created.id,
     identifier: created.identifier,
     status: created.status,
+    role: created.role,
+    isBootstrapAdmin: created.isBootstrapAdmin,
   };
 }
 
 export async function removeAllowedAction(id: string): Promise<void> {
   await requireAdmin();
   await removeAllowed(id);
+  revalidatePath("/admin/access");
+}
+
+export async function setRoleAction(email: string, role: Role): Promise<void> {
+  await requireAdmin();
+  await setRole(email, role);
   revalidatePath("/admin/access");
 }
 

@@ -1,8 +1,11 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { CalendlyEventType, Row } from "../lib/types";
 import { fmtDate } from "../lib/format";
 import { MatchedPills } from "./MatchedPills";
+
+const PAGE_SIZE = 15;
 
 type SortField =
   | "inviteeName"
@@ -44,6 +47,25 @@ export function BookingsTable({
   matchedEventTypes,
   onInspect,
 }: Props) {
+  const [page, setPage] = useState(1);
+
+  // Reset to page 1 whenever the filtered set changes (status chip, sort,
+  // host dropdown, etc.) — otherwise the user can land on an empty page.
+  // React 19 pattern: derive the reset during render via a setState while
+  // rendering, rather than an effect.
+  const resetKey = `${rows.length}|${sortField}|${sortDir}|${rows[0]?.id ?? ""}`;
+  const [prevKey, setPrevKey] = useState(resetKey);
+  if (prevKey !== resetKey) {
+    setPrevKey(resetKey);
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, rows.length);
+  const pageRows = useMemo(() => rows.slice(pageStart, pageEnd), [rows, pageStart, pageEnd]);
+
   if (rows.length === 0) {
     return (
       <div className="overflow-hidden rounded-xl border border-border">
@@ -91,7 +113,7 @@ export function BookingsTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {pageRows.map((r) => (
               <tr key={r.id} className="border-b border-border/60 last:border-b-0 hover:bg-muted/40">
                 <td className="px-3 py-2.5 font-medium">{r.inviteeName}</td>
                 <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{r.inviteeEmailDisplay}</td>
@@ -136,12 +158,71 @@ export function BookingsTable({
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between border-t border-border bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground">
         <span>
-          Showing {rows.length} of {total} matched bookings · sorted by {sortField}
+          Showing {pageStart + 1}–{pageEnd} of {rows.length}
+          {rows.length < total ? ` (of ${total} total)` : ""} · sorted by {sortField}
         </span>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <PagerBtn
+              disabled={safePage === 1}
+              onClick={() => setPage(1)}
+              aria-label="First page"
+            >
+              «
+            </PagerBtn>
+            <PagerBtn
+              disabled={safePage === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Previous page"
+            >
+              ‹
+            </PagerBtn>
+            <span className="px-2 font-mono tabular-nums">
+              {safePage} / {totalPages}
+            </span>
+            <PagerBtn
+              disabled={safePage === totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              aria-label="Next page"
+            >
+              ›
+            </PagerBtn>
+            <PagerBtn
+              disabled={safePage === totalPages}
+              onClick={() => setPage(totalPages)}
+              aria-label="Last page"
+            >
+              »
+            </PagerBtn>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+function PagerBtn({
+  disabled,
+  onClick,
+  children,
+  ...rest
+}: {
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-md border border-border bg-background px-2 py-0.5 font-mono text-xs text-foreground transition hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-30"
+      {...rest}
+    >
+      {children}
+    </button>
   );
 }
 

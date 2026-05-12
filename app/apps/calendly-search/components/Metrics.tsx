@@ -19,6 +19,15 @@ export function Metrics({ rows, allRows, hostFilter, debug, window }: Props) {
   const canceled = rows.filter((r) => r.status === "canceled").length;
   const uniqueInvitees = new Set(rows.map((r) => r.inviteeEmail || r.id)).size;
 
+  // Earliest/latest scheduled call inside the current filter set — answers
+  // "where's the last call?" without scrolling the whole table.
+  const sortedTimes = rows
+    .map((r) => r.startTime)
+    .filter((t): t is string => !!t)
+    .sort();
+  const firstCall = sortedTimes[0] ?? null;
+  const lastCall = sortedTimes[sortedTimes.length - 1] ?? null;
+
   // Prospects who canceled and have no active booking (host scope only;
   // ignore the Status chip so toggling it doesn't change this count).
   const scope = allRows.filter((r) => hostMatches(r, hostFilter));
@@ -51,42 +60,59 @@ export function Metrics({ rows, allRows, hostFilter, debug, window }: Props) {
     if (activeBookings.length >= 2 && uniqueHosts.size >= 2) doubleBookings++;
   }
 
+  const pct = (n: number) => (total === 0 ? "" : `${Math.round((n / total) * 100)}% of calls`);
+
   return (
     <section className="space-y-3">
-      {/* Window + headline stats — one tight row */}
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Window
+      <div className="rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+          <span>
+            <span className="font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Window
+            </span>{" "}
+            <span className="font-mono text-foreground">
+              {fmtDate(window.start)} <span className="text-muted-foreground">→</span>{" "}
+              {fmtDate(window.end)}
+            </span>
           </span>
-          <span className="font-mono text-sm text-foreground">
-            {fmtDate(window.start)} <span className="text-muted-foreground">→</span>{" "}
-            {fmtDate(window.end)}
-          </span>
-          <span className="ml-auto flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <Stat label="Calls" value={total} tone="accent" />
-            <Stat label="Prospects" value={uniqueInvitees} tone="indigo" />
-            <Stat label="Active" value={active} tone="green" />
-            <Stat label="Canceled" value={canceled} tone={canceled > 0 ? "rose" : "muted"} />
-          </span>
+          {firstCall && lastCall && (
+            <>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  Earliest
+                </span>{" "}
+                <span className="font-mono text-foreground">{fmtDate(firstCall)}</span>
+              </span>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  Latest
+                </span>{" "}
+                <span className="font-mono text-foreground">{fmtDate(lastCall)}</span>
+              </span>
+            </>
+          )}
         </div>
+      </div>
 
-        {(doubleBookings > 0 || canceledOnly > 0) && (
-          <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3 text-xs">
-            {doubleBookings > 0 && (
-              <Flag tone="rose">
-                ⚠ {doubleBookings} double-booked{" "}
-                <span className="text-rose-700/70">(multi-host conflict)</span>
-              </Flag>
-            )}
-            {canceledOnly > 0 && (
-              <Flag tone="amber">
-                {canceledOnly} canceled prospect{canceledOnly === 1 ? "" : "s"}{" "}
-                <span className="text-amber-700/70">(no active booking)</span>
-              </Flag>
-            )}
-          </div>
-        )}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <Card label="Matched Calls" value={total} valueClass="text-accent" />
+        <Card label="Unique Prospects" value={uniqueInvitees} valueClass="text-indigo-600" />
+        <Card label="Active Calls" value={active} valueClass="text-emerald-600" sub={pct(active)} />
+        <Card label="Canceled Calls" value={canceled} valueClass="text-rose-600" sub={pct(canceled)} />
+        <Card
+          label="Canceled Prospects"
+          value={canceledOnly}
+          valueClass="text-rose-600"
+          sub="without active booking"
+        />
+        <Card
+          label="Double Bookings"
+          value={doubleBookings}
+          valueClass={doubleBookings > 0 ? "text-rose-600" : "text-foreground"}
+          sub={doubleBookings > 0 ? "active multi-host conflict" : undefined}
+        />
       </div>
 
       {debug.windowsFailed > 0 && (
@@ -114,52 +140,25 @@ export function Metrics({ rows, allRows, hostFilter, debug, window }: Props) {
   );
 }
 
-function Stat({
+function Card({
   label,
   value,
-  tone,
+  valueClass,
+  sub,
 }: {
   label: string;
   value: number;
-  tone: "accent" | "indigo" | "green" | "rose" | "muted";
+  valueClass: string;
+  sub?: string;
 }) {
-  const toneCls =
-    tone === "accent"
-      ? "text-accent"
-      : tone === "indigo"
-      ? "text-indigo-600"
-      : tone === "green"
-      ? "text-emerald-600"
-      : tone === "rose"
-      ? "text-rose-600"
-      : "text-foreground/60";
   return (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span className={"font-mono text-xl font-semibold leading-none " + toneCls}>
-        {value}
-      </span>
-      <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
         {label}
-      </span>
-    </span>
-  );
-}
-
-function Flag({
-  tone,
-  children,
-}: {
-  tone: "rose" | "amber";
-  children: React.ReactNode;
-}) {
-  const cls =
-    tone === "rose"
-      ? "border-rose-500/40 bg-rose-500/10 text-rose-700"
-      : "border-amber-500/40 bg-amber-500/10 text-amber-700";
-  return (
-    <span className={"inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 " + cls}>
-      {children}
-    </span>
+      </p>
+      <p className={"mt-2 font-mono text-3xl font-semibold leading-none " + valueClass}>{value}</p>
+      {sub ? <p className="mt-2 text-[11px] text-muted-foreground">{sub}</p> : null}
+    </div>
   );
 }
 

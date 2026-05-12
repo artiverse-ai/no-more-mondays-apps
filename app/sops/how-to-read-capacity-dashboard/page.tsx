@@ -218,7 +218,7 @@ export default function HowToReadCapacityDashboardSop() {
       <section className="sop-card">
         <div className="sop-card-title">
           <span className="sop-card-num">07</span>
-          <h2 className="sop-h2">The ⚠ on a closer pill</h2>
+          <h2 className="sop-h2">The (i) badge next to a closer</h2>
         </div>
         <p className="sop-why">
           <strong>Why:</strong> The booking system trusts whatever it sees on
@@ -228,9 +228,10 @@ export default function HowToReadCapacityDashboardSop() {
         </p>
         <p>
           In the <strong>Filter by closer</strong> row, a closer pill turns{" "}
-          <span style={{ color: "#a05a00", fontWeight: 600 }}>amber with a{" "}
-          ⚠ icon</span> when their calendar looks thin for the visible date
-          range. Hover the pill to see their numbers. Closers live in
+          <span style={{ color: "#a05a00", fontWeight: 600 }}>amber</span>{" "}
+          when their calendar looks thin for the visible date range, and a
+          small <code>(i)</code> info badge appears next to the pill. Hover
+          the <code>(i)</code> to see the exact reason. Closers live in
           different timezones, so the check uses signals that don&rsquo;t
           depend on a specific TZ:
         </p>

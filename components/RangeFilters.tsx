@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { DatePopover } from "./DatePopover";
 
 const TIMEZONES = [
   { value: "America/New_York", label: "Eastern (ET) — NYC" },
@@ -48,6 +49,40 @@ function daysBetween(fromIso: string, toIso: string): number {
 
 const shortName = (email: string) => email.split("@")[0];
 
+// Compact info indicator: amber-circled `i`. Hover shows a custom tooltip
+// with the warning text (no native title-attr delay).
+function InfoCircle() {
+  return (
+    <span
+      aria-hidden
+      className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-amber-600/40 bg-amber-500/15 text-[10px] font-bold italic leading-none text-amber-700"
+    >
+      i
+    </span>
+  );
+}
+
+function InfoBadge({ text }: { text: string }) {
+  return (
+    <span className="group/info relative inline-flex">
+      <span
+        role="button"
+        tabIndex={0}
+        aria-label="Why this is flagged"
+        className="cursor-help"
+      >
+        <InfoCircle />
+      </span>
+      <span
+        role="tooltip"
+        className="pointer-events-none invisible absolute left-1/2 top-full z-30 mt-1.5 min-w-[18ch] max-w-[36ch] -translate-x-1/2 whitespace-normal rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] font-normal leading-snug text-popover-foreground shadow-md opacity-0 transition-opacity duration-100 group-hover/info:visible group-hover/info:opacity-100 group-focus-within/info:visible group-focus-within/info:opacity-100"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function RangeFilters({
   defaultFrom,
   defaultTo,
@@ -71,8 +106,6 @@ export function RangeFilters({
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
-  const fromRef = useRef<HTMLInputElement>(null);
-  const toRef = useRef<HTMLInputElement>(null);
 
   const update = (patch: Record<string, string>) => {
     const next = new URLSearchParams(params);
@@ -80,19 +113,6 @@ export function RangeFilters({
     // interval is now auto-derived from duration; never carry a stale value.
     next.delete("interval");
     startTransition(() => router.push(`/apps/calendar?${next.toString()}`, { scroll: false }));
-  };
-
-  const openFrom = () => {
-    const el = fromRef.current;
-    if (!el) return;
-    if (typeof el.showPicker === "function") el.showPicker();
-    else el.focus();
-  };
-  const openTo = () => {
-    const el = toRef.current;
-    if (!el) return;
-    if (typeof el.showPicker === "function") el.showPicker();
-    else el.focus();
   };
 
   const fromB = fmtBig(defaultFrom, defaultTz);
@@ -120,57 +140,53 @@ export function RangeFilters({
             <span aria-hidden>‹</span>
           </button>
 
-          <button
-            type="button"
-            onClick={openFrom}
-            title="Click to pick start date"
-            className="group flex cursor-pointer flex-col items-start rounded-md px-3 py-1 text-left transition-colors hover:bg-secondary"
-          >
-            <span className="font-heading text-2xl font-semibold leading-none tracking-tight">
-              {fromB.weekday}
-            </span>
-            <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-              {fromB.rest}
-              <span className="opacity-50 transition-opacity group-hover:opacity-100">📅</span>
-            </span>
-          </button>
-          <input
-            ref={fromRef}
-            type="date"
+          <DatePopover
             value={defaultFrom}
             max={defaultTo}
-            onChange={(e) => update({ from: e.target.value })}
-            className="sr-only"
-            tabIndex={-1}
-            aria-hidden="true"
-          />
+            onChange={(v) => update({ from: v })}
+          >
+            {(trigger) => (
+              <button
+                type="button"
+                title="Click to pick start date"
+                className="group flex cursor-pointer flex-col items-start rounded-md px-3 py-1 text-left transition-colors hover:bg-secondary"
+                {...trigger}
+              >
+                <span className="font-heading text-2xl font-semibold leading-none tracking-tight">
+                  {fromB.weekday}
+                </span>
+                <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  {fromB.rest}
+                  <span className="opacity-50 transition-opacity group-hover:opacity-100">📅</span>
+                </span>
+              </button>
+            )}
+          </DatePopover>
 
           <span className="px-2 text-muted-foreground">→</span>
 
-          <button
-            type="button"
-            onClick={openTo}
-            title="Click to pick end date"
-            className="group flex cursor-pointer flex-col items-start rounded-md px-3 py-1 text-left transition-colors hover:bg-secondary"
-          >
-            <span className="font-heading text-2xl font-semibold leading-none tracking-tight">
-              {toB.weekday}
-            </span>
-            <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-              {toB.rest}
-              <span className="opacity-50 transition-opacity group-hover:opacity-100">📅</span>
-            </span>
-          </button>
-          <input
-            ref={toRef}
-            type="date"
+          <DatePopover
             value={defaultTo}
             min={defaultFrom}
-            onChange={(e) => update({ to: e.target.value })}
-            className="sr-only"
-            tabIndex={-1}
-            aria-hidden="true"
-          />
+            onChange={(v) => update({ to: v })}
+          >
+            {(trigger) => (
+              <button
+                type="button"
+                title="Click to pick end date"
+                className="group flex cursor-pointer flex-col items-start rounded-md px-3 py-1 text-left transition-colors hover:bg-secondary"
+                {...trigger}
+              >
+                <span className="font-heading text-2xl font-semibold leading-none tracking-tight">
+                  {toB.weekday}
+                </span>
+                <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  {toB.rest}
+                  <span className="opacity-50 transition-opacity group-hover:opacity-100">📅</span>
+                </span>
+              </button>
+            )}
+          </DatePopover>
 
           <button
             type="button"
@@ -283,10 +299,9 @@ export function RangeFilters({
             const isFlagged = flaggedSet.has(email);
             const flagReason = flaggedReasons?.[email];
             return (
-              <li key={email}>
+              <li key={email} className="inline-flex items-center gap-1">
                 <button
                   type="button"
-                  title={flagReason}
                   onClick={() => {
                     const next = new URLSearchParams(params);
                     next.delete("interval");
@@ -305,24 +320,17 @@ export function RangeFilters({
                       : "border-border bg-background text-foreground hover:border-foreground/40"
                   }`}
                 >
-                  {isFlagged ? (
-                    <span
-                      aria-label="Calendar hygiene warning"
-                      className={isActive ? "" : "text-amber-600"}
-                    >
-                      ⚠
-                    </span>
-                  ) : null}
                   {shortName(email)}
                 </button>
+                {isFlagged && flagReason ? <InfoBadge text={flagReason} /> : null}
               </li>
             );
           })}
         </ul>
         {flaggedEmails && flaggedEmails.length > 0 ? (
           <p className="text-[11px] text-muted-foreground">
-            <span className="text-amber-700">⚠</span> = thin calendar for this
-            date range — hover for detail, see{" "}
+            <InfoCircle /> next to a name = thin calendar for this date range.
+            Hover for detail, or read{" "}
             <a
               href="/sops/how-to-read-capacity-dashboard"
               className="underline underline-offset-2 hover:text-foreground"

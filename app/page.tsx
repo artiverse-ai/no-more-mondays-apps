@@ -142,9 +142,9 @@ export default async function HomePage() {
   const user = await getCurrentUser();
 
   return (
-    <main className="mx-auto w-full max-w-7xl p-6 md:p-10">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        <div className="flex min-w-0 flex-1 flex-col space-y-10">
+    <div className="flex min-h-screen flex-col lg:flex-row lg:items-stretch">
+      <div className="min-w-0 flex-1">
+        <main className="mx-auto w-full max-w-6xl space-y-10 p-6 md:p-10">
           <header className="space-y-2 border-b border-border pb-8">
             <div className="flex items-start justify-between gap-6">
               <div className="space-y-2">
@@ -180,10 +180,10 @@ export default async function HomePage() {
 
           <Section title="Apps" tiles={apps} />
           <Section title="Dashboards" tiles={dashboards} />
-        </div>
-
-        <SopsRail sops={sops} />
+        </main>
       </div>
-    </main>
+
+      <SopsRail sops={sops} />
+    </div>
   );
 }

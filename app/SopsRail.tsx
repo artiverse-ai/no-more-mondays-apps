@@ -43,12 +43,12 @@ export function SopsRail({ sops }: { sops: SopRailEntry[] }) {
   return (
     <aside
       className={
-        "w-full shrink-0 transition-[width] duration-200 ease-out lg:sticky lg:top-6 lg:self-start " +
-        (open ? "lg:w-80" : "lg:w-11")
+        "w-full shrink-0 transition-[width] duration-200 ease-out lg:py-6 lg:pr-6 " +
+        (open ? "lg:w-80" : "lg:w-16")
       }
       aria-label="SOPs"
     >
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:sticky lg:top-6">
         {/* Header bar — different layout when collapsed (vertical) vs expanded */}
         {open ? (
           <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">

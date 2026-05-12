@@ -100,30 +100,30 @@ export default function NewCloserJoinsSop() {
           calendar to surface. A closer not on the list will never appear in
           the capacity view, even if their calendar is shared.
         </p>
-        <p>
-          <strong>Today (Google Sheet):</strong>
-        </p>
         <ol>
           <li>
             Open the{" "}
-            <em>Active Closers</em> Google Sheet (linked in #sales-ops
-            pinned messages).
+            <Link className="sop-link" href="/admin">
+              admin page
+            </Link>{" "}
+            (top-right of the calendar dashboard).
           </li>
           <li>
-            Add a new row with: <strong>email</strong> (Google Workspace
-            address that owns the calendar),{" "}
-            <strong>display name</strong>,{" "}
-            <strong>start_date</strong> (today), and{" "}
-            <strong>is_active</strong> = <code>TRUE</code>.
+            Under the <strong>Closers</strong> section, type their Google
+            Workspace email in the &ldquo;Add closer by email&rdquo; box and
+            press <strong>Add</strong>.
           </li>
-          <li>Save. No need to sort — the loader handles ordering.</li>
+          <li>
+            New closers come in with both flags <strong>on</strong> (Active +
+            Available), so they appear in the dashboard immediately after the
+            next 5-minute sync.
+          </li>
+          <li>
+            If they aren&rsquo;t ready to take calls yet (training, ramp-up),
+            flip <strong>Available</strong> off and turn it back on when they
+            are.
+          </li>
         </ol>
-        <p className="sop-callout">
-          <strong>Coming soon:</strong> this list is moving directly into
-          BigQuery, with an admin UI in this app. Once that lands, the
-          Google Sheet step is replaced by an &ldquo;Add closer&rdquo; button
-          and you can ignore everything in this section.
-        </p>
       </section>
 
       <section className="sop-card">

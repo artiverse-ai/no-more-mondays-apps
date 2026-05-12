@@ -39,27 +39,25 @@ export default function CloserRemovedSop() {
           delete the row — flip the flag — so historical reporting still
           knows who they were.
         </p>
-        <p>
-          <strong>Today (Google Sheet):</strong>
-        </p>
         <ol>
           <li>
-            Open the <em>Active Closers</em> Google Sheet.
+            Open the{" "}
+            <Link className="sop-link" href="/admin">
+              admin page
+            </Link>{" "}
+            and find them under the <strong>Closers</strong> section.
           </li>
           <li>
-            Find their row. Set <strong>is_active</strong> = <code>FALSE</code>{" "}
-            and fill in <strong>end_date</strong> with today.
+            Flip <strong>Active</strong> off. They drop out of the dashboard
+            on the next sync.
           </li>
           <li>
-            Save. <em>Do not delete the row</em> — past bookings and any
-            historical reporting still reference their email.
+            Don&rsquo;t click <strong>Remove</strong>. Removing wipes the row
+            and breaks historical attribution. <em>Inactive</em> is the
+            soft-delete you want; <em>Remove</em> is for cleaning up typos
+            and never-onboarded entries.
           </li>
         </ol>
-        <p className="sop-callout">
-          <strong>Coming soon:</strong> the active-closers list moves to
-          BigQuery with an admin UI in this app. The button to deactivate
-          will live there.
-        </p>
       </section>
 
       <section className="sop-card">

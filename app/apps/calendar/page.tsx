@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getRangeSlots, getTeamMembers } from "@/lib/availability";
+import { getCurrentUser } from "@/lib/cf-access";
 import { RangeFilters } from "@/components/RangeFilters";
 import { SlotMatrix } from "@/components/SlotMatrix";
 import { RangeDayChart } from "@/components/RangeDayChart";
@@ -71,7 +72,7 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
   const teamParam = pickStr(params.team, "");
   const selectedTeam = teamParam.split(",").map((s) => s.trim()).filter(Boolean);
 
-  const [slots, members] = await Promise.all([
+  const [slots, members, currentUser] = await Promise.all([
     getRangeSlots({
       fromDate,
       toDate,
@@ -81,6 +82,7 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
       emails: selectedTeam.length > 0 ? selectedTeam : undefined,
     }),
     getTeamMembers(),
+    getCurrentUser(),
   ]);
 
   const effectiveMembers = selectedTeam.length > 0 ? selectedTeam : members;
@@ -130,12 +132,22 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
             {members.length} active &amp; available closer
             {members.length === 1 ? "" : "s"} &middot; {tz}
           </p>
-          <Link
-            href="/sops/how-to-read-capacity-dashboard"
-            className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground hover:text-accent"
-          >
-            How to read this →
-          </Link>
+          <div className="flex items-center gap-3">
+            {currentUser?.isAdmin ? (
+              <Link
+                href="/admin"
+                className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground shadow-sm hover:border-accent hover:text-accent"
+              >
+                Admin
+              </Link>
+            ) : null}
+            <Link
+              href="/sops/how-to-read-capacity-dashboard"
+              className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground hover:text-accent"
+            >
+              How to read this →
+            </Link>
+          </div>
         </div>
       </header>
 

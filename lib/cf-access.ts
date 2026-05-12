@@ -26,6 +26,19 @@ function adminEmails(): string[] {
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
+  // SKIP_AUTH mode: Cloudflare Access isn't fronting the app yet, so there's
+  // no CF identity header. To keep /admin reachable in this transitional
+  // state, surface the first ADMIN_EMAILS entry as a synthetic admin user.
+  // Once CF Access is enabled and SKIP_AUTH is removed, only requests
+  // carrying the real CF header are honored.
+  if (process.env.SKIP_AUTH === "1") {
+    const admins = adminEmails();
+    if (admins.length > 0) {
+      return { email: admins[0], isAdmin: true };
+    }
+    return null;
+  }
+
   const h = await headers();
   const raw = h.get(HEADER_EMAIL);
   if (!raw) return null;

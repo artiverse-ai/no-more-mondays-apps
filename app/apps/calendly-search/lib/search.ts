@@ -60,8 +60,24 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     }
     const res = await fetch(url.toString(), { signal: opts.signal });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || err.message || `Proxy error ${res.status}`);
+      // Calendly returns { title, message, details: [{ parameter, message }] }.
+      // Surface all of it so we know exactly which param it rejected.
+      const errBody: {
+        title?: string;
+        message?: string;
+        error?: string;
+        details?: Array<{ parameter?: string; message?: string }>;
+      } = await res.json().catch(() => ({}));
+      const headline = errBody.message || errBody.error || errBody.title || `HTTP ${res.status}`;
+      const detailsStr =
+        errBody.details && errBody.details.length > 0
+          ? " · " +
+            errBody.details
+              .map((d) => `${d.parameter ?? "?"}: ${d.message ?? ""}`)
+              .join("; ")
+          : "";
+      const queryStr = url.search.length > 1 ? url.search.slice(1) : "";
+      throw new Error(`${headline}${detailsStr} [${queryStr}]`);
     }
     return res.json() as Promise<T>;
   };
@@ -349,11 +365,11 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
   return { rows, matchedEventTypes: matchedTypes, debug, window: windowOut, rawById };
 }
 
-// Calendly's /scheduled_events caps the (min_start_time, max_start_time)
-// range per request — the docs say 1 year, but in practice we've seen
-// silent partial results well under that. 90 days is conservative and
-// trades a few more parallel requests for reliable coverage.
-const MAX_WINDOW_DAYS = 90;
+// Calendly's /scheduled_events docs say up to 1 year per request, but 90-day
+// windows have been seen rejected with "supplied parameters are invalid" on
+// the first chunk. 60d is conservative; the extra fan-out is cheap compared
+// to silently losing months of data.
+const MAX_WINDOW_DAYS = 60;
 
 // Calendly's /scheduled_events rejects ISO timestamps with millisecond
 // precision ("The supplied parameters are invalid"). Drop ms.

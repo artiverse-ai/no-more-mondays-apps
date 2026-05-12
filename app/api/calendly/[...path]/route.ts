@@ -64,6 +64,17 @@ async function handle(
       cache: "no-store",
     });
     const body = await upstreamRes.text();
+    if (!upstreamRes.ok) {
+      // Surface the full upstream response in Vercel logs so we can debug
+      // "invalid parameters" failures without guessing.
+      console.error(
+        "[calendly-proxy]",
+        upstreamRes.status,
+        upstream.toString(),
+        "→",
+        body.slice(0, 1000),
+      );
+    }
     return new Response(body, {
       status: upstreamRes.status,
       headers: {

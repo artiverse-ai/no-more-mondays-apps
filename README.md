@@ -20,25 +20,26 @@ Internal apps and dashboards for No More Mondays, deployed as a single Next.js
 │   │       ├── SearchClient.tsx
 │   │       ├── components/
 │   │       └── lib/
+│   ├── dashboards/
+│   │   └── webinar/                Webinar Performance dashboard — live BigQuery
+│   │       ├── page.tsx            over dbt_tuddin marts; overview + filters
+│   │       └── [date]/page.tsx     per-webinar drill-through (KPIs, funnel, calls)
 │   ├── admin/                      Access management (add/remove allow-listed users)
 │   │   ├── page.tsx
 │   │   ├── AdminClient.tsx
 │   │   └── actions.ts              Server Actions that hit the Cloudflare API
 │   └── api/
 │       └── calendly/[...path]/     Server-side Calendly proxy (holds PAT)
-├── lib/
-│   ├── cf-access.ts                Read current user from CF Access headers
-│   └── cloudflare.ts               Cloudflare Access Group REST client
 ├── proxy.ts                        Next 16 proxy — gates whole site behind CF Access
 ├── components/                     UI + chart components (shadcn-based)
-├── lib/                            bq client, availability queries, helpers
+│   └── webinar/                    Webinar dashboard charts, table, filters
+├── lib/                            bq client, availability + closers + webinar
+│   ├── cf-access.ts                Read current user from CF Access headers
+│   ├── cloudflare.ts               Cloudflare Access Group REST client
+│   └── webinar.ts                  BigQuery queries over dbt_tuddin webinar marts
 ├── public/
 ├── apps_script/                    Google Apps Script (reference, runs in GAS)
 │                                   syncs GCal + Calendly into a Sheet
-├── dashboard/                      Legacy static dashboard (vanilla JS).
-│                                   Maintained separately by a teammate; will be
-│                                   ported into the Next app under a future
-│                                   /dashboards/webinar route.
 └── docs/DEPLOY.md                  Vercel + BigQuery setup
 ```
 
@@ -50,13 +51,14 @@ cp .env.local.example .env.local   # then fill in BQ creds
 pnpm dev                            # http://localhost:3000
 ```
 
-The calendar route at `/apps/calendar` queries BigQuery on every request. You
-need a service-account key with read access to the `nmm_calendar` dataset (see
-`docs/DEPLOY.md` for how to get one).
+The BigQuery-backed routes — `/apps/calendar` (reads `nmm_calendar`) and
+`/dashboards/webinar` (reads `dbt_tuddin`) — query BigQuery on every request.
+You need a service-account key with read access to both datasets in
+`no-more-mondays-analytics` (see `docs/DEPLOY.md` for how to get one).
 
-Without `.env.local`, the calendar route falls back to Application Default
-Credentials (`gcloud auth application-default login`). The home page and other
-non-BQ routes work without any credentials.
+Without `.env.local`, these routes fall back to Application Default Credentials
+(`gcloud auth application-default login`). The home page, SOPs, and the
+Calendly apps work without any BigQuery credentials.
 
 ## Where data comes from
 

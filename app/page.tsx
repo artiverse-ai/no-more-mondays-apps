@@ -29,11 +29,11 @@ const apps: Tile[] = [
 
 const dashboards: Tile[] = [
   {
-    href: "#",
+    href: "/dashboards/webinar",
     title: "Webinar Performance",
     description:
-      "End-to-end webinar funnel — spend, registrations, attendance, calls, revenue. Currently being rebuilt for this app.",
-    status: "coming_soon",
+      "End-to-end webinar funnel — spend, registrations, attendance, calls, revenue, ROAS. Live from BigQuery, with per-webinar drill-through.",
+    status: "live",
   },
 ];
 

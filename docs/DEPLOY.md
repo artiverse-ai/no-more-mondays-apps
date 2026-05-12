@@ -31,8 +31,13 @@ In **Project Settings → Environment Variables**, add these keys for both
 
 The service account needs:
 
-- `roles/bigquery.dataViewer` on the `nmm_calendar` dataset
+- `roles/bigquery.dataViewer` on the `nmm_calendar` dataset (calendar app)
+- `roles/bigquery.dataViewer` on the `dbt_tuddin` dataset (webinar dashboard —
+  `/dashboards/webinar` reads `mart_webinar_events` + `int_calls_enriched`)
 - `roles/bigquery.jobUser` on the `no-more-mondays-analytics` project
+
+(`BQ_PROJECT` / `BQ_DATASET` only steer the calendar app's queries; the webinar
+dashboard is hard-coded to `no-more-mondays-analytics.dbt_tuddin`.)
 
 You can use the existing
 `shahriar-s-service-account@no-more-mondays-analytics.iam.gserviceaccount.com`

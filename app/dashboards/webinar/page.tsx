@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getCurrentUser } from "@/lib/cf-access";
+import { getCurrentUser } from "@/lib/auth";
 import {
   computeKpis,
   filterWebinars,

@@ -4,7 +4,7 @@ import {
   getRangeSlots,
   getTeamMembers,
 } from "@/lib/availability";
-import { getCurrentUser } from "@/lib/cf-access";
+import { getCurrentUser } from "@/lib/auth";
 import { RangeFilters } from "@/components/RangeFilters";
 import { SlotMatrix } from "@/components/SlotMatrix";
 import { RangeDayChart } from "@/components/RangeDayChart";

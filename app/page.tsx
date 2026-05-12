@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/cf-access";
+import { getCurrentUser } from "@/lib/auth";
 import { SopsRail, type SopRailEntry } from "./SopsRail";
+import { AuthButtons } from "./AuthButtons";
 
 type Tile = {
   href: string;
@@ -159,14 +160,17 @@ export default async function HomePage() {
                   are analytics views.
                 </p>
               </div>
-              {user?.isAdmin ? (
-                <Link
-                  href="/admin"
-                  className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground shadow-sm hover:border-accent hover:text-accent"
-                >
-                  Admin
-                </Link>
-              ) : null}
+              <div className="flex items-center gap-3">
+                {user?.isAdmin ? (
+                  <Link
+                    href="/admin"
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground shadow-sm hover:border-accent hover:text-accent"
+                  >
+                    Admin
+                  </Link>
+                ) : null}
+                <AuthButtons />
+              </div>
             </div>
             {user ? (
               <p className="pt-1 text-xs text-muted-foreground">

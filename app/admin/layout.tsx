@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/cf-access";
+import { getCurrentUser } from "@/lib/auth";
 import { AdminTabs } from "./AdminTabs";
 
 export const dynamic = "force-dynamic";

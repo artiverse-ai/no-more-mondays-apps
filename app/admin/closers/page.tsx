@@ -1,6 +1,5 @@
 import { getClosers } from "@/lib/closers";
 import { ClosersClient } from "../ClosersClient";
-import { TabDescription } from "../AdminTabs";
 
 export const metadata = {
   title: "Closers · Admin · No More Mondays",
@@ -38,7 +37,6 @@ export default async function AdminClosersPage() {
       ) : (
         <ClosersClient initial={closers} />
       )}
-      <TabDescription href="/admin/closers" />
     </section>
   );
 }

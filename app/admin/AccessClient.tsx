@@ -1,15 +1,21 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { addUserAction, removeUserAction } from "./actions";
+import { addAllowedAction, removeAllowedAction } from "./actions";
+
+type Allowed = {
+  id: string;
+  identifier: string;
+  invitationId?: string | null;
+};
 
 type Props = {
-  initialEmails: string[];
+  initial: Allowed[];
   adminEmail: string;
 };
 
-export function AdminClient({ initialEmails, adminEmail }: Props) {
-  const [emails, setEmails] = useState<string[]>(initialEmails);
+export function AccessClient({ initial, adminEmail }: Props) {
+  const [allowed, setAllowed] = useState<Allowed[]>(initial);
   const [newEmail, setNewEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -29,34 +35,38 @@ export function AdminClient({ initialEmails, adminEmail }: Props) {
       setError("Enter a valid email.");
       return;
     }
-    if (emails.includes(trimmed)) {
-      setError("Already on the list.");
+    if (allowed.some((a) => a.identifier === trimmed)) {
+      setError("Already on the allow-list.");
       return;
     }
     startTransition(async () => {
       try {
-        await addUserAction(trimmed);
-        setEmails([...emails, trimmed].sort());
+        const created = await addAllowedAction(trimmed);
+        setAllowed((cur) =>
+          [...cur, created].sort((a, b) =>
+            a.identifier.localeCompare(b.identifier),
+          ),
+        );
         setNewEmail("");
-        setNotice(`Added ${trimmed}.`);
+        setNotice(`Added ${trimmed} — Clerk emailed them a sign-up link.`);
       } catch (e) {
         setError((e as Error).message);
       }
     });
   };
 
-  const onRemove = (email: string) => {
+  const onRemove = (entry: Allowed) => {
     reset();
-    const isSelf = email === adminEmail;
+    const isSelf = entry.identifier === adminEmail.toLowerCase();
     const msg = isSelf
-      ? "Remove yourself? You'll lose access next sign-in."
-      : `Remove ${email}?`;
+      ? "Remove yourself? You'll lose admin access next sign-in."
+      : `Revoke access for ${entry.identifier}?`;
     if (!confirm(msg)) return;
     startTransition(async () => {
       try {
-        await removeUserAction(email);
-        setEmails(emails.filter((e) => e !== email));
-        setNotice(`Removed ${email}.`);
+        await removeAllowedAction(entry.id);
+        setAllowed((cur) => cur.filter((a) => a.id !== entry.id));
+        setNotice(`Removed ${entry.identifier}.`);
       } catch (e) {
         setError((e as Error).message);
       }
@@ -70,7 +80,7 @@ export function AdminClient({ initialEmails, adminEmail }: Props) {
         className="rounded-2xl border border-border bg-card p-5 shadow-sm"
       >
         <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          Add user by email
+          Invite by email
         </label>
         <div className="flex gap-2">
           <input
@@ -86,9 +96,14 @@ export function AdminClient({ initialEmails, adminEmail }: Props) {
             disabled={pending || !newEmail.trim()}
             className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {pending ? "Working…" : "Add"}
+            {pending ? "Working…" : "Invite"}
           </button>
         </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Adds the email to Clerk&rsquo;s allowlist and emails them a sign-up
+          link. Once they click it and create a Clerk account they can sign
+          in. Removing here revokes their access on the next sign-in.
+        </p>
       </form>
 
       {notice ? (
@@ -108,24 +123,24 @@ export function AdminClient({ initialEmails, adminEmail }: Props) {
             Allowed users
           </span>
           <span className="font-mono text-xs text-muted-foreground">
-            {emails.length}
+            {allowed.length}
           </span>
         </div>
-        {emails.length === 0 ? (
+        {allowed.length === 0 ? (
           <p className="px-4 py-10 text-center text-sm text-muted-foreground">
-            No users yet. Add the first email above.
+            Nobody on the list yet. Invite the first user above.
           </p>
         ) : (
           <ul>
-            {emails.map((email) => {
-              const isSelf = email === adminEmail;
+            {allowed.map((entry) => {
+              const isSelf = entry.identifier === adminEmail.toLowerCase();
               return (
                 <li
-                  key={email}
+                  key={entry.id}
                   className="flex items-center justify-between border-b border-border/60 px-4 py-2.5 last:border-b-0"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm">{email}</span>
+                    <span className="font-mono text-sm">{entry.identifier}</span>
                     {isSelf ? (
                       <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
                         you
@@ -134,7 +149,7 @@ export function AdminClient({ initialEmails, adminEmail }: Props) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => onRemove(email)}
+                    onClick={() => onRemove(entry)}
                     disabled={pending}
                     className="rounded-md border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground hover:border-destructive hover:text-destructive disabled:opacity-50"
                   >

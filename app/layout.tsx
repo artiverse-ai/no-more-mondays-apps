@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -27,8 +28,14 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // Browser extensions (screen recorders, etc.) inject attributes onto
+      // <html> before React hydrates — ignore the resulting attribute diff.
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Breadcrumbs />
+        {children}
+      </body>
     </html>
   );
 }

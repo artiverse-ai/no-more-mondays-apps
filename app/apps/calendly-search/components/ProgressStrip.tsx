@@ -52,7 +52,7 @@ export function ProgressStrip({ progress, initialMessage }: Props) {
             </span>
           </>
         ) : isInitial ? (
-          <> Subsequent loads are instant (cached for 5 min).</>
+          <> Pulling fresh data from Calendly.</>
         ) : null}
       </p>
       <style>{`

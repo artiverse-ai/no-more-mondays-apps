@@ -93,16 +93,17 @@ export function SearchClient() {
     setLoading(false);
   };
 
-  // Pull the discrete set of internal_note values on mount. Cached for 5 min
-  // server-side, so revisiting the page is instant. Once they land we
-  // default-select all and kick off a search so the user lands on populated
-  // data instead of an empty form.
+  // Pull the discrete set of internal_note values on mount. No caching —
+  // we hit Calendly fresh every time so newly-added funnels show up
+  // immediately. Once the list lands we default-select all and kick off a
+  // search so the user lands on populated data instead of an empty form.
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
       try {
         const res = await fetch("/api/calendly/internal-notes", {
           signal: controller.signal,
+          cache: "no-store",
         });
         const data: { notes?: string[]; error?: string } = await res
           .json()

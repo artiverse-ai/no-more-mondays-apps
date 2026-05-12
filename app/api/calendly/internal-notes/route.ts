@@ -11,10 +11,10 @@ import { NextResponse } from "next/server";
 const CALENDLY_BASE = "https://api.calendly.com";
 const CONCURRENCY = 8;
 
-// Re-validate the cached response every 5 min. Calendly event types change
-// rarely; users opening the page in quick succession should not re-hammer the
-// Calendly API.
-export const revalidate = 300;
+// No caching — the user wants live funnel data on every page load, so any
+// new internal_note added in Calendly shows up immediately.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 type EventType = {
   uri: string;

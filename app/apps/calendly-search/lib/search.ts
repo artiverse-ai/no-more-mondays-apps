@@ -228,31 +228,42 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
   await runWithConcurrency(
     tasks,
     async ({ status, window }) => {
-      try {
-        const events = await fetchAllPages<CalendlyScheduledEvent>("/scheduled_events", {
+      const fetchOnce = () =>
+        fetchAllPages<CalendlyScheduledEvent>("/scheduled_events", {
           organization: orgUri,
-          min_start_time: window.min.toISOString(),
-          max_start_time: window.max.toISOString(),
+          // Calendly rejects sub-second precision on these params with
+          // "The supplied parameters are invalid". Strip ms.
+          min_start_time: toCalendlyIso(window.min),
+          max_start_time: toCalendlyIso(window.max),
           status,
           sort: "start_time:desc",
         });
-        for (const ev of events) {
-          if (eventMap.has(ev.uri)) continue;
-          const et = matchedTypeByUri.get(ev.event_type);
-          if (!et) continue;
-
-          if (ev.status === "canceled") debug.canceledFetched++;
-          else debug.activeFetched++;
-
-          eventMap.set(ev.uri, { event: ev, eventType: et });
+      let events: CalendlyScheduledEvent[];
+      try {
+        events = await fetchOnce();
+      } catch (e1) {
+        // One automatic retry — many "invalid parameters" failures on the
+        // first chunk are flaky on Calendly's side and pass on retry.
+        try {
+          await new Promise((r) => setTimeout(r, 500));
+          events = await fetchOnce();
+        } catch (e2) {
+          debug.windowsFailed++;
+          const label = `${status} ${window.min.toISOString().slice(0, 10)}→${window.max.toISOString().slice(0, 10)}`;
+          debug.fetchErrors.push(`${label}: ${(e2 as Error).message}`);
+          void e1;
+          return;
         }
-      } catch (e) {
-        // Capture instead of swallow. One failed window can otherwise hide
-        // a full year of bookings, which is exactly what made Future return
-        // less than Next 14 Days.
-        debug.windowsFailed++;
-        const label = `${status} ${window.min.toISOString().slice(0, 10)}→${window.max.toISOString().slice(0, 10)}`;
-        debug.fetchErrors.push(`${label}: ${(e as Error).message}`);
+      }
+      for (const ev of events) {
+        if (eventMap.has(ev.uri)) continue;
+        const et = matchedTypeByUri.get(ev.event_type);
+        if (!et) continue;
+
+        if (ev.status === "canceled") debug.canceledFetched++;
+        else debug.activeFetched++;
+
+        eventMap.set(ev.uri, { event: ev, eventType: et });
       }
     },
     (done, total) => {
@@ -343,6 +354,12 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
 // silent partial results well under that. 90 days is conservative and
 // trades a few more parallel requests for reliable coverage.
 const MAX_WINDOW_DAYS = 90;
+
+// Calendly's /scheduled_events rejects ISO timestamps with millisecond
+// precision ("The supplied parameters are invalid"). Drop ms.
+function toCalendlyIso(d: Date): string {
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
 
 function chunkWindow(start: Date, end: Date): { min: Date; max: Date }[] {
   const out: { min: Date; max: Date }[] = [];

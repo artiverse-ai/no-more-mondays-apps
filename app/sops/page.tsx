@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 type SopEntry = {
-  slug: string;
+  href: string;
+  external: boolean;
   title: string;
   audience: string;
   description: string;
@@ -9,28 +10,32 @@ type SopEntry = {
 
 const SOPS: SopEntry[] = [
   {
-    slug: "how-to-read-capacity-dashboard",
+    href: "/sops/how-to-read-capacity-dashboard",
+    external: false,
     title: "How to read the capacity dashboard",
     audience: "Ops · Sales managers",
     description:
       "What each chart and number on the team-availability dashboard means, how to filter, and what to do when something looks off.",
   },
   {
-    slug: "closer-calendar-management",
+    href: "https://nmm-closer-sop.vercel.app/",
+    external: true,
     title: "Calendar management for closers",
     audience: "Closers",
     description:
-      "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week.",
+      "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week. Hosted at nmm-closer-sop.vercel.app.",
   },
   {
-    slug: "new-closer-joins",
+    href: "/sops/new-closer-joins",
+    external: false,
     title: "When a new closer joins",
     audience: "Ops",
     description:
       "The walkthrough for adding a new closer: get their calendar shared, add them to the active list, verify they appear in the dashboard.",
   },
   {
-    slug: "closer-removed",
+    href: "/sops/closer-removed",
+    external: false,
     title: "When a closer is removed",
     audience: "Ops",
     description:
@@ -41,6 +46,57 @@ const SOPS: SopEntry[] = [
 export const metadata = {
   title: "SOPs · No More Mondays",
 };
+
+function Card({ sop }: { sop: SopEntry }) {
+  const body = (
+    <>
+      <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
+        <span className="sop-eyebrow" style={{ margin: 0 }}>
+          {sop.audience}
+        </span>
+        {sop.external ? (
+          <span
+            className="sop-eyebrow"
+            style={{ margin: 0, opacity: 0.6 }}
+            aria-label="External link"
+          >
+            ↗ External
+          </span>
+        ) : null}
+      </div>
+      <h2 className="sop-h2" style={{ marginBottom: 8 }}>
+        {sop.title}
+      </h2>
+      <p style={{ color: "var(--muted-foreground)", fontSize: 14, margin: 0 }}>
+        {sop.description}
+      </p>
+    </>
+  );
+  if (sop.external) {
+    return (
+      <a
+        key={sop.href}
+        href={sop.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="sop-card block transition hover:border-accent"
+        style={{ marginBottom: 0 }}
+      >
+        {body}
+      </a>
+    );
+  }
+  return (
+    <Link
+      key={sop.href}
+      href={sop.href}
+      className="sop-card block transition hover:border-accent"
+      style={{ marginBottom: 0 }}
+    >
+      {body}
+    </Link>
+  );
+}
 
 export default function SopsIndexPage() {
   return (
@@ -57,22 +113,7 @@ export default function SopsIndexPage() {
 
       <div className="grid grid-cols-1 gap-3">
         {SOPS.map((sop) => (
-          <Link
-            key={sop.slug}
-            href={`/sops/${sop.slug}`}
-            className="sop-card block transition hover:border-accent"
-            style={{ marginBottom: 0 }}
-          >
-            <p className="sop-eyebrow" style={{ marginBottom: 6 }}>
-              {sop.audience}
-            </p>
-            <h2 className="sop-h2" style={{ marginBottom: 8 }}>
-              {sop.title}
-            </h2>
-            <p style={{ color: "var(--muted-foreground)", fontSize: 14, margin: 0 }}>
-              {sop.description}
-            </p>
-          </Link>
+          <Card key={sop.href} sop={sop} />
         ))}
       </div>
 

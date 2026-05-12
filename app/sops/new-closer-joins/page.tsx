@@ -42,9 +42,14 @@ export default function NewCloserJoinsSop() {
         <ol>
           <li>
             Send them this link:{" "}
-            <Link className="sop-link" href="/sops/closer-calendar-management">
-              /sops/closer-calendar-management
-            </Link>
+            <a
+              className="sop-link"
+              href="https://nmm-closer-sop.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              nmm-closer-sop.vercel.app ↗
+            </a>
           </li>
           <li>
             Highlight section <strong>01 — Share your calendar with
@@ -138,7 +143,7 @@ export default function NewCloserJoinsSop() {
         </p>
         <ol>
           <li>
-            Wait <strong>10–15 minutes</strong> for the next sync run to pick
+            Wait <strong>5–10 minutes</strong> for the next sync run to pick
             up the new row in the active-closers list (and the calendar share,
             if it&rsquo;s the first sync since they shared).
           </li>
@@ -163,8 +168,17 @@ export default function NewCloserJoinsSop() {
           <li>
             If the matrix is completely empty: their calendar has zero events
             in the visible window. Either no recurring blockers set up yet (a
-            problem — they need to do steps 02–05 of the closer SOP), or the
-            calendar share permission is wrong (recheck step 02 above).
+            problem — they need to do steps 02–05 of the{" "}
+            <a
+              className="sop-link"
+              href="https://nmm-closer-sop.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              closer SOP ↗
+            </a>
+            ), or the calendar share permission is wrong (recheck step 02
+            above).
           </li>
         </ol>
       </section>
@@ -197,8 +211,17 @@ export default function NewCloserJoinsSop() {
             dashboard refresh.
           </li>
           <li>
-            Bookmark the closer SOP for them. Encourage the 3-minute weekly
-            check from section 08 of that doc.
+            Bookmark the{" "}
+            <a
+              className="sop-link"
+              href="https://nmm-closer-sop.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              closer SOP ↗
+            </a>{" "}
+            for them. Encourage the 3-minute weekly check from section 08 of
+            that doc.
           </li>
         </ol>
       </section>

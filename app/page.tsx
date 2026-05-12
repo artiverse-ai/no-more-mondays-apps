@@ -6,6 +6,7 @@ type Tile = {
   title: string;
   description: string;
   status: "live" | "coming_soon";
+  external?: boolean;
 };
 
 const apps: Tile[] = [
@@ -44,11 +45,12 @@ const sops: Tile[] = [
     status: "live",
   },
   {
-    href: "/sops/closer-calendar-management",
+    href: "https://nmm-closer-sop.vercel.app/",
     title: "Calendar management for closers",
     description:
-      "Share your calendar, block your busy time, set the right timezone — for new closers and as a reference.",
+      "Share your calendar, block your busy time, set the right timezone — for new closers and as a reference. Hosted at nmm-closer-sop.vercel.app.",
     status: "live",
+    external: true,
   },
   {
     href: "/sops/new-closer-joins",
@@ -68,6 +70,7 @@ const sops: Tile[] = [
 
 function TileCard({ tile }: { tile: Tile }) {
   const isLive = tile.status === "live";
+  const isExternal = isLive && tile.external === true;
   const inner = (
     <div
       className={
@@ -78,26 +81,42 @@ function TileCard({ tile }: { tile: Tile }) {
       }
     >
       <div>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h3 className="font-heading text-lg font-semibold tracking-tight">
             {tile.title}
           </h3>
-          {isLive ? null : (
+          {isExternal ? (
+            <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              External
+            </span>
+          ) : !isLive ? (
             <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
               Coming soon
             </span>
-          )}
+          ) : null}
         </div>
         <p className="mt-2 text-sm text-muted-foreground">{tile.description}</p>
       </div>
       {isLive ? (
         <div className="mt-6 text-xs font-medium uppercase tracking-[0.18em] text-accent">
-          Open &rarr;
+          Open {isExternal ? "↗" : "→"}
         </div>
       ) : null}
     </div>
   );
 
+  if (isExternal) {
+    return (
+      <a
+        href={tile.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block h-full"
+      >
+        {inner}
+      </a>
+    );
+  }
   if (isLive) {
     return (
       <Link href={tile.href} className="block h-full">

@@ -227,10 +227,10 @@ export default function HowToReadCapacityDashboardSop() {
         </p>
         <ul>
           <li>
-            <strong>Google Calendar → BigQuery</strong>: a sync job runs on a
-            schedule (every ~2 hours today; moving to faster soon). Recent
-            calendar edits may not show for that long. If something is missing
-            beyond that, ping ops.
+            <strong>Google Calendar → BigQuery</strong>: a sync job runs every{" "}
+            <strong>5 minutes</strong>. Recent calendar edits typically appear
+            within that window. If something is missing beyond ~10 minutes,
+            ping ops.
           </li>
           <li>
             <strong>A closer appears who shouldn&rsquo;t / is missing</strong>:
@@ -257,9 +257,14 @@ export default function HowToReadCapacityDashboardSop() {
         </div>
         <ul>
           <li>
-            <Link className="sop-link" href="/sops/closer-calendar-management">
-              Calendar management for closers
-            </Link>{" "}
+            <a
+              className="sop-link"
+              href="https://nmm-closer-sop.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Calendar management for closers ↗
+            </a>{" "}
             — what every closer is supposed to be doing on their end. Read it
             once so you know what to ask a closer to fix when the dashboard
             shows something weird.

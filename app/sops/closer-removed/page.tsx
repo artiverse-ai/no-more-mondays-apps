@@ -72,7 +72,7 @@ export default function CloserRemovedSop() {
         </p>
         <ol>
           <li>
-            Wait <strong>10–15 minutes</strong> for the next sync run.
+            Wait <strong>5–10 minutes</strong> for the next sync run.
           </li>
           <li>
             Open the{" "}
@@ -87,8 +87,8 @@ export default function CloserRemovedSop() {
             have one fewer column of contributors.
           </li>
           <li>
-            If they&rsquo;re still there after 30 minutes, recheck step 01 — the
-            row probably didn&rsquo;t save, or you flipped the flag on the
+            If they&rsquo;re still there after ~15 minutes, recheck step 01 —
+            the row probably didn&rsquo;t save, or you flipped the flag on the
             wrong row.
           </li>
         </ol>

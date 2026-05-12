@@ -9,6 +9,8 @@ type Props = {
   availableNotes: string[];
   notesLoading: boolean;
   notesError: string | null;
+  strategyOnly: boolean;
+  setStrategyOnly: (v: boolean) => void;
   presetKey: PresetKey;
   setPresetKey: (k: PresetKey) => void;
   customStart: string;
@@ -27,6 +29,8 @@ export function SearchForm(props: Props) {
     availableNotes,
     notesLoading,
     notesError,
+    strategyOnly,
+    setStrategyOnly,
     presetKey,
     setPresetKey,
     customStart,
@@ -67,6 +71,20 @@ export function SearchForm(props: Props) {
               field. Defaults to all selected — uncheck All to pick specific funnels.
             </p>
           )}
+          <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={strategyOnly}
+              onChange={(e) => setStrategyOnly(e.target.checked)}
+              className="h-4 w-4 cursor-pointer accent-accent"
+            />
+            <span className="font-medium text-foreground">
+              Only Strategy-titled calls
+            </span>
+            <span className="text-muted-foreground">
+              (event type name starts with &ldquo;Strategy&rdquo;)
+            </span>
+          </label>
         </div>
 
         <div>

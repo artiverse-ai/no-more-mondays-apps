@@ -16,6 +16,7 @@ import { HostsTable } from "./components/HostsTable";
 import { CallHeatMatrix } from "./components/CallHeatMatrix";
 import { DailyVolumeChart } from "./components/DailyVolumeChart";
 import { HostDistributionChart } from "./components/HostDistributionChart";
+import { FunnelDistributionChart } from "./components/FunnelDistributionChart";
 import { JsonModal } from "./components/JsonModal";
 import { runSearch } from "./lib/search";
 import { PresetKey, Row, SearchProgress, SearchResult } from "./lib/types";
@@ -46,6 +47,7 @@ export function SearchClient() {
   const [closersError, setClosersError] = useState<string | null>(null);
 
   // ---- search inputs ----
+  const [strategyOnly, setStrategyOnly] = useState(true);
   const [presetKey, setPresetKey] = useState<PresetKey>("future");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
@@ -86,6 +88,7 @@ export function SearchClient() {
     try {
       const res = await runSearch({
         notes: notesToUse,
+        titlePrefix: strategyOnly ? "Strategy" : null,
         presetKey,
         customStart,
         customEnd,
@@ -208,6 +211,8 @@ export function SearchClient() {
         availableNotes={availableNotes}
         notesLoading={notesLoading}
         notesError={notesError}
+        strategyOnly={strategyOnly}
+        setStrategyOnly={setStrategyOnly}
         presetKey={presetKey}
         setPresetKey={setPresetKey}
         customStart={customStart}
@@ -252,8 +257,9 @@ export function SearchClient() {
           {/* Bar charts — always visible right under the scorecard,
               regardless of which view tab is active. They give the
               aggregate view; the Calendar tab below gives the drill-down. */}
+          <DailyVolumeChart rows={filtered} />
           <div className="grid gap-4 lg:grid-cols-2">
-            <DailyVolumeChart rows={filtered} />
+            <FunnelDistributionChart rows={filtered} />
             <HostDistributionChart rows={filtered} />
           </div>
 

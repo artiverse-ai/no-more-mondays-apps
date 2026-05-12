@@ -30,6 +30,9 @@ const API_BASE = "/api/calendly";
 
 export type SearchOptions = {
   notes: string[];
+  /** When set, also require event_type.name to start with this prefix
+   *  (case-insensitive). Layered ON TOP of the internal_note filter. */
+  titlePrefix?: string | null;
   presetKey: PresetKey;
   customStart?: string;
   customEnd?: string;
@@ -228,11 +231,20 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
     },
   );
 
-  // Phase 4 — match event types by internal_note ∈ picked set.
+  // Phase 4 — match event types by internal_note ∈ picked set. When a
+  // titlePrefix is supplied (e.g. "Strategy"), event_type.name must also
+  // start with that prefix — case-insensitive. This is layered on top so
+  // the funnel multi-select still controls funnels; titlePrefix just
+  // hides non-Strategy variants like "#1 Game Plan Call".
   const wanted = new Set(opts.notes.map((n) => n.trim().toLowerCase()));
+  const prefix = (opts.titlePrefix ?? "").trim().toLowerCase();
   const matchedTypes = allEventTypes.filter((et) => {
     const n = (et.internal_note ?? "").trim().toLowerCase();
-    return n.length > 0 && wanted.has(n);
+    if (n.length === 0 || !wanted.has(n)) return false;
+    if (prefix && !(et.name ?? "").trim().toLowerCase().startsWith(prefix)) {
+      return false;
+    }
+    return true;
   });
   debug.eventTypesScanned = allEventTypes.length;
   debug.matchedTypes = matchedTypes.length;

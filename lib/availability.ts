@@ -681,6 +681,133 @@ export async function getPersonDayStats(args: {
   );
 }
 
+// =====================================================================
+// CALENDAR HYGIENE — flag closers whose calendars look suspiciously empty
+// =====================================================================
+
+// Anyone busy < 25% of the visible range is flagged. A normal calendar with
+// a nightly sleep block alone clears 33%; <25% almost always means the
+// closer hasn't followed the calendar-management SOP.
+export const LOW_COVERAGE_THRESHOLD = 0.25;
+
+const SQL_HYGIENE = `
+WITH params AS (
+  SELECT
+    TIMESTAMP(DATETIME(DATE(@from_date), TIME '00:00:00'), @tz) AS range_start,
+    TIMESTAMP_ADD(TIMESTAMP(DATETIME(DATE(@to_date), TIME '00:00:00'), @tz), INTERVAL 24 HOUR) AS range_end
+),
+members AS (
+  SELECT email FROM ${table("team_members")}
+  WHERE (IFNULL(ARRAY_LENGTH(@emails), 0) = 0 OR email IN UNNEST(@emails))
+),
+clipped AS (
+  SELECT
+    bi.host_email,
+    GREATEST(bi.start_time, p.range_start) AS s,
+    LEAST(bi.end_time, p.range_end) AS e
+  FROM ${table("busy_intervals")} bi, params p
+  WHERE bi.host_email IN (SELECT email FROM members)
+    AND bi.start_time < p.range_end
+    AND bi.end_time > p.range_start
+),
+ordered AS (
+  SELECT
+    host_email, s, e,
+    MAX(e) OVER (
+      PARTITION BY host_email
+      ORDER BY s
+      ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+    ) AS prev_max_end
+  FROM clipped
+),
+grouped AS (
+  SELECT
+    host_email, s, e,
+    SUM(CASE WHEN prev_max_end IS NULL OR s > prev_max_end THEN 1 ELSE 0 END)
+      OVER (PARTITION BY host_email ORDER BY s ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS grp
+  FROM ordered
+),
+merged AS (
+  SELECT host_email, MIN(s) AS gs, MAX(e) AS ge
+  FROM grouped
+  GROUP BY host_email, grp
+),
+busy AS (
+  SELECT host_email, SUM(TIMESTAMP_DIFF(ge, gs, MINUTE)) AS busy_min
+  FROM merged
+  GROUP BY host_email
+),
+events AS (
+  SELECT host_email, COUNT(*) AS events_count
+  FROM clipped
+  GROUP BY host_email
+)
+SELECT
+  m.email,
+  COALESCE(b.busy_min, 0) AS busy_min,
+  COALESCE(ev.events_count, 0) AS events_count,
+  TIMESTAMP_DIFF(
+    (SELECT range_end FROM params),
+    (SELECT range_start FROM params),
+    MINUTE
+  ) AS range_total_min
+FROM members m
+LEFT JOIN busy b ON b.host_email = m.email
+LEFT JOIN events ev ON ev.host_email = m.email
+ORDER BY busy_min ASC
+`;
+
+export type CloserHygiene = {
+  email: string;
+  busy_min: number;
+  events_count: number;
+  range_total_min: number;
+  coverage_pct: number; // 0..1
+  is_low_coverage: boolean;
+};
+
+export async function getCalendarHygiene(args: {
+  fromDate: string;
+  toDate: string;
+  tz?: string;
+  emails?: string[];
+}): Promise<CloserHygiene[]> {
+  const [rows] = await bq().query({
+    query: SQL_HYGIENE,
+    params: {
+      from_date: args.fromDate,
+      to_date: args.toDate,
+      tz: args.tz ?? "America/New_York",
+      emails: args.emails ?? [],
+    },
+    types: {
+      from_date: "STRING",
+      to_date: "STRING",
+      tz: "STRING",
+      emails: ["STRING"],
+    },
+  });
+  return (rows as Array<{
+    email: string;
+    busy_min: number | string;
+    events_count: number | string;
+    range_total_min: number | string;
+  }>).map((r) => {
+    const busy_min = Number(r.busy_min);
+    const range_total_min = Number(r.range_total_min);
+    const coverage_pct =
+      range_total_min > 0 ? busy_min / range_total_min : 0;
+    return {
+      email: r.email,
+      busy_min,
+      events_count: Number(r.events_count),
+      range_total_min,
+      coverage_pct,
+      is_low_coverage: coverage_pct < LOW_COVERAGE_THRESHOLD,
+    };
+  });
+}
+
 const SQL_DATA_RANGE = `
 SELECT
   MIN(start_time) AS min_ts,

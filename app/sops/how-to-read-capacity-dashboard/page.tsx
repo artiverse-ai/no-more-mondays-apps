@@ -218,6 +218,49 @@ export default function HowToReadCapacityDashboardSop() {
       <section className="sop-card">
         <div className="sop-card-title">
           <span className="sop-card-num">07</span>
+          <h2 className="sop-h2">The amber calendar coverage warning</h2>
+        </div>
+        <p className="sop-why">
+          <strong>Why:</strong> The booking system trusts whatever it sees on
+          a closer&rsquo;s calendar. If their calendar is mostly empty, the
+          dashboard reports they&rsquo;re wide open — which means real
+          prospects can be offered into time the closer is actually unavailable.
+        </p>
+        <ul>
+          <li>
+            The dashboard runs a check on every render: for each closer in the
+            visible range, what percentage of the time is blocked on their
+            calendar?
+          </li>
+          <li>
+            A normal human with a nightly sleep block alone is{" "}
+            <strong>~33% busy</strong>. Add lunch, meetings, gym, family time
+            and a healthy calendar lands at 50%+.
+          </li>
+          <li>
+            Anyone under <strong>25%</strong> coverage in the visible window
+            gets flagged in the amber banner just below the filters. The
+            banner lists each flagged closer with their coverage % and average
+            hours blocked per day.
+          </li>
+        </ul>
+        <p className="sop-callout">
+          <strong>Action:</strong> send them the{" "}
+          <a className="sop-link" href="/sops/closer-calendar-management">
+            calendar management SOP
+          </a>
+          . If they aren&rsquo;t ready to fix it today, pause them via{" "}
+          <a className="sop-link" href="/admin/closers">
+            /admin/closers
+          </a>{" "}
+          (flip <em>Available</em> off) so the dashboard stops offering them
+          until they&rsquo;ve set blockers up.
+        </p>
+      </section>
+
+      <section className="sop-card">
+        <div className="sop-card-title">
+          <span className="sop-card-num">08</span>
           <h2 className="sop-h2">When numbers look wrong</h2>
         </div>
         <p className="sop-why">
@@ -252,7 +295,7 @@ export default function HowToReadCapacityDashboardSop() {
 
       <section className="sop-card">
         <div className="sop-card-title">
-          <span className="sop-card-num">08</span>
+          <span className="sop-card-num">09</span>
           <h2 className="sop-h2">Related SOPs</h2>
         </div>
         <ul>

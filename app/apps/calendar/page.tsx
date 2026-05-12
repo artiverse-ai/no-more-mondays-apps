@@ -1,11 +1,16 @@
 import Link from "next/link";
-import { getRangeSlots, getTeamMembers } from "@/lib/availability";
+import {
+  getCalendarHygiene,
+  getRangeSlots,
+  getTeamMembers,
+} from "@/lib/availability";
 import { getCurrentUser } from "@/lib/cf-access";
 import { RangeFilters } from "@/components/RangeFilters";
 import { SlotMatrix } from "@/components/SlotMatrix";
 import { RangeDayChart } from "@/components/RangeDayChart";
 import { RangePerCloserChart } from "@/components/RangePerCloserChart";
 import { HeadlineKPIs } from "@/components/HeadlineKPIs";
+import { CalendarHygieneBanner } from "@/components/CalendarHygieneBanner";
 
 const todayInTz = (tz: string): string => {
   const fmt = new Intl.DateTimeFormat("en-CA", {
@@ -72,7 +77,7 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
   const teamParam = pickStr(params.team, "");
   const selectedTeam = teamParam.split(",").map((s) => s.trim()).filter(Boolean);
 
-  const [slots, members, currentUser] = await Promise.all([
+  const [slots, members, currentUser, hygiene] = await Promise.all([
     getRangeSlots({
       fromDate,
       toDate,
@@ -83,6 +88,12 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
     }),
     getTeamMembers(),
     getCurrentUser(),
+    getCalendarHygiene({
+      fromDate,
+      toDate,
+      tz,
+      emails: selectedTeam.length > 0 ? selectedTeam : undefined,
+    }),
   ]);
 
   const effectiveMembers = selectedTeam.length > 0 ? selectedTeam : members;
@@ -171,6 +182,9 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
           for <span className="font-semibold text-foreground">{effectiveTeamSize} closer{effectiveTeamSize === 1 ? "" : "s"}</span>.
         </p>
       </section>
+
+      {/* Calendar hygiene warning — only renders if any closer is flagged */}
+      <CalendarHygieneBanner hygiene={hygiene} />
 
       {/* Headline KPIs — click for detail dialogs */}
       <section className="space-y-3">

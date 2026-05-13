@@ -1,6 +1,6 @@
 # No More Mondays (NMM) — Analytics Context File
 
-> **Source of truth:** [`artiverse-ai/no-more-mondays-analytics:NMM_ANALYSIS_CONTEXT.md`](https://github.com/artiverse-ai/no-more-mondays-analytics/blob/main/NMM_ANALYSIS_CONTEXT.md). This file is a copy mirrored into the apps repo so dashboard agents can reference it without leaving the repo. If it goes stale, pull the latest from the source.
+> **Source of truth:** [`artiverse-ai/no-more-mondays-analytics:NMM_ANALYSIS_CONTEXT.md`](https://github.com/artiverse-ai/we-/no-more-mondays-analytics/blob/main/NMM_ANALYSIS_CONTEXT.md). This file is a copy mirrored into the apps repo so dashboard agents can reference it without leaving the repo. If it goes stale, pull the latest from the source.
 >
 > **Purpose:** Hand this file to any Claude instance with BigQuery MCP access. It contains everything needed to run analysis on this project with zero setup questions. Read it fully before querying.
 
@@ -657,7 +657,8 @@ Covers all three eras and all three webinar types via UNION of `int_funnel_webin
 | `is_reactivation_data_available` | BOOL | TRUE for Era 3 webinars; FALSE for Era 1-2 |
 | `calls_booked` | INT64 | Total Calendly bookings (incl. canceled) |
 | `calls_booked_active` | INT64 | Non-canceled bookings (dynamic, re-evaluates each run) |
-| `calls_held` | INT64 | Calls actually held (from Airtable) |
+| `shows` | INT64 | Renamed from `calls_held` (2026-05-13). = COUNTIF(is_show_up) — excludes Setter DQ (fixes the prior is_call_held bug). |
+| `qualified_shows` | INT64 | Closer-qualified shows = COUNTIF(is_close_rate_eligible) (excludes Setter DQ AND Closer DQ). NULL for legacy rows. |
 | `webinar_deposits` | INT64 | Deposit count |
 | `deals_closed` | INT64 | Closed deals |
 | `cash_collected` | NUMERIC | Cash received |
@@ -667,9 +668,12 @@ Covers all three eras and all three webinar types via UNION of `int_funnel_webin
 | `paid_cpr` | FLOAT64 | webinar_reg_ad_spend / meta_registrants (true paid cost per registration) |
 | `blended_cpa` | FLOAT64 | total_webinar_ad_spend / unique_attendees |
 | `blended_cpbc` | FLOAT64 | total_webinar_ad_spend / calls_booked |
-| `blended_cost_per_held_call` | FLOAT64 | total_webinar_ad_spend / calls_held |
+| `blended_cpbc_active` | FLOAT64 | total_webinar_ad_spend / calls_booked_active |
+| `blended_cost_per_show` | FLOAT64 | total_webinar_ad_spend / shows (renamed from `blended_cost_per_held_call`) |
+| `blended_cost_per_qualified_show` | FLOAT64 | total_webinar_ad_spend / qualified_shows |
 | `cac` | FLOAT64 | total_webinar_ad_spend / deals_closed |
 | `roas_cash` | FLOAT64 | cash_collected / total_webinar_ad_spend |
+| `roas_cash_running` | FLOAT64 | (Σ Fanbasis payments by deal-prospect emails attributable to this webinar) / total_webinar_ad_spend. **Live ROAS** — grows over time as payment-plan installments come in. NULL for legacy rows. |
 | `roas_revenue` | FLOAT64 | revenue_generated / total_webinar_ad_spend |
 | `pitch_to_book_rate` | FLOAT64 | calls_booked / pitched_attendees |
 | `reg_to_book_rate` | FLOAT64 | calls_booked / total_registrants (legacy rows: / lp_opt_ins) |
@@ -684,8 +688,8 @@ Covers all three eras and all three webinar types via UNION of `int_funnel_webin
 Filters: `WHERE webinar_day IN ('Sunday', 'Monthly Workshop')` — excludes Wednesday.  
 Maps `mart_webinar_events` columns to the original schema: `total_webinar_ad_spend AS ad_spend`,
 `lp_form_submissions AS webinar_registrations`, `unique_attendees AS show_ups`, `pitched_attendees AS pitched_show_ups`,
-`calls_booked AS webinar_calls_booked`, `calls_held AS webinar_calls_held`, `deals_closed AS webinar_deals`,
-`blended_cpbc AS cost_per_booked_call`, `blended_cost_per_held_call AS cost_per_held_call`, `cac AS cost_per_close`,
+`calls_booked AS webinar_calls_booked`, `shows AS webinar_calls_held` (renamed 2026-05-13), `deals_closed AS webinar_deals`,
+`blended_cpbc AS cost_per_booked_call`, `blended_cost_per_show AS cost_per_held_call` (renamed 2026-05-13), `cac AS cost_per_close`,
 `is_legacy AS is_legacy_data`. Because `blended_cpr` was removed from the mart, `cost_per_registration` is recomputed
 inline: `ROUND(SAFE_DIVIDE(total_webinar_ad_spend, NULLIF(total_registrants, 0)), 2)`.
 
@@ -702,6 +706,23 @@ UNION of `int_closer_performance_core` (Airtable, call-level) and `int_closer_pe
 **Grain:** 1 row = 1 campaign × calendar day  
 **Purpose:** Looker Studio campaign drill-through  
 **Note:** Despite the `stg_` prefix, this is a Looker-ready mart-equivalent for ad performance.
+
+### 8.5 `mart_high_level_daily`
+**Materialization:** table  
+**Grain:** 1 row = 1 calendar day (`metric_date`), zero-filled across `GENERATE_DATE_ARRAY('2025-05-01', CURRENT_DATE())`.
+**Purpose:** Source for the CEO / high-level dashboard (per the 2026-05-13 sales-metrics sprint).
+
+Stores daily counts + sums + rate numerators/denominators so the BI layer can sum any
+date range and compute rates from the sums (Show Rate, Close Rate, AOV, ACV, PIF Rate,
+Cost Per Booked Call, ROAS TCC, ROAS TCV, etc.).
+
+**Dual date-key:**
+- Marketing-side (cash, revenue, deals, PIF) on `int_calls_enriched.date_closed`.
+- Funnel-stage (dispositioned, shows, DQ counts) on `int_calls_enriched.appointment_date_time::date`.
+
+**`total_ad_spend` covers ALL Meta campaigns** (every `campaign_category` — registration, Hammer-Them, monthly, book-a-call Hammer-Them, other) — NOT just webinar. **`total_calls_booked` filters Calendly** to `LOWER(event_name) LIKE '%strategy%'` (sales calls only — excludes game plans / inner circle / etc.).
+
+Sales-cycle medians are computed in Looker directly from `int_calls_enriched` (medians can't be rolled up across pre-aggregated days). See `docs/mart_high_level_daily_spec.md` for the full column spec and BI formulas.
 
 ---
 

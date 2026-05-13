@@ -117,9 +117,15 @@ export type WebinarCall = {
   call_date_time: string | null; // ISO timestamp
   booking_week_sun: string; // YYYY-MM-DD
   final_marketing_flow: string | null;
-  is_call_held: boolean;
+  // PR #43: `is_show_up` is the truth (call held AND not a Setter DQ).
+  // The old `is_call_held` flag was deprecated because it incorrectly
+  // counted Setter DQ rows — we never render a "held" pill again.
+  is_show_up: boolean;
   is_deal: boolean;
   is_deposit: boolean;
+  is_canceled: boolean;
+  is_rescheduled: boolean;
+  is_ghosted: boolean;
   not_taken_category: string | null;
   cash_collected: number | null;
   revenue_generated: number | null;
@@ -268,9 +274,12 @@ function toWebinarCall(row: Record<string, unknown>): WebinarCall {
     call_date_time: asStr(row.call_date_time),
     booking_week_sun: asDate(row.booking_week_sun),
     final_marketing_flow: asStr(row.final_marketing_flow),
-    is_call_held: asBool(row.is_call_held),
+    is_show_up: asBool(row.is_show_up),
     is_deal: asBool(row.is_deal),
     is_deposit: asBool(row.is_deposit),
+    is_canceled: asBool(row.is_canceled),
+    is_rescheduled: asBool(row.is_rescheduled),
+    is_ghosted: asBool(row.is_ghosted),
     not_taken_category: asStr(row.not_taken_category),
     cash_collected: asNum(row.cash_collected),
     revenue_generated: asNum(row.revenue_generated),
@@ -306,7 +315,9 @@ export async function getCallsForBookingWeek(
       SELECT
         prospect_email_lc, prospect_name, closer_owner, setter_owner, calendly_setter_name,
         call_outcome, call_date_time, booking_week_sun, final_marketing_flow,
-        is_call_held, is_deal, is_deposit, not_taken_category,
+        is_show_up, is_deal, is_deposit,
+        is_canceled, is_rescheduled, is_ghosted,
+        not_taken_category,
         cash_collected, revenue_generated
       FROM ${INT_CALLS_ENRICHED}
       WHERE booking_week_sun = DATE(@week)

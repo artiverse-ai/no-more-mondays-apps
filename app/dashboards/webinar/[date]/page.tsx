@@ -54,7 +54,7 @@ export default async function WebinarDetailPage(
     (b.call_date_time ?? "").localeCompare(a.call_date_time ?? ""),
   );
   const callStats = {
-    held: calls.filter((c) => c.is_call_held).length,
+    shows: calls.filter((c) => c.is_show_up).length,
     deals: calls.filter((c) => c.is_deal).length,
     cash: calls.reduce((acc, c) => acc + (c.cash_collected ?? 0), 0),
   };
@@ -193,7 +193,7 @@ export default async function WebinarDetailPage(
           </span>
           <span className="text-[11px] text-muted-foreground">
             {calls.length} call{calls.length === 1 ? "" : "s"} &middot;{" "}
-            {callStats.held} held &middot; {callStats.deals} deal
+            {callStats.shows} show{callStats.shows === 1 ? "" : "s"} &middot; {callStats.deals} deal
             {callStats.deals === 1 ? "" : "s"} &middot; {fmt.money(callStats.cash)} cash
           </span>
         </div>
@@ -306,53 +306,54 @@ function Group({
   );
 }
 
+// Mutually-exclusive primary status using iOS-HIG-style colors. Priority,
+// top → down: deal/deposit → setter/closer DQ → showed → cancellation
+// flavor → fallback "—". A row NEVER renders both "showed" and "Setter
+// DQ" (the pre-PR-#43 bug); is_show_up already excludes Setter DQs.
 function CallStatus({ call }: { call: WebinarCall }) {
-  const pills: React.ReactNode[] = [];
-  if (call.is_deal) {
-    pills.push(
-      <Badge
-        key="deal"
-        variant="outline"
-        className="border-emerald-300 bg-emerald-50 text-emerald-800"
-      >
-        deal
-      </Badge>,
-    );
-  } else if (call.is_deposit) {
-    pills.push(
-      <Badge
-        key="deposit"
-        variant="outline"
-        className="border-sky-300 bg-sky-50 text-sky-800"
-      >
-        deposit
-      </Badge>,
-    );
-  } else if (call.is_call_held) {
-    pills.push(
-      <Badge
-        key="held"
-        variant="outline"
-        className="border-border bg-muted text-muted-foreground"
-      >
-        held
-      </Badge>,
-    );
-  }
+  if (call.is_deal) return <Pill tone="success-solid">Deal</Pill>;
+  if (call.is_deposit) return <Pill tone="info">Deposit</Pill>;
+  if (call.call_outcome === "Setter DQ") return <Pill tone="danger">Setter DQ</Pill>;
+  if (call.call_outcome === "Closer DQ") return <Pill tone="warning">Closer DQ</Pill>;
+  if (call.is_show_up) return <Pill tone="success-soft">Showed</Pill>;
+  if (call.is_canceled) return <Pill tone="neutral">Canceled</Pill>;
+  if (call.is_rescheduled) return <Pill tone="neutral">Rescheduled</Pill>;
+  if (call.is_ghosted) return <Pill tone="neutral">Ghosted</Pill>;
   if (call.not_taken_category) {
-    pills.push(
-      <Badge
-        key="ntc"
-        variant="outline"
-        className="border-border bg-muted text-muted-foreground"
-      >
-        {call.not_taken_category.toLowerCase()}
-      </Badge>,
-    );
+    return <Pill tone="neutral">{call.not_taken_category}</Pill>;
   }
-  return pills.length ? (
-    <span className="flex flex-wrap gap-1">{pills}</span>
-  ) : (
-    <span>—</span>
+  return <span className="text-muted-foreground">—</span>;
+}
+
+type PillTone =
+  | "success-solid"
+  | "success-soft"
+  | "info"
+  | "warning"
+  | "danger"
+  | "neutral";
+
+function Pill({
+  tone,
+  children,
+}: {
+  tone: PillTone;
+  children: React.ReactNode;
+}) {
+  const toneCls: Record<PillTone, string> = {
+    "success-solid":
+      "border-alert-green/40 bg-alert-green/20 text-alert-green",
+    "success-soft":
+      "border-alert-green/25 bg-alert-green/10 text-alert-green",
+    info: "border-alert-blue/40 bg-alert-blue/15 text-alert-blue",
+    warning:
+      "border-alert-orange/40 bg-alert-orange/15 text-alert-orange",
+    danger: "border-alert-red/40 bg-alert-red/15 text-alert-red",
+    neutral: "border-border bg-muted text-muted-foreground",
+  };
+  return (
+    <Badge variant="outline" className={toneCls[tone]}>
+      {children}
+    </Badge>
   );
 }

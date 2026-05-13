@@ -1,6 +1,15 @@
+import { getCurrentUser } from "@/lib/auth";
+import {
+  MARKETING_EDITOR,
+  SALES_EDITOR,
+  listSolutions,
+} from "@/lib/weekly-report-solutions";
+import { SolutionsTab } from "./SolutionsTab";
 import { Tabs } from "./Tabs";
 import { Tip, TooltipLayer } from "./Tooltip";
 import styles from "./report.module.css";
+
+const REPORT_WEEK = "2026-05-03";
 import {
   BOOKING_MODE,
   CHANNEL_MIX_MAY10,
@@ -36,7 +45,22 @@ const COLORS = {
   purple: "var(--purple)",
 } as const;
 
-export default function Page() {
+export default async function Page() {
+  const me = await getCurrentUser();
+  // Pre-fetch the solutions server-side so the tabs render populated.
+  // Swallow failures (BQ unreachable, etc.) — the tab will just start empty
+  // and the user can post once the connection recovers.
+  let mktInitial: Awaited<ReturnType<typeof listSolutions>> = [];
+  let salesInitial: typeof mktInitial = [];
+  try {
+    [mktInitial, salesInitial] = await Promise.all([
+      listSolutions(REPORT_WEEK, "marketing"),
+      listSolutions(REPORT_WEEK, "sales"),
+    ]);
+  } catch {
+    // ignore
+  }
+
   return (
     <div className={styles.bg}>
       <TooltipLayer />
@@ -52,9 +76,35 @@ export default function Page() {
           { id: "t1", label: "Latest Webinar" },
           { id: "t2", label: "Last Week's Sales" },
           { id: "t3", label: "Strategic Insights" },
+          { id: "t4", label: "Marketing Solutions" },
+          { id: "t5", label: "Sales Solutions" },
         ]}
         defaultActive="t1"
-        panels={{ t1: <Tab1 />, t2: <Tab2 />, t3: <Tab3 /> }}
+        panels={{
+          t1: <Tab1 />,
+          t2: <Tab2 />,
+          t3: <Tab3 />,
+          t4: (
+            <SolutionsTab
+              reportWeek={REPORT_WEEK}
+              tab="marketing"
+              editorEmail={MARKETING_EDITOR}
+              initial={mktInitial}
+              currentUserEmail={me?.email ?? ""}
+              currentUserIsAdmin={Boolean(me?.isAdmin)}
+            />
+          ),
+          t5: (
+            <SolutionsTab
+              reportWeek={REPORT_WEEK}
+              tab="sales"
+              editorEmail={SALES_EDITOR}
+              initial={salesInitial}
+              currentUserEmail={me?.email ?? ""}
+              currentUserIsAdmin={Boolean(me?.isAdmin)}
+            />
+          ),
+        }}
       />
     </div>
   );

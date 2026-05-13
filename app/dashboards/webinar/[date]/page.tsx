@@ -95,20 +95,24 @@ export default async function WebinarDetailPage(
 
       {/* Marketing */}
       <Group title="Marketing">
-        <Kpi label="Ad spend" value={fmt.money2(w.ad_spend)} />
-        <Kpi label="Impressions" value={fmt.int(w.meta_impressions)} />
-        <Kpi label="Clicks" value={fmt.int(w.meta_clicks)} />
+        <Kpi label="Total Webinar Ad Spend" value={fmt.money2(w.total_webinar_ad_spend)} />
+        <Kpi label="Reg Ad Spend" value={fmt.money2(w.webinar_reg_ad_spend)} />
+        <Kpi label="Hammer Them Ad Spend" value={fmt.money2(w.webinar_hammer_them_ad_spend)} />
+        <Kpi
+          label="Hammer Them Frequency"
+          value={fmt.number(w.frequency_webinar_hammer_them, 2)}
+          sub="impressions / reach"
+        />
+        <Kpi label="Impressions" value={fmt.number(w.meta_impressions, 1)} />
+        <Kpi label="Meta Link Clicks" value={fmt.number(w.meta_link_clicks, 1)} />
         <Kpi label="Meta CTR" value={fmt.pct(w.meta_ctr)} />
         <Kpi label="Meta CVR" value={fmt.pct(w.meta_cvr)} />
         <Kpi label="Meta CPL" value={fmt.money2(w.meta_cpl)} />
         <Kpi label="Paid CPR" value={fmt.money2(w.paid_cpr)} />
-        <Kpi label="Blended CPR" value={fmt.money2(w.blended_cpr)} />
         <Kpi label="Blended CPA" value={fmt.money2(w.blended_cpa)} />
         <Kpi label="Blended CPBC" value={fmt.money2(w.blended_cpbc)} />
-        <Kpi
-          label="Cost / held call"
-          value={fmt.money2(w.blended_cost_per_held_call)}
-        />
+        <Kpi label="Cash / Attendee" value={fmt.money2(w.cash_collected_per_attendee)} />
+        <Kpi label="Contract Value / Attendee" value={fmt.money2(w.contract_value_per_attendee)} />
         <Kpi label="CAC" value={fmt.money2(w.cac)} />
       </Group>
 
@@ -147,13 +151,17 @@ export default async function WebinarDetailPage(
       <Group title="Sales">
         <Kpi label="Calls booked" value={fmt.int(w.calls_booked)} />
         <Kpi label="Active (non-canceled)" value={fmt.int(w.calls_booked_active)} />
-        <Kpi label="Calls held" value={fmt.int(w.calls_held)} />
+        <Kpi label="Shows" value={fmt.int(w.shows)} sub="excludes Setter DQs (PR #43)" />
+        <Kpi label="Qualified Shows" value={fmt.int(w.qualified_shows)} sub="closer-qualified" />
         <Kpi label="Deposits" value={fmt.int(w.webinar_deposits)} />
         <Kpi label="Deals closed" value={fmt.int(w.deals_closed)} />
         <Kpi label="Cash collected" value={fmt.money2(w.cash_collected)} />
         <Kpi label="Deposit collected" value={fmt.money2(w.deposit_collected)} />
         <Kpi label="Revenue generated" value={fmt.money2(w.revenue_generated)} />
         <Kpi label="Revenue predicted" value={fmt.money2(w.revenue_predicted)} />
+        <Kpi label="Cost Per Show" value={fmt.money2(w.blended_cost_per_show)} />
+        <Kpi label="Cost Per Qualified Show" value={fmt.money2(w.blended_cost_per_qualified_show)} />
+        <Kpi label="Cost Per Active Booked Call" value={fmt.money2(w.blended_cpbc_active)} />
         <Kpi
           label="ROAS (cash)"
           value={w.roas_cash == null ? "—" : fmt.ratio(w.roas_cash)}
@@ -161,6 +169,11 @@ export default async function WebinarDetailPage(
         <Kpi
           label="ROAS (revenue)"
           value={w.roas_revenue == null ? "—" : fmt.ratio(w.roas_revenue)}
+        />
+        <Kpi
+          label="Live ROAS"
+          value={fmt.ratio(w.roas_cash_running)}
+          sub="running cash / spend"
         />
         <Kpi label="Pitch → book rate" value={fmt.pct(w.pitch_to_book_rate)} />
       </Group>

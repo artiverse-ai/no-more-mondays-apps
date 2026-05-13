@@ -5,8 +5,9 @@
 // hard-code the production location regardless of the BQ_PROJECT / BQ_DATASET
 // env vars (those only steer the calendar app).
 //
-// The Vercel service account therefore needs `roles/bigquery.dataViewer` on the
-// `dbt_tuddin` dataset in addition to `nmm_calendar` (see docs/DEPLOY.md).
+// Aligned with analytics-repo PR #42 (webinar marketing refactor) and PR #43
+// (sales side + new CEO mart). See docs/sales-ceo-dashboard-update-2026-05.md
+// for the verbatim column-change list.
 
 import { bq } from "./bq";
 
@@ -27,18 +28,29 @@ export type WebinarEvent = {
   data_era: string;
   is_legacy: boolean;
 
+  // ----- Landing page / opt-in -----
   lp_page_views: number | null;
   lp_opt_ins: number | null;
   lp_opt_in_rate: number | null;
   lp_form_submissions: number | null;
 
-  ad_spend: number | null;
+  // ----- Marketing (PR #42) -----
+  // total_webinar_ad_spend = webinar_reg_ad_spend + webinar_hammer_them_ad_spend
+  // (dbt-tested invariant). Sunday-day spend is 50/50-split between that
+  // Sunday's webinar and the following Wednesday's, so these can be fractional.
+  total_webinar_ad_spend: number | null;
+  webinar_reg_ad_spend: number | null;
+  webinar_hammer_them_ad_spend: number | null;
+  /** Meta frequency for the Hammer-Them webinar campaign. NULL for legacy rows. */
+  frequency_webinar_hammer_them: number | null;
+  /** Webinar registration campaigns only (Hammer-Them excluded); may be fractional on Sunday-split rows. */
   meta_impressions: number | null;
-  meta_clicks: number | null;
+  meta_link_clicks: number | null;
   meta_ctr: number | null;
   meta_cvr: number | null;
   meta_cpl: number | null;
 
+  // ----- Registration sources -----
   total_registrants: number | null;
   meta_registrants: number | null;
   tiktok_registrants: number | null;
@@ -46,14 +58,23 @@ export type WebinarEvent = {
   setter_registrants: number | null;
   other_organic_registrants: number | null;
 
+  // ----- Attendance -----
   unique_attendees: number | null;
   pitched_attendees: number | null;
   reg_to_attend_rate: number | null;
   attend_to_pitched_rate: number | null;
+  /** cash_collected / unique_attendees (PR #42). */
+  cash_collected_per_attendee: number | null;
+  /** revenue_generated / unique_attendees (PR #42). */
+  contract_value_per_attendee: number | null;
 
+  // ----- Sales / pipeline (PR #43) -----
   calls_booked: number | null;
   calls_booked_active: number | null;
-  calls_held: number | null;
+  /** Show-ups. Renamed from calls_held; now EXCLUDES Setter DQ rows (bug fix). */
+  shows: number | null;
+  /** Closer-qualified shows (excludes Setter DQ AND Closer DQ). NULL for legacy. */
+  qualified_shows: number | null;
   webinar_deposits: number | null;
   deals_closed: number | null;
 
@@ -62,14 +83,22 @@ export type WebinarEvent = {
   revenue_generated: number | null;
   revenue_predicted: number | null;
 
+  // ----- Unit economics -----
   paid_cpr: number | null;
-  blended_cpr: number | null;
   blended_cpa: number | null;
   blended_cpbc: number | null;
-  blended_cost_per_held_call: number | null;
+  /** total_webinar_ad_spend / calls_booked_active (PR #43). */
+  blended_cpbc_active: number | null;
+  /** Renamed from blended_cost_per_held_call; same formula intent. */
+  blended_cost_per_show: number | null;
+  /** total_webinar_ad_spend / qualified_shows (PR #43). NULL for legacy. */
+  blended_cost_per_qualified_show: number | null;
   cac: number | null;
   roas_cash: number | null;
   roas_revenue: number | null;
+  /** "Live ROAS": running cash by deal-prospect emails / total_webinar_ad_spend.
+   *  Grows as payment-plan installments come in. NULL for legacy rows. */
+  roas_cash_running: number | null;
   pitch_to_book_rate: number | null;
 
   dbt_updated_at: string | null; // ISO timestamp
@@ -103,7 +132,7 @@ export type WebinarKpis = {
   registrants: number;
   attendees: number;
   booked: number;
-  held: number;
+  shows: number;
   deals: number;
   cash: number;
   revenue: number;
@@ -175,9 +204,12 @@ function toWebinarEvent(row: Record<string, unknown>): WebinarEvent {
     lp_opt_in_rate: asNum(row.lp_opt_in_rate),
     lp_form_submissions: asNum(row.lp_form_submissions),
 
-    ad_spend: asNum(row.ad_spend),
+    total_webinar_ad_spend: asNum(row.total_webinar_ad_spend),
+    webinar_reg_ad_spend: asNum(row.webinar_reg_ad_spend),
+    webinar_hammer_them_ad_spend: asNum(row.webinar_hammer_them_ad_spend),
+    frequency_webinar_hammer_them: asNum(row.frequency_webinar_hammer_them),
     meta_impressions: asNum(row.meta_impressions),
-    meta_clicks: asNum(row.meta_clicks),
+    meta_link_clicks: asNum(row.meta_link_clicks),
     meta_ctr: asNum(row.meta_ctr),
     meta_cvr: asNum(row.meta_cvr),
     meta_cpl: asNum(row.meta_cpl),
@@ -193,10 +225,13 @@ function toWebinarEvent(row: Record<string, unknown>): WebinarEvent {
     pitched_attendees: asNum(row.pitched_attendees),
     reg_to_attend_rate: asNum(row.reg_to_attend_rate),
     attend_to_pitched_rate: asNum(row.attend_to_pitched_rate),
+    cash_collected_per_attendee: asNum(row.cash_collected_per_attendee),
+    contract_value_per_attendee: asNum(row.contract_value_per_attendee),
 
     calls_booked: asNum(row.calls_booked),
     calls_booked_active: asNum(row.calls_booked_active),
-    calls_held: asNum(row.calls_held),
+    shows: asNum(row.shows),
+    qualified_shows: asNum(row.qualified_shows),
     webinar_deposits: asNum(row.webinar_deposits),
     deals_closed: asNum(row.deals_closed),
 
@@ -206,13 +241,15 @@ function toWebinarEvent(row: Record<string, unknown>): WebinarEvent {
     revenue_predicted: asNum(row.revenue_predicted),
 
     paid_cpr: asNum(row.paid_cpr),
-    blended_cpr: asNum(row.blended_cpr),
     blended_cpa: asNum(row.blended_cpa),
     blended_cpbc: asNum(row.blended_cpbc),
-    blended_cost_per_held_call: asNum(row.blended_cost_per_held_call),
+    blended_cpbc_active: asNum(row.blended_cpbc_active),
+    blended_cost_per_show: asNum(row.blended_cost_per_show),
+    blended_cost_per_qualified_show: asNum(row.blended_cost_per_qualified_show),
     cac: asNum(row.cac),
     roas_cash: asNum(row.roas_cash),
     roas_revenue: asNum(row.roas_revenue),
+    roas_cash_running: asNum(row.roas_cash_running),
     pitch_to_book_rate: asNum(row.pitch_to_book_rate),
 
     dbt_updated_at: asStr(row.dbt_updated_at),
@@ -306,16 +343,16 @@ export function computeKpis(rows: WebinarEvent[]): WebinarKpis {
     registrants = 0,
     attendees = 0,
     booked = 0,
-    held = 0,
+    shows = 0,
     deals = 0,
     cash = 0,
     revenue = 0;
   for (const r of rows) {
-    spend += r.ad_spend ?? 0;
+    spend += r.total_webinar_ad_spend ?? 0;
     registrants += r.total_registrants ?? 0;
     attendees += r.unique_attendees ?? 0;
     booked += r.calls_booked ?? 0;
-    held += r.calls_held ?? 0;
+    shows += r.shows ?? 0;
     deals += r.deals_closed ?? 0;
     cash += r.cash_collected ?? 0;
     revenue += r.revenue_generated ?? 0;
@@ -325,7 +362,7 @@ export function computeKpis(rows: WebinarEvent[]): WebinarKpis {
     registrants,
     attendees,
     booked,
-    held,
+    shows,
     deals,
     cash,
     revenue,
@@ -343,7 +380,7 @@ export function funnelStages(w: WebinarEvent): FunnelStage[] {
     { label: "Attended", value: w.unique_attendees ?? 0 },
     { label: "Pitched", value: w.pitched_attendees ?? 0 },
     { label: "Booked call", value: w.calls_booked ?? 0 },
-    { label: "Held call", value: w.calls_held ?? 0 },
+    { label: "Shows", value: w.shows ?? 0 },
     { label: "Deal closed", value: w.deals_closed ?? 0 },
   ];
 }

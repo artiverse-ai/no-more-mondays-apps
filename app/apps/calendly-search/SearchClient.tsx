@@ -192,6 +192,16 @@ export function SearchClient() {
     );
   }, [result, closerScope, activeClosers, inactiveClosers]);
 
+  const availableHosts = useMemo(() => {
+    return [
+      ...new Set(
+        closerScopedAll
+          .flatMap((r) => (r.hostNames.length ? r.hostNames : [r.hostName]))
+          .filter((h) => h && h !== "—"),
+      ),
+    ].sort();
+  }, [closerScopedAll]);
+
   const onSort = (field: SortField) => {
     if (sortField === field) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -219,6 +229,14 @@ export function SearchClient() {
         setCustomStart={setCustomStart}
         customEnd={customEnd}
         setCustomEnd={setCustomEnd}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        closerScope={closerScope}
+        setCloserScope={setCloserScope}
+        closersLoading={closersLoading}
+        hostFilter={hostFilter}
+        setHostFilter={setHostFilter}
+        availableHosts={availableHosts}
         loading={loading}
         onSearch={onSearch}
         onCancel={onCancel}
@@ -267,13 +285,6 @@ export function SearchClient() {
             allRows={closerScopedAll}
             viewMode={viewMode}
             setViewMode={setViewMode}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            closerScope={closerScope}
-            setCloserScope={setCloserScope}
-            closersLoading={closersLoading}
-            hostFilter={hostFilter}
-            setHostFilter={setHostFilter}
             filteredCount={filtered.length}
             onExport={() => exportCsv(filtered)}
           />

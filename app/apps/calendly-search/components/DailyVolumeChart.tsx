@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -103,14 +104,28 @@ export function DailyVolumeChart({ rows }: { rows: Row[] }) {
               name="Active"
               fill="var(--nmm-green)"
               radius={[0, 0, 0, 0]}
-            />
+            >
+              <LabelList
+                dataKey="active"
+                position="center"
+                formatter={(v) => (typeof v === "number" && v > 0 ? String(v) : "")}
+                style={{ fill: "#fff", fontSize: 10, fontWeight: 700 }}
+              />
+            </Bar>
             <Bar
               dataKey="canceled"
               stackId="status"
               name="Canceled"
               fill="#dc2626"
               radius={[4, 4, 0, 0]}
-            />
+            >
+              <LabelList
+                dataKey="canceled"
+                position="center"
+                formatter={(v) => (typeof v === "number" && v > 0 ? String(v) : "")}
+                style={{ fill: "#fff", fontSize: 10, fontWeight: 700 }}
+              />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>

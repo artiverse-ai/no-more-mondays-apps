@@ -69,7 +69,7 @@ export function CallHeatMatrix({
     rows: Row[];
   } | null>(null);
 
-  const { dateCols, hourRows, cellMap, rowTotals, colTotals, grandActive, grandCanceled, max, truncated } = useMemo(() => {
+  const { dateCols, hourRows, cellMap, rowTotals, colTotals, rowRows, colRows, grandRows, grandActive, grandCanceled, max, truncated } = useMemo(() => {
     const byCell = new Map<CellKey, Row[]>();
     const allDates = new Set<string>();
     const allHours = new Set<string>();
@@ -100,6 +100,9 @@ export function CallHeatMatrix({
 
     const rowTotals = new Map<string, StatusSplit>();
     const colTotals = new Map<string, StatusSplit>();
+    const rowRows = new Map<string, Row[]>(); // hour → all rows for that hour
+    const colRows = new Map<string, Row[]>(); // date → all rows for that date
+    const grandRows: Row[] = [];
     let grandActive = 0;
     let grandCanceled = 0;
     let max = 0;
@@ -115,6 +118,13 @@ export function CallHeatMatrix({
       cT.active += a;
       cT.canceled += c;
       colTotals.set(date, cT);
+      const rR = rowRows.get(hour) ?? [];
+      rR.push(...v);
+      rowRows.set(hour, rR);
+      const cR = colRows.get(date) ?? [];
+      cR.push(...v);
+      colRows.set(date, cR);
+      grandRows.push(...v);
       grandActive += a;
       grandCanceled += c;
       if (v.length > max) max = v.length;
@@ -126,6 +136,9 @@ export function CallHeatMatrix({
       cellMap,
       rowTotals,
       colTotals,
+      rowRows,
+      colRows,
+      grandRows,
       grandActive,
       grandCanceled,
       max,
@@ -213,12 +226,26 @@ export function CallHeatMatrix({
                 const t = colTotals.get(d) ?? { active: 0, canceled: 0 };
                 return (
                   <div key={d} className="border-l border-border p-0">
-                    <TotalSplit active={t.active} canceled={t.canceled} emphasis="md" />
+                    <TotalSplit
+                      active={t.active}
+                      canceled={t.canceled}
+                      emphasis="md"
+                      rows={colRows.get(d) ?? []}
+                      label={{ date: d, hour: "All hours" }}
+                      onOpen={setOpenCell}
+                    />
                   </div>
                 );
               })}
               <div className="border-l-2 border-foreground/30 bg-accent/10 p-0">
-                <TotalSplit active={grandActive} canceled={grandCanceled} emphasis="lg" />
+                <TotalSplit
+                  active={grandActive}
+                  canceled={grandCanceled}
+                  emphasis="lg"
+                  rows={grandRows}
+                  label={{ date: "All dates", hour: "All hours" }}
+                  onOpen={setOpenCell}
+                />
               </div>
             </div>
 
@@ -270,7 +297,16 @@ export function CallHeatMatrix({
                 <div className="border-l-2 border-foreground/30 bg-secondary/30 p-0">
                   {(() => {
                     const t = rowTotals.get(hour) ?? { active: 0, canceled: 0 };
-                    return <TotalSplit active={t.active} canceled={t.canceled} emphasis="sm" />;
+                    return (
+                      <TotalSplit
+                        active={t.active}
+                        canceled={t.canceled}
+                        emphasis="sm"
+                        rows={rowRows.get(hour) ?? []}
+                        label={{ date: "All dates", hour }}
+                        onOpen={setOpenCell}
+                      />
+                    );
                   })()}
                 </div>
               </div>
@@ -359,18 +395,24 @@ function HeatCell({
   );
 }
 
-// Same active/canceled split treatment as HeatCell, but used in the column-
-// and row-total rows. Non-interactive (no click handlers), no intensity
-// scaling — totals always show full saturation so they read as headline
-// numbers vs. the body cells.
+// Same active/canceled split treatment as HeatCell, used in the column- and
+// row-totals + grand total. Each colored region is clickable; clicking opens
+// the cell modal with the corresponding status subset of the supplied rows.
+// Read-only — never changes dashboard filters.
 function TotalSplit({
   active,
   canceled,
   emphasis,
+  rows,
+  label,
+  onOpen,
 }: {
   active: number;
   canceled: number;
   emphasis: "sm" | "md" | "lg";
+  rows: Row[];
+  label: { date: string; hour: string };
+  onOpen: (cell: { date: string; hour: string; rows: Row[] }) => void;
 }) {
   const total = active + canceled;
   if (total === 0) {
@@ -386,23 +428,35 @@ function TotalSplit({
       : emphasis === "md"
       ? "text-sm font-heading font-semibold py-2"
       : "text-xs font-mono font-semibold py-2";
+
+  const handle = (status: "active" | "canceled") => {
+    const subset = rows.filter((r) => r.status === status);
+    if (subset.length > 0) onOpen({ ...label, rows: subset });
+  };
+
   return (
     <div className="flex h-full min-h-[36px] flex-row">
       {active > 0 ? (
-        <div
+        <button
+          type="button"
+          onClick={() => handle("active")}
           style={{ flex: active, backgroundColor: "rgba(22, 163, 74, 0.8)" }}
-          className={`flex items-center justify-center text-emerald-950 tabular-nums ${sizeCls}`}
+          className={`flex items-center justify-center text-emerald-950 tabular-nums transition hover:brightness-110 focus:outline-none focus:brightness-110 ${sizeCls}`}
+          title={`${active} active · click to see details`}
         >
           {active}
-        </div>
+        </button>
       ) : null}
       {canceled > 0 ? (
-        <div
+        <button
+          type="button"
+          onClick={() => handle("canceled")}
           style={{ flex: canceled, backgroundColor: "rgba(220, 38, 38, 0.8)" }}
-          className={`flex items-center justify-center text-rose-950 tabular-nums ${sizeCls}`}
+          className={`flex items-center justify-center text-rose-950 tabular-nums transition hover:brightness-110 focus:outline-none focus:brightness-110 ${sizeCls}`}
+          title={`${canceled} canceled · click to see details`}
         >
           {canceled}
-        </div>
+        </button>
       ) : null}
     </div>
   );

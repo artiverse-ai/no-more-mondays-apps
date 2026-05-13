@@ -76,8 +76,21 @@ export function HostDistributionChart({ rows }: { rows: Row[] }) {
               }}
             />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} iconSize={10} />
-            <Bar dataKey="active" stackId="s" name="Active" fill="var(--nmm-green)" />
+            <Bar dataKey="active" stackId="s" name="Active" fill="var(--nmm-green)">
+              <LabelList
+                dataKey="active"
+                position="center"
+                formatter={(v) => (typeof v === "number" && v > 0 ? String(v) : "")}
+                style={{ fill: "#fff", fontSize: 10, fontWeight: 700 }}
+              />
+            </Bar>
             <Bar dataKey="canceled" stackId="s" name="Canceled" fill="#dc2626">
+              <LabelList
+                dataKey="canceled"
+                position="center"
+                formatter={(v) => (typeof v === "number" && v > 0 ? String(v) : "")}
+                style={{ fill: "#fff", fontSize: 10, fontWeight: 700 }}
+              />
               <LabelList
                 dataKey="total"
                 position="right"

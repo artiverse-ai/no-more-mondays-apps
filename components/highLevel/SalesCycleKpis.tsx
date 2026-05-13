@@ -12,7 +12,13 @@ function daysLabel(value: number | null): string {
   return `${Number.isInteger(value) ? value : value.toFixed(1)} d`;
 }
 
-export function SalesCycleKpis({ cycles }: { cycles: SalesCycleRow[] }) {
+export function SalesCycleKpis({
+  cycles,
+  devMode = false,
+}: {
+  cycles: SalesCycleRow[];
+  devMode?: boolean;
+}) {
   const occ = medianBookingToClose(cycles);
   const fuc = medianFirstCallToClose(cycles);
 
@@ -24,13 +30,17 @@ export function SalesCycleKpis({ cycles }: { cycles: SalesCycleRow[] }) {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Kpi
           label="Booking → Close (OCC)"
+          metric="median_booking_to_close_occ"
+          devMode={devMode}
           value={daysLabel(occ.value)}
-          sub={`${occ.n} OCC deal${occ.n === 1 ? "" : "s"} · median(booking_to_close_days)`}
+          sub={`${occ.n} OCC deal${occ.n === 1 ? "" : "s"}`}
         />
         <Kpi
           label="First Call → Close (FUC)"
+          metric="median_first_call_to_close_fuc"
+          devMode={devMode}
           value={daysLabel(fuc.value)}
-          sub={`${fuc.n} FUC deal${fuc.n === 1 ? "" : "s"} · median(first_call_to_close_days)`}
+          sub={`${fuc.n} FUC deal${fuc.n === 1 ? "" : "s"}`}
         />
       </div>
     </section>

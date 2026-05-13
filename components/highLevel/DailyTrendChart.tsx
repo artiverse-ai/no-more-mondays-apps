@@ -19,24 +19,60 @@ import {
   TOOLTIP_LABEL_STYLE,
   fmt,
 } from "@/components/webinar/format";
-import type { HighLevelDay } from "@/lib/highLevel";
+import type { HighLevelDay, TrendGranularity } from "@/lib/highLevel";
 
 const LABELS: Record<string, string> = {
   spend: "Ad spend",
   cash: "Cash collected",
 };
 
-export function DailyTrendChart({ days }: { days: HighLevelDay[] }) {
+function formatBucketLabel(metricDate: string, gran: TrendGranularity): string {
+  const dt = new Date(metricDate + "T00:00:00Z");
+  if (gran === "year") {
+    return dt.toLocaleDateString("en-US", { year: "numeric", timeZone: "UTC" });
+  }
+  if (gran === "month") {
+    return dt.toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  // day / week — both use "May 3" (week shows Sunday-start)
+  return fmt.dateShort(metricDate);
+}
+
+const TITLE: Record<TrendGranularity, string> = {
+  day: "Daily ad spend & cash collected",
+  week: "Weekly ad spend & cash collected",
+  month: "Monthly ad spend & cash collected",
+  year: "Yearly ad spend & cash collected",
+};
+
+const SUBTITLE: Record<TrendGranularity, string> = {
+  day: "all-campaign spend, summed per day",
+  week: "summed per Sunday-anchored week",
+  month: "summed per calendar month",
+  year: "summed per calendar year",
+};
+
+export function DailyTrendChart({
+  days,
+  gran = "day",
+}: {
+  days: HighLevelDay[];
+  gran?: TrendGranularity;
+}) {
   const data = days.map((d) => ({
-    label: fmt.dateShort(d.metric_date),
+    label: formatBucketLabel(d.metric_date, gran),
     spend: d.total_ad_spend ?? 0,
     cash: d.total_cash_collected ?? 0,
   }));
 
   return (
     <ChartCard
-      title="Daily ad spend & cash collected"
-      subtitle="all-campaign spend (date_closed for cash)"
+      title={TITLE[gran]}
+      subtitle={SUBTITLE[gran]}
       height="h-72"
     >
       <ResponsiveContainer width="100%" height="100%">

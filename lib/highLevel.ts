@@ -264,6 +264,111 @@ function median(nums: number[]): number | null {
     : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+// =====================================================================
+// Granularity rollup for the daily mart (CEO trend chart)
+// =====================================================================
+
+export type TrendGranularity = "day" | "week" | "month" | "year";
+
+function toSundayStart(date: string): string {
+  const [y, m, d] = date.split("-").map((n) => parseInt(n, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - dt.getUTCDay());
+  return dt.toISOString().slice(0, 10);
+}
+
+function bucketKey(date: string, gran: TrendGranularity): string {
+  if (gran === "week") return toSundayStart(date);
+  if (gran === "month") return date.slice(0, 7) + "-01";
+  if (gran === "year") return date.slice(0, 4) + "-01-01";
+  return date;
+}
+
+/** Auto-suggest granularity from the resolved period span. */
+export function suggestGranularity(args: {
+  from: string;
+  to: string;
+}): TrendGranularity {
+  const ms =
+    new Date(args.to + "T00:00:00Z").getTime() -
+    new Date(args.from + "T00:00:00Z").getTime();
+  const days = Math.max(1, Math.round(ms / 86_400_000) + 1);
+  if (days <= 31) return "day";
+  if (days <= 120) return "week";
+  if (days <= 730) return "month";
+  return "year";
+}
+
+/** Roll mart_high_level_daily rows up to the chosen granularity. Sums every
+ *  additive counter; metric_date is the bucket start (Sunday for week,
+ *  1st-of-month for month, Jan-1 for year). dbt_updated_at gets the bucket's
+ *  latest timestamp so the page header still shows a meaningful refresh time. */
+export function aggregateHighLevelByGran(
+  rows: HighLevelDay[],
+  gran: TrendGranularity,
+): HighLevelDay[] {
+  if (gran === "day") return rows;
+  const map = new Map<string, HighLevelDay>();
+  for (const r of rows) {
+    const key = bucketKey(r.metric_date, gran);
+    let pt = map.get(key);
+    if (!pt) {
+      pt = {
+        metric_date: key,
+        total_ad_spend: 0,
+        total_calls_booked: 0,
+        total_calls_booked_active: 0,
+        total_cash_collected: 0,
+        total_revenue_contracted: 0,
+        total_deals_closed: 0,
+        count_pif_deals: 0,
+        count_prospects_dispositioned: 0,
+        count_show_rate_eligible: 0,
+        count_show_ups: 0,
+        count_close_rate_eligible: 0,
+        count_deals_attended: 0,
+        count_setter_dq: 0,
+        count_closer_dq: 0,
+        dbt_updated_at: r.dbt_updated_at,
+      };
+      map.set(key, pt);
+    }
+    pt.total_ad_spend = (pt.total_ad_spend ?? 0) + (r.total_ad_spend ?? 0);
+    pt.total_calls_booked =
+      (pt.total_calls_booked ?? 0) + (r.total_calls_booked ?? 0);
+    pt.total_calls_booked_active =
+      (pt.total_calls_booked_active ?? 0) + (r.total_calls_booked_active ?? 0);
+    pt.total_cash_collected =
+      (pt.total_cash_collected ?? 0) + (r.total_cash_collected ?? 0);
+    pt.total_revenue_contracted =
+      (pt.total_revenue_contracted ?? 0) + (r.total_revenue_contracted ?? 0);
+    pt.total_deals_closed =
+      (pt.total_deals_closed ?? 0) + (r.total_deals_closed ?? 0);
+    pt.count_pif_deals = (pt.count_pif_deals ?? 0) + (r.count_pif_deals ?? 0);
+    pt.count_prospects_dispositioned =
+      (pt.count_prospects_dispositioned ?? 0) +
+      (r.count_prospects_dispositioned ?? 0);
+    pt.count_show_rate_eligible =
+      (pt.count_show_rate_eligible ?? 0) + (r.count_show_rate_eligible ?? 0);
+    pt.count_show_ups = (pt.count_show_ups ?? 0) + (r.count_show_ups ?? 0);
+    pt.count_close_rate_eligible =
+      (pt.count_close_rate_eligible ?? 0) + (r.count_close_rate_eligible ?? 0);
+    pt.count_deals_attended =
+      (pt.count_deals_attended ?? 0) + (r.count_deals_attended ?? 0);
+    pt.count_setter_dq = (pt.count_setter_dq ?? 0) + (r.count_setter_dq ?? 0);
+    pt.count_closer_dq = (pt.count_closer_dq ?? 0) + (r.count_closer_dq ?? 0);
+    if (
+      r.dbt_updated_at &&
+      (!pt.dbt_updated_at || r.dbt_updated_at > pt.dbt_updated_at)
+    ) {
+      pt.dbt_updated_at = r.dbt_updated_at;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    a.metric_date.localeCompare(b.metric_date),
+  );
+}
+
 export function medianBookingToClose(
   rows: SalesCycleRow[],
 ): { value: number | null; n: number } {

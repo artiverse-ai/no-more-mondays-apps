@@ -22,7 +22,7 @@ import {
 } from "./format";
 
 const LABELS: Record<string, string> = {
-  spend: "Ad spend",
+  spend: "Webinar Ad Spend",
   cash: "Cash collected",
 };
 
@@ -31,12 +31,12 @@ export function SpendCashChart({ rows }: { rows: WebinarEvent[] }) {
     .sort((a, b) => a.webinar_date.localeCompare(b.webinar_date))
     .map((r) => ({
       label: fmt.dateShort(r.webinar_date),
-      spend: r.ad_spend ?? 0,
+      spend: r.total_webinar_ad_spend ?? 0,
       cash: r.cash_collected ?? 0,
     }));
 
   return (
-    <ChartCard title="Ad spend & cash collected" subtitle="per webinar, over time">
+    <ChartCard title="Webinar ad spend & cash collected" subtitle="per webinar, over time">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />

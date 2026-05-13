@@ -10,7 +10,7 @@ import {
 } from "@/lib/webinar";
 import { DealsChart } from "@/components/webinar/DealsChart";
 import { FunnelChart } from "@/components/webinar/FunnelChart";
-import { Kpi } from "@/components/webinar/Kpi";
+import { HeadlineKPIs } from "@/components/webinar/HeadlineKPIs";
 import { RoasChart } from "@/components/webinar/RoasChart";
 import { SpendCashChart } from "@/components/webinar/SpendCashChart";
 import { WebinarFilters } from "@/components/webinar/WebinarFilters";
@@ -97,6 +97,15 @@ export default async function WebinarDashboardPage(
         </div>
       </header>
 
+      {/* Setter-DQ note on the new `shows` column (PR #43) */}
+      <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-[11px] leading-relaxed text-amber-900">
+        <strong className="font-semibold">Heads-up:</strong>{" "}
+        <code className="rounded bg-amber-100 px-1 py-0.5 font-mono">shows</code>{" "}
+        now excludes Setter DQs (PR #43 fix). Historical values may be smaller
+        than the pre-2026-04-19 &ldquo;Calls Held&rdquo; you remember — this is
+        a bug fix, not a regression.
+      </p>
+
       {/* Filters */}
       <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <WebinarFilters
@@ -110,27 +119,7 @@ export default async function WebinarDashboardPage(
       </section>
 
       {/* KPI cards */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-        <Kpi label="Webinars" value={fmt.int(filtered.length)} />
-        <Kpi label="Ad spend" value={fmt.money(kpis.spend)} />
-        <Kpi label="Registrants" value={fmt.int(kpis.registrants)} />
-        <Kpi label="Attendees" value={fmt.int(kpis.attendees)} />
-        <Kpi label="Calls booked" value={fmt.int(kpis.booked)} />
-        <Kpi label="Calls held" value={fmt.int(kpis.held)} />
-        <Kpi label="Deals closed" value={fmt.int(kpis.deals)} />
-        <Kpi label="Cash collected" value={fmt.money(kpis.cash)} />
-        <Kpi label="Revenue generated" value={fmt.money(kpis.revenue)} />
-        <Kpi
-          label="Avg ROAS (cash)"
-          value={kpis.roas == null ? "—" : fmt.ratio(kpis.roas)}
-          sub="cash / spend"
-        />
-        <Kpi
-          label="Avg CAC"
-          value={kpis.cac == null ? "—" : fmt.money(kpis.cac)}
-          sub="spend / deal"
-        />
-      </section>
+      <HeadlineKPIs kpis={kpis} rowCount={filtered.length} />
 
       {/* Charts */}
       {filtered.length === 0 ? (

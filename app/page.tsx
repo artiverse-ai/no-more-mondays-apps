@@ -36,6 +36,13 @@ const dashboards: Tile[] = [
       "End-to-end webinar funnel — spend, registrations, attendance, calls, revenue, ROAS. Live from BigQuery, with per-webinar drill-through.",
     status: "live",
   },
+  {
+    href: "/dashboards/weekly-report/2026-05-03",
+    title: "Weekly Report — May 3-9, 2026",
+    description:
+      "Monday recap: latest webinar performance, last week's sales funnel, and strategic insights. Static port of the Mon May 11 report.",
+    status: "live",
+  },
 ];
 
 const sops: SopRailEntry[] = [

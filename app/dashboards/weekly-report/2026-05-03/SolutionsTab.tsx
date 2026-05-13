@@ -11,6 +11,7 @@ export type Solution = {
   authorName: string | null;
   body: string;
   createdAt: string;
+  updatedAt: string | null;
 };
 
 const fmtET = new Intl.DateTimeFormat("en-US", {
@@ -47,6 +48,10 @@ export function SolutionsTab({
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Per-card edit state — keyed by solution id.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const canPost =
     currentUserEmail.toLowerCase() === editorEmail.toLowerCase() ||
@@ -91,6 +96,44 @@ export function SolutionsTab({
       setSolutions((prev) => prev.filter((s) => s.id !== id));
     } catch (e) {
       setError((e as Error).message);
+    }
+  };
+
+  const startEdit = (s: Solution) => {
+    setEditingId(s.id);
+    setEditDraft(s.body);
+    setError(null);
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft("");
+  };
+  const saveEdit = async (id: string) => {
+    const body = editDraft.trim();
+    if (!body) return;
+    setSavingEdit(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/weekly-report/${reportWeek}/solutions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      const data: { solution?: Solution; error?: string } = await res
+        .json()
+        .catch(() => ({}));
+      if (!res.ok || !data.solution) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setSolutions((prev) =>
+        prev.map((s) => (s.id === id ? data.solution! : s)),
+      );
+      setEditingId(null);
+      setEditDraft("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -215,7 +258,12 @@ export function SolutionsTab({
           solutions.map((s) => {
             const isMine =
               currentUserEmail.toLowerCase() === s.authorEmail.toLowerCase();
-            const canDelete = isMine || currentUserIsAdmin;
+            const canManage = isMine || currentUserIsAdmin;
+            const isEditing = editingId === s.id;
+            const edited =
+              s.updatedAt && s.updatedAt !== s.createdAt
+                ? `(edited ${fmtET.format(new Date(s.updatedAt))} ET)`
+                : null;
             return (
               <div
                 key={s.id}
@@ -236,6 +284,7 @@ export function SolutionsTab({
                     justifyContent: "space-between",
                     gap: 10,
                     marginBottom: 8,
+                    flexWrap: "wrap",
                   }}
                 >
                   <div
@@ -244,6 +293,7 @@ export function SolutionsTab({
                       alignItems: "baseline",
                       gap: 10,
                       minWidth: 0,
+                      flexWrap: "wrap",
                     }}
                   >
                     <span
@@ -265,35 +315,152 @@ export function SolutionsTab({
                       }}
                     >
                       {fmtET.format(new Date(s.createdAt))} ET
+                      {edited ? (
+                        <span style={{ marginLeft: 6, color: "var(--text-muted)" }}>
+                          {edited}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
-                  {canDelete ? (
-                    <button
-                      type="button"
-                      onClick={() => void remove(s.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--text-muted)",
-                        cursor: "pointer",
-                        fontSize: 11,
-                      }}
-                      title="Delete"
-                    >
-                      ✕
-                    </button>
+                  {canManage && !isEditing ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(s)}
+                        style={{
+                          background: "none",
+                          border: "1px solid var(--border)",
+                          color: "var(--text-secondary)",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          borderRadius: 4,
+                          padding: "2px 8px",
+                          fontFamily: "var(--font-outfit), sans-serif",
+                        }}
+                        title="Edit"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void remove(s.id)}
+                        style={{
+                          background: "none",
+                          border: "1px solid var(--border)",
+                          color: "var(--text-muted)",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          borderRadius: 4,
+                          padding: "2px 8px",
+                          fontFamily: "var(--font-outfit), sans-serif",
+                        }}
+                        title="Delete"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   ) : null}
                 </div>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text-secondary)",
-                    lineHeight: 1.65,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {s.body}
-                </p>
+                {isEditing ? (
+                  <div>
+                    <textarea
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      rows={4}
+                      style={{
+                        width: "100%",
+                        background: "var(--bg)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 6,
+                        color: "var(--text-primary)",
+                        padding: 10,
+                        fontFamily: "var(--font-outfit), sans-serif",
+                        fontSize: 13,
+                        lineHeight: 1.5,
+                        resize: "vertical",
+                        outline: "none",
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                          e.preventDefault();
+                          void saveEdit(s.id);
+                        } else if (e.key === "Escape") {
+                          cancelEdit();
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        marginTop: 8,
+                        alignItems: "center",
+                        justifyContent: "flex-end",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "var(--text-muted)",
+                          marginRight: "auto",
+                        }}
+                      >
+                        ⌘+Enter to save · Esc to cancel
+                      </span>
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        disabled={savingEdit}
+                        style={{
+                          background: "none",
+                          border: "1px solid var(--border)",
+                          color: "var(--text-secondary)",
+                          padding: "5px 12px",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          fontFamily: "var(--font-outfit), sans-serif",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void saveEdit(s.id)}
+                        disabled={savingEdit || !editDraft.trim()}
+                        style={{
+                          background: "var(--purple)",
+                          color: "#0a0a0a",
+                          border: "none",
+                          borderRadius: 4,
+                          padding: "5px 14px",
+                          fontFamily: "var(--font-outfit), sans-serif",
+                          fontWeight: 600,
+                          fontSize: 12,
+                          cursor:
+                            savingEdit || !editDraft.trim()
+                              ? "not-allowed"
+                              : "pointer",
+                          opacity: savingEdit || !editDraft.trim() ? 0.5 : 1,
+                        }}
+                      >
+                        {savingEdit ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "var(--text-secondary)",
+                      lineHeight: 1.65,
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {s.body}
+                  </p>
+                )}
               </div>
             );
           })

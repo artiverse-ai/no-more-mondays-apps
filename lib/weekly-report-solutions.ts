@@ -19,6 +19,7 @@ export type Solution = {
   authorName: string | null;
   body: string;
   createdAt: string; // ISO
+  updatedAt: string | null; // ISO if edited, null if never edited
 };
 
 const TABLE = table("weekly_report_solutions");
@@ -48,35 +49,32 @@ async function ensureTable(): Promise<void> {
       author_name STRING,
       body STRING NOT NULL,
       created_at TIMESTAMP NOT NULL,
+      updated_at TIMESTAMP,
       deleted_at TIMESTAMP
     )`,
+  });
+  // Idempotent migration for instances that were created before updated_at
+  // existed. Safe to run every cold start — IF NOT EXISTS is a no-op when
+  // the column is already there.
+  await bq().query({
+    query: `ALTER TABLE ${TABLE} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`,
   });
   _tableReady = true;
 }
 
-export async function listSolutions(
-  reportWeek: string,
-  tab: SolutionTab,
-): Promise<Solution[]> {
-  await ensureTable();
-  const [rows] = await bq().query({
-    query: `SELECT id, report_week, tab, author_email, author_name, body,
-                   FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', created_at, 'UTC') AS created_at
-            FROM ${TABLE}
-            WHERE report_week = @week AND tab = @tab AND deleted_at IS NULL
-            ORDER BY created_at DESC`,
-    params: { week: reportWeek, tab },
-    types: { week: "STRING", tab: "STRING" },
-  });
-  return (rows as Array<{
-    id: string;
-    report_week: string;
-    tab: SolutionTab;
-    author_email: string;
-    author_name: string | null;
-    body: string;
-    created_at: string;
-  }>).map((r) => ({
+type RawSolutionRow = {
+  id: string;
+  report_week: string;
+  tab: SolutionTab;
+  author_email: string;
+  author_name: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string | null;
+};
+
+function rowToSolution(r: RawSolutionRow): Solution {
+  return {
     id: r.id,
     reportWeek: r.report_week,
     tab: r.tab,
@@ -84,7 +82,28 @@ export async function listSolutions(
     authorName: r.author_name,
     body: r.body,
     createdAt: r.created_at,
-  }));
+    updatedAt: r.updated_at,
+  };
+}
+
+const SELECT_FIELDS = `id, report_week, tab, author_email, author_name, body,
+       FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', created_at, 'UTC') AS created_at,
+       FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', updated_at, 'UTC') AS updated_at`;
+
+export async function listSolutions(
+  reportWeek: string,
+  tab: SolutionTab,
+): Promise<Solution[]> {
+  await ensureTable();
+  const [rows] = await bq().query({
+    query: `SELECT ${SELECT_FIELDS}
+            FROM ${TABLE}
+            WHERE report_week = @week AND tab = @tab AND deleted_at IS NULL
+            ORDER BY created_at DESC`,
+    params: { week: reportWeek, tab },
+    types: { week: "STRING", tab: "STRING" },
+  });
+  return (rows as RawSolutionRow[]).map(rowToSolution);
 }
 
 export async function createSolution(opts: {
@@ -127,7 +146,23 @@ export async function createSolution(opts: {
     authorName: opts.authorName,
     body: opts.body,
     createdAt: nowIso,
+    updatedAt: null,
   };
+}
+
+export async function updateSolution(
+  id: string,
+  body: string,
+): Promise<Solution | null> {
+  await ensureTable();
+  await bq().query({
+    query: `UPDATE ${TABLE}
+            SET body = @body, updated_at = CURRENT_TIMESTAMP()
+            WHERE id = @id AND deleted_at IS NULL`,
+    params: { id, body },
+    types: { id: "STRING", body: "STRING" },
+  });
+  return getSolution(id);
 }
 
 export async function softDeleteSolution(id: string): Promise<void> {
@@ -142,31 +177,14 @@ export async function softDeleteSolution(id: string): Promise<void> {
 export async function getSolution(id: string): Promise<Solution | null> {
   await ensureTable();
   const [rows] = await bq().query({
-    query: `SELECT id, report_week, tab, author_email, author_name, body,
-                   FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', created_at, 'UTC') AS created_at
+    query: `SELECT ${SELECT_FIELDS}
             FROM ${TABLE}
             WHERE id = @id AND deleted_at IS NULL
             LIMIT 1`,
     params: { id },
     types: { id: "STRING" },
   });
-  const r = (rows as Array<{
-    id: string;
-    report_week: string;
-    tab: SolutionTab;
-    author_email: string;
-    author_name: string | null;
-    body: string;
-    created_at: string;
-  }>)[0];
+  const r = (rows as RawSolutionRow[])[0];
   if (!r) return null;
-  return {
-    id: r.id,
-    reportWeek: r.report_week,
-    tab: r.tab,
-    authorEmail: r.author_email,
-    authorName: r.author_name,
-    body: r.body,
-    createdAt: r.created_at,
-  };
+  return rowToSolution(r);
 }

@@ -30,6 +30,13 @@ const apps: Tile[] = [
 
 const dashboards: Tile[] = [
   {
+    href: "/dashboards/high-level",
+    title: "High-Level CEO",
+    description:
+      "Daily marketing + sales + sales-cycle rollup across all funnels (Meta-wide ad spend, booked calls, show rate, ROAS). Live from BigQuery.",
+    status: "live",
+  },
+  {
     href: "/dashboards/webinar",
     title: "Webinar Performance",
     description:

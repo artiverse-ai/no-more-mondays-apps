@@ -282,7 +282,6 @@ export function SearchClient() {
             <CallHeatMatrix
               rows={filtered}
               statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
               onInspect={setModalRowId}
             />
           ) : viewMode === "bookings" ? (

@@ -48,22 +48,19 @@ type StatusSplit = { active: number; canceled: number };
 
 type StatusFilter = "all" | "active" | "canceled";
 
-// Heatmap of call volume by date × hour-of-day (Eastern Time). Each cell is
-// split vertically into active (green, top) and canceled (red, bottom),
-// proportional to the bucket's mix. Clicking a colored part:
-//   1. Filters the whole dashboard to that status (so the other color
-//      vanishes from every cell since the upstream filter removes those rows)
-//   2. Opens the detail modal with the clicked status's calls in that bucket
-// Clicking the same colored part again toggles the filter back to "all".
+// Heatmap of call volume by date × hour-of-day (Eastern Time). Cells split
+// left/right: green = active calls, red = canceled, widths proportional to
+// the mix. Click is read-only: clicking the green half opens a modal with
+// the bucket's active calls; clicking red opens with the canceled. The
+// dashboard-level filters (Status chips up top) are the only way to filter
+// globally — the heatmap never mutates them.
 export function CallHeatMatrix({
   rows,
   statusFilter,
-  setStatusFilter,
   onInspect,
 }: {
   rows: Row[];
   statusFilter: StatusFilter;
-  setStatusFilter: (s: StatusFilter) => void;
   onInspect: (id: string) => void;
 }) {
   const [openCell, setOpenCell] = useState<{
@@ -157,7 +154,7 @@ export function CallHeatMatrix({
             </h3>
           </div>
           <div className="flex flex-col items-end gap-1 text-[10px] text-muted-foreground">
-            <p>Click <span className="text-emerald-700">green</span> to filter to Active · <span className="text-rose-700">red</span> to Canceled</p>
+            <p>Click a colored half to see those calls in detail.</p>
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-1">
                 <span className="inline-block h-2 w-3 rounded-sm bg-emerald-500/80" />
@@ -256,12 +253,16 @@ export function CallHeatMatrix({
                       max={max}
                       statusFilter={statusFilter}
                       onClickStatus={(status) => {
-                        // Toggle the filter (so the other color "vanishes"
-                        // across the heatmap), AND always open the cell
-                        // modal with the FULL bucket so the user gets
-                        // call-by-call detail just like before.
-                        setStatusFilter(statusFilter === status ? "all" : status);
-                        setOpenCell({ date: d, hour, rows: bucket });
+                        // Click is read-only — never changes the dashboard
+                        // status filter. It just opens the detail modal for
+                        // the clicked sub-section: green half → that hour's
+                        // active calls; red half → that hour's canceled
+                        // calls. The top-bar Status chips remain the only
+                        // way to filter globally.
+                        const subset = bucket.filter((r) => r.status === status);
+                        if (subset.length > 0) {
+                          setOpenCell({ date: d, hour, rows: subset });
+                        }
                       }}
                     />
                   );

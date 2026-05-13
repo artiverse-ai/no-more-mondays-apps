@@ -11,23 +11,26 @@ import {
   YAxis,
 } from "recharts";
 
-import type { WebinarEvent } from "@/lib/webinar";
+import type { WebinarPoint } from "@/lib/webinar";
 import { ChartCard } from "./ChartCard";
 import {
   AXIS_LINE,
   AXIS_TICK,
   TOOLTIP_CONTENT_STYLE,
   TOOLTIP_LABEL_STYLE,
-  fmt,
 } from "./format";
 
-export function DealsChart({ rows }: { rows: WebinarEvent[] }) {
-  const data = [...rows]
-    .sort((a, b) => a.webinar_date.localeCompare(b.webinar_date))
-    .map((r) => ({ label: fmt.dateShort(r.webinar_date), deals: r.deals_closed ?? 0 }));
+export function DealsChart({
+  points,
+  title = "Deals closed",
+}: {
+  points: WebinarPoint[];
+  title?: string;
+}) {
+  const data = points.map((p) => ({ label: p.label, deals: p.deals_closed }));
 
   return (
-    <ChartCard title="Deals closed per webinar">
+    <ChartCard title={title}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 16, right: 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />

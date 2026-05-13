@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 import { getCurrentUser } from "@/lib/auth";
+import { getDevMode } from "@/lib/dev-mode";
 import {
+  aggregateWebinarByGran,
   computeKpis,
   filterWebinars,
   funnelStages,
@@ -9,13 +11,16 @@ import {
   sortWebinars,
 } from "@/lib/webinar";
 import { DealsChart } from "@/components/webinar/DealsChart";
+import { DevModeToggle } from "@/components/DevModeToggle";
 import { FunnelChart } from "@/components/webinar/FunnelChart";
-import { HeadlineKPIs } from "@/components/webinar/HeadlineKPIs";
+import { AllMetrics, HeroKPIs } from "@/components/webinar/HeadlineKPIs";
 import { RoasChart } from "@/components/webinar/RoasChart";
 import { SpendCashChart } from "@/components/webinar/SpendCashChart";
 import { WebinarFilters } from "@/components/webinar/WebinarFilters";
 import { WebinarTable } from "@/components/webinar/WebinarTable";
 import { fmt } from "@/components/webinar/format";
+import { GranularityPicker } from "@/components/ui/granularity-picker";
+import { GRANS_WEBINAR, parseGranularity } from "@/lib/granularity";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +41,13 @@ export default async function WebinarDashboardPage(
   const to = pickStr(sp.to);
   const sort = pickStr(sp.sort, "webinar_date");
   const dir: "asc" | "desc" = pickStr(sp.dir, "desc") === "asc" ? "asc" : "desc";
+  const gran = parseGranularity(sp.gran, GRANS_WEBINAR, "webinar");
 
-  const [all, user] = await Promise.all([getWebinars(), getCurrentUser()]);
+  const [all, user, devMode] = await Promise.all([
+    getWebinars(),
+    getCurrentUser(),
+    getDevMode(),
+  ]);
 
   const days = [...new Set(all.map((w) => w.webinar_day))].filter(Boolean);
   const eras = [...new Set(all.map((w) => w.data_era))].filter(Boolean);
@@ -50,6 +60,17 @@ export default async function WebinarDashboardPage(
     a.webinar_date.localeCompare(b.webinar_date),
   );
   const latest = ascByDate[ascByDate.length - 1] ?? null;
+
+  // Roll the filtered webinars up to the chosen time-axis granularity.
+  // For gran === "webinar", this is one point per event (current default).
+  const chartPoints = aggregateWebinarByGran(filtered, gran);
+  const granLabel: Record<typeof gran, string> = {
+    webinar: "per webinar",
+    week: "by Sunday-anchored week",
+    month: "by month",
+    year: "by year",
+    day: "per day",
+  };
 
   const updatedAt = all[0]?.dbt_updated_at;
   const updatedStr =
@@ -73,8 +94,8 @@ export default async function WebinarDashboardPage(
             Webinar Performance
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            End-to-end funnel — spend, registrations, attendance, calls, revenue.
-            Live from{" "}
+            End-to-end funnel — spend, registrations, attendance, calls,
+            revenue. Live from{" "}
             <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
               dbt_tuddin.mart_webinar_events
             </code>
@@ -86,28 +107,36 @@ export default async function WebinarDashboardPage(
             {all.length} webinar{all.length === 1 ? "" : "s"}
             {updatedStr ? ` · dbt updated ${updatedStr}` : ""}
           </p>
-          {user?.isAdmin ? (
-            <Link
-              href="/admin"
-              className="rounded-md border border-border bg-card px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground shadow-sm hover:border-accent hover:text-accent"
-            >
-              Admin
-            </Link>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {user?.isAdmin ? <DevModeToggle current={devMode} /> : null}
+            {user?.isAdmin ? (
+              <Link
+                href="/admin"
+                className="inline-flex h-7 items-center rounded-md border border-border bg-card px-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-sm transition-colors hover:border-accent hover:text-accent"
+                style={{ transitionTimingFunction: "var(--ease-out)" }}
+              >
+                Admin
+              </Link>
+            ) : null}
+          </div>
         </div>
       </header>
 
-      {/* Setter-DQ note on the new `shows` column (PR #43) */}
-      <p className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-[11px] leading-relaxed text-amber-900">
-        <strong className="font-semibold">Heads-up:</strong>{" "}
-        <code className="rounded bg-amber-100 px-1 py-0.5 font-mono">shows</code>{" "}
+      {/* Setter-DQ note on the new `shows` column (PR #43) — HIG callout */}
+      <p className="rounded-xl border border-alert-orange/30 bg-alert-orange/5 px-4 py-2.5 text-[12px] leading-relaxed text-foreground">
+        <strong className="font-semibold text-alert-orange">Heads-up:</strong>{" "}
+        <code className="rounded bg-alert-orange/10 px-1 py-0.5 font-mono">
+          shows
+        </code>{" "}
         now excludes Setter DQs (PR #43 fix). Historical values may be smaller
         than the pre-2026-04-19 &ldquo;Calls Held&rdquo; you remember — this is
-        a bug fix, not a regression.
+        a bug fix, not a regression. Click the{" "}
+        <code className="rounded bg-muted/60 px-1 py-0.5 font-mono">i</code>{" "}
+        next to any metric for the formula.
       </p>
 
       {/* Filters */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <WebinarFilters
           days={days}
           eras={eras}
@@ -118,8 +147,11 @@ export default async function WebinarDashboardPage(
         />
       </section>
 
-      {/* KPI cards */}
-      <HeadlineKPIs kpis={kpis} rowCount={filtered.length} />
+      {/* Hero KPIs — 4 big primary metrics */}
+      <HeroKPIs kpis={kpis} devMode={devMode} />
+
+      {/* Collapsible "All metrics" with the rest */}
+      <AllMetrics kpis={kpis} rowCount={filtered.length} devMode={devMode} />
 
       {/* Charts */}
       {filtered.length === 0 ? (
@@ -127,18 +159,38 @@ export default async function WebinarDashboardPage(
           No webinars match these filters.
         </p>
       ) : (
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <SpendCashChart rows={filtered} />
-          <DealsChart rows={filtered} />
-          <RoasChart rows={filtered} />
-          {latest ? (
-            <FunnelChart
-              stages={funnelStages(latest)}
-              title="Funnel — most recent webinar"
-              subtitle={`${fmt.date(latest.webinar_date)} · ${latest.webinar_day}`}
-              height="h-64"
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Trends
+              </p>
+              <h2 className="font-heading text-2xl font-semibold tracking-tight">
+                Over time
+              </h2>
+            </div>
+            <GranularityPicker
+              pathname="/dashboards/webinar"
+              value={gran}
+              options={GRANS_WEBINAR}
             />
-          ) : null}
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <SpendCashChart points={chartPoints} subtitle={granLabel[gran]} />
+            <DealsChart
+              points={chartPoints}
+              title={`Deals closed ${granLabel[gran]}`}
+            />
+            <RoasChart points={chartPoints} />
+            {latest ? (
+              <FunnelChart
+                stages={funnelStages(latest)}
+                title="Funnel — most recent webinar"
+                subtitle={`${fmt.date(latest.webinar_date)} · ${latest.webinar_day}`}
+                height="h-64"
+              />
+            ) : null}
+          </div>
         </section>
       )}
 

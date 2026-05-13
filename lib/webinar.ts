@@ -409,6 +409,114 @@ export function filterWebinars(
   });
 }
 
+// =====================================================================
+// Granularity rollup for time-series charts.
+// =====================================================================
+
+/** Aggregated time-series point for chart rendering. */
+export type WebinarPoint = {
+  /** Sortable YYYY-MM-DD key for the bucket start. */
+  bucketDate: string;
+  /** Pretty label for the X axis (e.g. "May 3", "May 2026", "2026"). */
+  label: string;
+  webinar_count: number;
+  total_webinar_ad_spend: number;
+  cash_collected: number;
+  revenue_generated: number;
+  shows: number;
+  deals_closed: number;
+  calls_booked: number;
+  unique_attendees: number;
+  /** Per-bucket ROAS — recomputed from bucket totals, NOT averaged. */
+  roas_cash: number | null;
+};
+
+// Accepts the broader Granularity union from components/ui/granularity-picker
+// so the page can pass through `?gran=` without narrowing. "day" is treated
+// as "webinar" here — webinars don't happen daily.
+type WebinarGran = "day" | "webinar" | "week" | "month" | "year";
+
+function toSundayStart(date: string): string {
+  const [y, m, d] = date.split("-").map((n) => parseInt(n, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - dt.getUTCDay());
+  return dt.toISOString().slice(0, 10);
+}
+
+function bucketKey(date: string, gran: WebinarGran): string {
+  if (gran === "week") return toSundayStart(date);
+  if (gran === "month") return date.slice(0, 7) + "-01";
+  if (gran === "year") return date.slice(0, 4) + "-01-01";
+  return date; // webinar / day → one bucket per event
+}
+
+function formatBucketLabel(bucketDate: string, gran: WebinarGran): string {
+  const dt = new Date(bucketDate + "T00:00:00Z");
+  if (gran === "year") {
+    return dt.toLocaleDateString("en-US", { year: "numeric", timeZone: "UTC" });
+  }
+  if (gran === "month") {
+    return dt.toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  // webinar / week — same compact "May 3" label; the section heading
+  // tells the user what they're looking at.
+  return dt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** Roll a webinar set up to the chosen granularity, sorted ascending by date. */
+export function aggregateWebinarByGran(
+  rows: WebinarEvent[],
+  gran: WebinarGran,
+): WebinarPoint[] {
+  const map = new Map<string, WebinarPoint>();
+  for (const r of rows) {
+    const key = bucketKey(r.webinar_date, gran);
+    let pt = map.get(key);
+    if (!pt) {
+      pt = {
+        bucketDate: key,
+        label: formatBucketLabel(key, gran),
+        webinar_count: 0,
+        total_webinar_ad_spend: 0,
+        cash_collected: 0,
+        revenue_generated: 0,
+        shows: 0,
+        deals_closed: 0,
+        calls_booked: 0,
+        unique_attendees: 0,
+        roas_cash: null,
+      };
+      map.set(key, pt);
+    }
+    pt.webinar_count += 1;
+    pt.total_webinar_ad_spend += r.total_webinar_ad_spend ?? 0;
+    pt.cash_collected += r.cash_collected ?? 0;
+    pt.revenue_generated += r.revenue_generated ?? 0;
+    pt.shows += r.shows ?? 0;
+    pt.deals_closed += r.deals_closed ?? 0;
+    pt.calls_booked += r.calls_booked ?? 0;
+    pt.unique_attendees += r.unique_attendees ?? 0;
+  }
+  // Recompute ROAS per bucket from totals (NOT average-of-per-webinar).
+  for (const pt of map.values()) {
+    pt.roas_cash =
+      pt.total_webinar_ad_spend > 0
+        ? pt.cash_collected / pt.total_webinar_ad_spend
+        : null;
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    a.bucketDate.localeCompare(b.bucketDate),
+  );
+}
+
 export function sortWebinars(
   rows: WebinarEvent[],
   key: string,

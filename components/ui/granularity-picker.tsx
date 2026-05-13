@@ -2,21 +2,26 @@
 
 // Segmented control for time-axis granularity. URL-param driven so server
 // pages can rollup daily rows server-side. Reused across the Webinar,
-// CEO, Sales, and Setter dashboards in later phases.
+// CEO, Sales, and Setter dashboards.
 //
-// Each dashboard supplies its own list of valid options because the
-// granularities differ:
-//   - CEO / Sales / Setter:  day  / week / month / year
-//   - Webinar:                webinar / week / month / year
-//                             (webinars don't happen daily — one bar per event)
+// Types + option arrays + the parser live in lib/granularity.ts so
+// server pages can import them without crossing the RSC boundary.
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { cn } from "@/lib/utils";
+import type {
+  Granularity,
+  GranularityOption,
+} from "@/lib/granularity";
 
-export type Granularity = "day" | "webinar" | "week" | "month" | "year";
-
-export type GranularityOption = { key: Granularity; label: string };
+export type { Granularity, GranularityOption };
+// Re-exports for ergonomic call sites — both server and client.
+export {
+  GRANS_TIME,
+  GRANS_WEBINAR,
+  parseGranularity,
+} from "@/lib/granularity";
 
 export function GranularityPicker({
   pathname,
@@ -25,13 +30,9 @@ export function GranularityPicker({
   paramName = "gran",
   className,
 }: {
-  /** Path to push to (e.g. "/dashboards/webinar"). */
   pathname: string;
-  /** Currently-selected granularity. */
   value: Granularity;
-  /** Granularities allowed on this route, left → right. */
   options: GranularityOption[];
-  /** URL param name. Default `gran`. */
   paramName?: string;
   className?: string;
 }) {
@@ -81,29 +82,4 @@ export function GranularityPicker({
       })}
     </div>
   );
-}
-
-/** Default option sets for each dashboard. */
-export const GRANS_TIME: GranularityOption[] = [
-  { key: "day", label: "Day" },
-  { key: "week", label: "Week" },
-  { key: "month", label: "Month" },
-  { key: "year", label: "Year" },
-];
-
-export const GRANS_WEBINAR: GranularityOption[] = [
-  { key: "webinar", label: "Webinar" },
-  { key: "week", label: "Week" },
-  { key: "month", label: "Month" },
-  { key: "year", label: "Year" },
-];
-
-/** Validate `?gran=` value against an allowed set; default if invalid. */
-export function parseGranularity(
-  raw: string | string[] | undefined,
-  allowed: GranularityOption[],
-  fallback: Granularity,
-): Granularity {
-  const v = typeof raw === "string" ? raw : "";
-  return allowed.some((o) => o.key === v) ? (v as Granularity) : fallback;
 }

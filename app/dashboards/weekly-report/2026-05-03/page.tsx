@@ -4,39 +4,45 @@ import {
   SALES_EDITOR,
   listSolutions,
 } from "@/lib/weekly-report-solutions";
+import {
+  buildBookingMode,
+  buildChannelMix,
+  buildChannelMixTrend,
+  buildCloserOverall,
+  buildCloserOverallTotal,
+  buildCloserPerWebinar,
+  buildCloserWoW,
+  buildFunnelConnectors,
+  buildFunnelStages,
+  buildKpiCards,
+  buildReactivationFunnel,
+  buildSetterPerformance,
+  buildTopOfFunnelRows,
+  buildWoWComparison,
+  fetchWeeklyReport,
+} from "@/lib/weekly-report-bq";
 import { SolutionsTab } from "./SolutionsTab";
 import { Tabs } from "./Tabs";
 import { Tip, TooltipLayer } from "./Tooltip";
 import styles from "./report.module.css";
-
-const REPORT_WEEK = "2026-05-03";
 import {
-  BOOKING_MODE,
-  CHANNEL_MIX_MAY10,
-  CHANNEL_MIX_TREND,
-  CLOSER_OVERALL,
-  CLOSER_OVERALL_TOTAL,
-  CLOSER_WOW,
-  FUNNEL_CONNECTORS,
-  FUNNEL_STAGES,
   INSIGHTS,
-  KPI_CARDS,
   MAIN_CAMPAIGN_CPL_TREND,
   MAY_10_CONTEXT,
   META_CAMPAIGNS,
   META_CAMPAIGN_TOTAL,
-  PER_WEBINAR_MAY3,
-  PER_WEBINAR_MAY6,
-  REACTIVATION_FUNNEL,
   REPORT_META,
-  SETTER_PERF,
-  TOP_OF_FUNNEL,
-  WOW_COMPARISON,
 } from "./data";
+
+const REPORT_WEEK = "2026-05-03";
 
 export const metadata = {
   title: "Weekly Report — May 3-9, 2026 · No More Mondays",
 };
+
+// Re-fetch on every request — BQ data moves as deals close. The render is
+// cheap and our internal-tool traffic is tiny.
+export const revalidate = 0;
 
 const COLORS = {
   blue: "var(--blue)",
@@ -47,19 +53,53 @@ const COLORS = {
 
 export default async function Page() {
   const me = await getCurrentUser();
-  // Pre-fetch the solutions server-side so the tabs render populated.
-  // Swallow failures (BQ unreachable, etc.) — the tab will just start empty
-  // and the user can post once the connection recovers.
-  let mktInitial: Awaited<ReturnType<typeof listSolutions>> = [];
-  let salesInitial: typeof mktInitial = [];
-  try {
-    [mktInitial, salesInitial] = await Promise.all([
-      listSolutions(REPORT_WEEK, "marketing"),
-      listSolutions(REPORT_WEEK, "sales"),
-    ]);
-  } catch {
-    // ignore
-  }
+
+  // All BQ fetches in parallel.
+  const [reportData, mktInitial, salesInitial] = await Promise.all([
+    fetchWeeklyReport(REPORT_WEEK),
+    listSolutions(REPORT_WEEK, "marketing").catch(() => []),
+    listSolutions(REPORT_WEEK, "sales").catch(() => []),
+  ]);
+
+  // Build the shapes the tab components consume.
+  const topOfFunnel = buildTopOfFunnelRows(reportData.webinars);
+  const channelMix = buildChannelMix(reportData.webinars[0]);
+  const channelMixTrend = buildChannelMixTrend(reportData.webinars);
+  const reactivation = buildReactivationFunnel(reportData.webinars);
+
+  const funnelStages = buildFunnelStages(reportData.thisWeekFunnel);
+  const funnelConnectors = buildFunnelConnectors(reportData.thisWeekFunnel);
+  const kpiCards = buildKpiCards(reportData.thisWeekFunnel, reportData.priorWeekFunnel);
+  const wowRows = buildWoWComparison(reportData.thisWeekFunnel, reportData.priorWeekFunnel);
+  const closerOverall = buildCloserOverall(reportData.closerOverall);
+  const closerOverallTotal = buildCloserOverallTotal(reportData.thisWeekFunnel);
+  const closerWoW = buildCloserWoW(reportData.closerWoW);
+  const perWebinarMostRecent = buildCloserPerWebinar(reportData.perWebinarMostRecent);
+  const perWebinarSecond = buildCloserPerWebinar(reportData.perWebinarSecond);
+  const bookingMode = buildBookingMode(reportData.bookingMode);
+  const setterPerf = buildSetterPerformance(reportData.setterPerformance);
+
+  const t1Data = {
+    topOfFunnel,
+    channelMix,
+    channelMixTrend,
+    reactivation,
+    webinarDates: reportData.window.webinarDates,
+  };
+  const t2Data = {
+    funnelStages,
+    funnelConnectors,
+    kpiCards,
+    wowRows,
+    closerOverall,
+    closerOverallTotal,
+    closerWoW,
+    perWebinarMostRecent,
+    perWebinarSecond,
+    bookingMode,
+    setterPerf,
+    webinarDates: reportData.window.webinarDates,
+  };
 
   return (
     <div className={styles.bg}>
@@ -81,8 +121,8 @@ export default async function Page() {
         ]}
         defaultActive="t1"
         panels={{
-          t1: <Tab1 />,
-          t2: <Tab2 />,
+          t1: <Tab1 {...t1Data} />,
+          t2: <Tab2 {...t2Data} />,
           t3: <Tab3 />,
           t4: (
             <SolutionsTab
@@ -111,13 +151,26 @@ export default async function Page() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  TAB 1 — Latest Webinar
+//  TAB 1 — Latest Webinar (BQ-fed numbers; static commentary)
 // ════════════════════════════════════════════════════════════════════════
 
-function Tab1() {
+type Tab1Props = {
+  topOfFunnel: ReturnType<typeof buildTopOfFunnelRows>;
+  channelMix: ReturnType<typeof buildChannelMix>;
+  channelMixTrend: ReturnType<typeof buildChannelMixTrend>;
+  reactivation: ReturnType<typeof buildReactivationFunnel>;
+  webinarDates: string[];
+};
+
+function Tab1({ topOfFunnel, channelMix, channelMixTrend, reactivation, webinarDates }: Tab1Props) {
+  const headers = webinarDates.length >= 3
+    ? webinarDates.slice(0, 3)
+    : [...webinarDates, "—", "—", "—"].slice(0, 3);
+  const totalReg = channelMix.reduce((s, c) => s + c.count, 0);
+
   return (
     <>
-      {/* Context banner */}
+      {/* Context banner — narrative, stays static */}
       <div className={styles.ctxBanner}>
         <div className={styles.ctxTag}>⚙ {MAY_10_CONTEXT.tag}</div>
         <h3>{MAY_10_CONTEXT.title}</h3>
@@ -136,97 +189,73 @@ function Tab1() {
 
       {/* Top-of-Funnel comparison */}
       <section className={styles.section}>
-        <div className={styles.sh}>Top-of-Funnel Comparison</div>
+        <div className={styles.sh}>Top-of-Funnel Comparison (live · BQ-fed)</div>
         <div className={styles.tw}>
           <table className={styles.ct}>
             <thead>
               <tr>
                 <th>Metric</th>
-                <th className={styles.lhh}>
-                  <Tip tip="Sun May 10 — Mini Lump Sum, Mother's Day.\nExpanded reactivation + Zoom enrollment change.\nAd spend adjusted ~$5,906 (12pm ET cutoff approx).\nSales partial — 1 deal confirmed at report pull.">
-                    May 10 Sun ▴
-                  </Tip>
-                </th>
-                <th>May 6 Wed</th>
-                <th>May 3 Sun</th>
+                <th className={styles.lhh}>{headers[0]}</th>
+                <th>{headers[1]}</th>
+                <th>{headers[2]}</th>
               </tr>
             </thead>
             <tbody>
-              {TOP_OF_FUNNEL.map((r, i) =>
+              {topOfFunnel.map((r, i) =>
                 r.kind === "divider" ? (
                   <tr key={i} className={styles.divRow}>
                     <td colSpan={4}>{r.label}</td>
                   </tr>
                 ) : (
                   <tr key={i}>
-                    <td>
-                      {r.tip ? <Tip tip={r.tip}>{r.label}</Tip> : r.label}
-                    </td>
-                    {r.values.map((v, j) => {
-                      const cls = r.classes?.[j] ?? (j === 0 ? "lh" : "");
-                      return (
-                        <td key={j} className={classesFor(cls)}>
-                          {renderValueCell(v, cls)}
-                        </td>
-                      );
-                    })}
+                    <td>{r.tip ? <Tip tip={r.tip}>{r.label}</Tip> : r.label}</td>
+                    {r.values.map((v, j) => (
+                      <td key={j} className={j === 0 ? styles.lh : ""}>{v}</td>
+                    ))}
                   </tr>
                 ),
               )}
             </tbody>
           </table>
         </div>
-        <div className={styles.spendAdjNote}>
-          * Ad spend adjustment: Thu $1,821 + Fri $1,732 + Sat $1,328 + 50% Sun $1,024 = ~$5,906. Mart figure $6,930 (full window). No hourly Meta data — 50% is an approximation for 12pm ET start. Hammer Them 2 (retargeting) excluded.
-        </div>
         <div className={styles.fn}>
-          <span className={styles.fnHi}>†</span> Other organic includes 2 Skool Community posts. <span className={styles.fnHi}>‡</span> May 10 Zoom enrollment = 4,160. Attend rate GHL basis 19.1% / Zoom basis 4.4%. ROAS &amp; CAC partial (1 deal) — evaluate Thursday midweek.
+          Live from <code className={styles.code}>mart_webinar_events</code>. Numbers will move as the day progresses — refresh to re-pull.
         </div>
       </section>
 
       {/* Channel mix */}
       <section className={styles.section}>
-        <div className={styles.sh}>Channel Mix — May 10 Sun (960 GHL Registrants)</div>
+        <div className={styles.sh}>Channel Mix — Latest Webinar ({totalReg} Registrants)</div>
         <div className={styles.twoCol}>
           <div>
-            {CHANNEL_MIX_MAY10.map((c) => (
+            {channelMix.map((c) => (
               <div className={styles.chRow} key={c.name}>
                 <div className={styles.chName}>{c.name}</div>
                 <div className={styles.chBg}>
-                  <div
-                    className={styles.chFill}
-                    style={{ width: `${c.pct}%`, background: COLORS[c.color] }}
-                  />
+                  <div className={styles.chFill} style={{ width: `${c.pct}%`, background: COLORS[c.color] }} />
                 </div>
                 <div className={styles.chN}>{c.count}</div>
                 <div className={styles.chP}>{c.pct.toFixed(1)}%</div>
               </div>
             ))}
-            <div className={styles.fn}>
-              Setter = 0 this cycle. Meta dependency highest in recent cycles at 89.7%. ManyChat down from 99 on May 6.
-            </div>
           </div>
           <div>
-            <div className={styles.sh} style={{ marginBottom: 12 }}>
-              Channel Mix Trend
-            </div>
+            <div className={styles.sh} style={{ marginBottom: 12 }}>Channel Mix Trend</div>
             <div className={styles.tw}>
               <table className={styles.dt}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left" }}>Channel</th>
-                    <th className={styles.lhh}>May 10</th>
-                    <th>May 6</th>
-                    <th>May 3</th>
+                    <th className={styles.lhh}>{headers[0]}</th>
+                    <th>{headers[1]}</th>
+                    <th>{headers[2]}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {CHANNEL_MIX_TREND.map((r) => (
+                  {channelMixTrend.map((r) => (
                     <tr key={r.name}>
                       <td>{r.name}</td>
-                      <td className={`${styles.lh} ${r.dn ? styles.dn : ""}`}>
-                        {r.may10}
-                      </td>
+                      <td className={`${styles.lh} ${r.dn ? styles.dn : ""}`}>{r.may10}</td>
                       <td>{r.may6}</td>
                       <td>{r.may3}</td>
                     </tr>
@@ -238,9 +267,9 @@ function Tab1() {
         </div>
       </section>
 
-      {/* Meta Campaigns */}
+      {/* Meta Campaigns — still static (different table grain, see backlog) */}
       <section className={styles.section}>
-        <div className={styles.sh}>Meta Campaigns — Week of May 10 Promo Window</div>
+        <div className={styles.sh}>Meta Campaigns — Week of {headers[0]} Promo Window (static — backlog)</div>
         <div className={styles.tw}>
           <table className={styles.dt}>
             <thead>
@@ -265,13 +294,11 @@ function Tab1() {
                 </tr>
               ))}
               <tr className={styles.divRow}>
-                <td colSpan={6}>Lead-gen Total (excl. Hammer Them 2 retargeting)</td>
+                <td colSpan={6}>Lead-gen Total (excl. retargeting)</td>
               </tr>
               <tr>
                 <td>{META_CAMPAIGN_TOTAL.label}</td>
-                <td>
-                  <strong>{META_CAMPAIGN_TOTAL.spend}</strong>
-                </td>
+                <td><strong>{META_CAMPAIGN_TOTAL.spend}</strong></td>
                 <td>{META_CAMPAIGN_TOTAL.impr}</td>
                 <td>{META_CAMPAIGN_TOTAL.clicks}</td>
                 <td>{META_CAMPAIGN_TOTAL.conv}</td>
@@ -280,13 +307,8 @@ function Tab1() {
             </tbody>
           </table>
         </div>
-        <div className={styles.fn}>
-          Full promo window total covers May 10 + upcoming May 13. Mart per-webinar attribution (~$5,906 adjusted) is source of truth for ROAS/CAC. Hammer Them 1: 0 conversions across all 3 tracked windows ($1,582 total). Hammer Them 2 (retargeting) excluded.
-        </div>
         <br />
-        <div className={styles.sh} style={{ marginBottom: 12 }}>
-          Main Campaign CPL Trend
-        </div>
+        <div className={styles.sh} style={{ marginBottom: 12 }}>Main Campaign CPL Trend</div>
         <div className={styles.tw}>
           <table className={styles.dt}>
             <thead>
@@ -301,66 +323,44 @@ function Tab1() {
               {MAIN_CAMPAIGN_CPL_TREND.map((r) => (
                 <tr key={r.name}>
                   <td>{r.name}</td>
-                  <td className={`${styles.lh} ${classByFlag(r.may10Class)}`}>{r.may10}</td>
+                  <td className={`${styles.lh} ${r.may10Class === "up" ? styles.up : r.may10Class === "dn" ? styles.dn : r.may10Class === "nt" ? styles.nt : ""}`}>{r.may10}</td>
                   <td>{r.may3}</td>
-                  <td className={classByFlag(r.apr26Class)}>{r.apr26}</td>
+                  <td className={r.apr26Class === "dn" ? styles.dn : ""}>{r.apr26}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-        <div className={styles.fn}>
-          Main campaign CPL down 70% over 3 promo windows. GHL regs holding (800–960/webinar) — confirms genuine efficiency gain.
         </div>
       </section>
 
       {/* Reactivation */}
       <section className={styles.section}>
-        <div className={styles.sh}>Reactivation Funnel</div>
+        <div className={styles.sh}>Reactivation Funnel (live)</div>
         <div className={styles.tw}>
           <table className={styles.dt}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left" }}>Webinar</th>
-                <th>
-                  <Tip tip="No-show contacts targeted.\nMay 10 tag confirmed via raw_ghl:\nevent: no show-webinar-2026-05-06-mini-lump-sum-reactivation\nSource: mart_webinar_events.reactivation_pool_size">
-                    Pool
-                  </Tip>
-                </th>
-                <th>
-                  <Tip tip="Pool contacts who attended.\nSource: mart_webinar_events.reactivations_attended">
-                    Attended
-                  </Tip>
-                </th>
+                <th>Pool</th>
+                <th>Attended</th>
                 <th>Attend Rate</th>
-                <th>
-                  <Tip tip="Pool contacts who booked a call within 7 days.\nSource: mart_webinar_events.reactivations_booked">
-                    Booked
-                  </Tip>
-                </th>
+                <th>Booked</th>
                 <th>Book Rate</th>
               </tr>
             </thead>
             <tbody>
-              {REACTIVATION_FUNNEL.map((r) => (
+              {reactivation.map((r) => (
                 <tr key={r.webinar}>
                   <td className={r.highlight ? styles.lh : ""}>{r.webinar}</td>
                   <td className={r.highlight ? styles.lh : ""}>{r.pool}</td>
-                  <td className={`${r.highlight ? styles.lh : ""} ${r.upAttended ? styles.up : ""}`}>
-                    {r.attended}
-                  </td>
+                  <td className={r.highlight ? styles.lh : ""}>{r.attended}</td>
                   <td className={r.highlight ? styles.lh : ""}>{r.attendRate}</td>
-                  <td className={`${r.highlight ? styles.lh : ""} ${r.upBooked ? styles.up : ""}`}>
-                    {r.booked}
-                  </td>
+                  <td className={r.highlight ? styles.lh : ""}>{r.booked}</td>
                   <td className={r.highlight ? styles.lh : ""}>{r.bookRate}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-        <div className={styles.fn}>
-          <span className={styles.fnHi}>†</span> GHL tag: <span style={{ fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: 10 }}>event: no show-webinar-2026-05-06-mini-lump-sum-reactivation</span>. 3,705 confirmed via raw_ghl. Mart now correctly picking up. Total Zoom enrollment 4,160 — ~505 of the 3,705 not enrolled in Zoom. Attend rate 2.3% vs standard 1.7–1.8% — slight lift from reminders. Book rate 19.8% of attended is strong.
         </div>
       </section>
     </>
@@ -368,17 +368,32 @@ function Tab1() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  TAB 2 — Sales
+//  TAB 2 — Last Week's Sales (BQ-fed)
 // ════════════════════════════════════════════════════════════════════════
 
-function Tab2() {
+type Tab2Props = {
+  funnelStages: ReturnType<typeof buildFunnelStages>;
+  funnelConnectors: ReturnType<typeof buildFunnelConnectors>;
+  kpiCards: ReturnType<typeof buildKpiCards>;
+  wowRows: ReturnType<typeof buildWoWComparison>;
+  closerOverall: ReturnType<typeof buildCloserOverall>;
+  closerOverallTotal: ReturnType<typeof buildCloserOverallTotal>;
+  closerWoW: ReturnType<typeof buildCloserWoW>;
+  perWebinarMostRecent: ReturnType<typeof buildCloserPerWebinar>;
+  perWebinarSecond: ReturnType<typeof buildCloserPerWebinar>;
+  bookingMode: ReturnType<typeof buildBookingMode>;
+  setterPerf: ReturnType<typeof buildSetterPerformance>;
+  webinarDates: string[];
+};
+
+function Tab2(p: Tab2Props) {
   return (
     <>
       <section className={styles.section}>
-        <div className={styles.sh}>Sales Funnel — Week May 3–9, 2026</div>
+        <div className={styles.sh}>Sales Funnel — Week May 3–9, 2026 (live)</div>
         <div className={styles.funnel}>
-          {FUNNEL_STAGES.map((s, i) => {
-            const conn = i < FUNNEL_CONNECTORS.length ? FUNNEL_CONNECTORS[i] : null;
+          {p.funnelStages.map((s, i) => {
+            const conn = i < p.funnelConnectors.length ? p.funnelConnectors[i] : null;
             const color = COLORS[s.color as keyof typeof COLORS];
             const bgRgba = colorRgba(s.color, 0.09);
             const borderRgba = colorRgba(s.color, 0.22);
@@ -387,29 +402,19 @@ function Tab2() {
                 <div className={styles.fRow}>
                   <div
                     className={styles.fBar}
-                    style={{
-                      background: bgRgba,
-                      border: `1px solid ${borderRgba}`,
-                      width: `${s.width}%`,
-                    }}
+                    style={{ background: bgRgba, border: `1px solid ${borderRgba}`, width: `${s.width}%` }}
                   >
                     <span className={styles.fLabel} style={{ color }}>
                       <Tip tip={s.tip}>{s.label}</Tip>
                     </span>
-                    <span className={styles.fVal} style={{ color }}>
-                      {s.value}
-                    </span>
+                    <span className={styles.fVal} style={{ color }}>{s.value}</span>
                   </div>
                 </div>
                 {conn ? (
                   <div className={styles.fConn}>
                     <span
                       className={styles.fRate}
-                      style={
-                        conn.rateColor === "green"
-                          ? { background: "rgba(74,222,128,.08)", color: "var(--green)" }
-                          : undefined
-                      }
+                      style={conn.rateColor === "green" ? { background: "rgba(74,222,128,.08)", color: "var(--green)" } : undefined}
                     >
                       {conn.rate}
                     </span>
@@ -422,15 +427,11 @@ function Tab2() {
         </div>
 
         <div className={styles.kpiGrid}>
-          {KPI_CARDS.map((k) => (
+          {p.kpiCards.map((k) => (
             <div className={styles.kpi} key={k.label}>
-              <div className={styles.kpiLbl}>
-                <Tip tip={k.tip}>{k.label}</Tip>
-              </div>
+              <div className={styles.kpiLbl}><Tip tip={k.tip}>{k.label}</Tip></div>
               <div className={styles.kpiVal}>{k.value}</div>
-              <div className={`${styles.kpiCh} ${k.changeClass === "up" ? styles.up : k.changeClass === "dn" ? styles.dn : ""}`}>
-                {k.change}
-              </div>
+              <div className={`${styles.kpiCh} ${k.changeClass === "up" ? styles.up : k.changeClass === "dn" ? styles.dn : ""}`}>{k.change}</div>
             </div>
           ))}
         </div>
@@ -443,79 +444,59 @@ function Tab2() {
             <thead>
               <tr>
                 <th>Metric</th>
-                <th className={styles.lhh}>
-                  <Tip tip="DATE(appointment_date_time) BETWEEN '2026-05-03' AND '2026-05-09'\nAll sales activity occurring this week.">
-                    May 3–9
-                  </Tip>
-                </th>
-                <th>
-                  <Tip tip="DATE(appointment_date_time) BETWEEN '2026-04-26' AND '2026-05-02'\nSame appointment_date_time basis — like-for-like.">
-                    Apr 26–May 2
-                  </Tip>
-                </th>
+                <th className={styles.lhh}>This Week</th>
+                <th>Prior</th>
                 <th>Change</th>
               </tr>
             </thead>
             <tbody>
-              {WOW_COMPARISON.map((r, i) =>
+              {p.wowRows.map((r, i) =>
                 r.kind === "divider" ? (
-                  <tr key={i} className={styles.divRow}>
-                    <td colSpan={4}>{r.label}</td>
-                  </tr>
+                  <tr key={i} className={styles.divRow}><td colSpan={4}>{r.label}</td></tr>
                 ) : (
                   <tr key={i}>
                     <td>{r.tip ? <Tip tip={r.tip}>{r.label}</Tip> : r.label}</td>
-                    <td className={classesFor(r.thisWeekClass ?? "lh")}>{r.thisWeek}</td>
+                    <td className={`${styles.lh} ${r.thisWeekClass ? styles[r.thisWeekClass as keyof typeof styles] : ""}`}>{r.thisWeek}</td>
                     <td>{r.prior}</td>
-                    <td className={classByFlag(r.changeClass)}>{r.change}</td>
+                    <td className={r.changeClass === "up" ? styles.up : r.changeClass === "dn" ? styles.dn : styles.nt}>{r.change}</td>
                   </tr>
                 ),
               )}
             </tbody>
           </table>
         </div>
-        <div className={styles.fn}>
-          Both weeks on <strong>appointment_date_time basis</strong> — all call activity occurring within each calendar week, regardless of when the prospect originally booked. Consistent like-for-like comparison.
-        </div>
       </section>
 
       <section className={styles.section}>
         <div className={styles.sh}>Closer Performance — Per Webinar (booking_week_sun basis)</div>
         <div className={styles.twoCol}>
-          <PerWebinarTable title="Sun May 3 Webinar" rows={PER_WEBINAR_MAY3} />
-          <PerWebinarTable title="Wed May 6 Webinar" rows={PER_WEBINAR_MAY6} />
-        </div>
-        <div className={styles.fn}>
-          Per-webinar tables use booking_week_sun basis — deals reflect what closed from each webinar&apos;s own booked pipeline only.
+          <PerWebinarTable title={p.webinarDates[1] ?? "—"} rows={p.perWebinarMostRecent} />
+          <PerWebinarTable title={p.webinarDates[2] ?? "—"} rows={p.perWebinarSecond} />
         </div>
       </section>
 
       <section className={styles.section}>
-        <div className={styles.sh}>Closer Performance — Overall (appointment_date_time May 3–9)</div>
+        <div className={styles.sh}>Closer Performance — Overall (appointment_date_time, May 3–9)</div>
         <div className={styles.tw}>
           <table className={styles.dt}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left" }}>
-                  <Tip tip="All metrics COUNT DISTINCT prospect_email_lc\nDate filter: DATE(appointment_date_time) BETWEEN '2026-05-03' AND '2026-05-09'\nMatches Looker Studio int_calls_enriched view\nSource: int_calls_enriched">
-                    Closer
-                  </Tip>
-                </th>
-                <th><Tip tip="COUNT DISTINCT prospect_email_lc\nAll prospects with activity this week">Prospects</Tip></th>
-                <th><Tip tip="Prospects (D'd)\nCOUNT DISTINCT WHERE is_dispositioned">Pros (D&apos;d)</Tip></th>
-                <th><Tip tip="COUNT DISTINCT WHERE call_outcome='Setter DQ'">S.DQ</Tip></th>
-                <th><Tip tip="COUNT DISTINCT WHERE call_outcome='Closer DQ'">C.DQ</Tip></th>
-                <th><Tip tip="Prospects (SQ) — Setter-Qualified\nCOUNT DISTINCT WHERE is_show_rate_eligible">Pros (SQ)</Tip></th>
-                <th><Tip tip="Shows (SQ) — Setter-Qualified Show-Ups\nCOUNT DISTINCT WHERE is_show_up">Shows (SQ)</Tip></th>
-                <th><Tip tip="Shows (CQ) — Closer-Qualified Show-Ups\nCOUNT DISTINCT WHERE is_close_rate_eligible">Shows (CQ)</Tip></th>
+                <th style={{ textAlign: "left" }}>Closer</th>
+                <th>Prospects</th>
+                <th>Pros (D&apos;d)</th>
+                <th>S.DQ</th>
+                <th>C.DQ</th>
+                <th>Pros (SQ)</th>
+                <th>Shows (SQ)</th>
+                <th>Shows (CQ)</th>
                 <th>Deals</th>
                 <th>Cash</th>
-                <th><Tip tip="Shows (SQ) / Prospects (SQ)">Show%</Tip></th>
-                <th><Tip tip="Deals / Shows (CQ)">Close%</Tip></th>
+                <th>Show%</th>
+                <th>Close%</th>
               </tr>
             </thead>
             <tbody>
-              {CLOSER_OVERALL.map((r) => (
+              {p.closerOverall.map((r) => (
                 <tr key={r.closer}>
                   <td>{r.closer}</td>
                   <td>{r.prospects}</td>
@@ -531,50 +512,39 @@ function Tab2() {
                   <td className={r.upClose ? styles.up : r.dnClose ? styles.dn : ""}>{r.close}</td>
                 </tr>
               ))}
-              <tr className={styles.divRow}>
-                <td colSpan={12}>Week Total</td>
-              </tr>
+              <tr className={styles.divRow}><td colSpan={12}>Week Total</td></tr>
               <tr>
-                <td><strong>{CLOSER_OVERALL_TOTAL.label}</strong></td>
-                <td>{CLOSER_OVERALL_TOTAL.prospects}</td>
-                <td>{CLOSER_OVERALL_TOTAL.prosD}</td>
-                <td>{CLOSER_OVERALL_TOTAL.sDQ}</td>
-                <td>{CLOSER_OVERALL_TOTAL.cDQ}</td>
-                <td>{CLOSER_OVERALL_TOTAL.prosSQ}</td>
-                <td>{CLOSER_OVERALL_TOTAL.showsSQ}</td>
-                <td>{CLOSER_OVERALL_TOTAL.showsCQ}</td>
-                <td>{CLOSER_OVERALL_TOTAL.deals}</td>
-                <td>{CLOSER_OVERALL_TOTAL.cash}</td>
-                <td>{CLOSER_OVERALL_TOTAL.show}</td>
-                <td>{CLOSER_OVERALL_TOTAL.close}</td>
+                <td><strong>{p.closerOverallTotal.label}</strong></td>
+                <td>{p.closerOverallTotal.prospects}</td>
+                <td>{p.closerOverallTotal.prosD}</td>
+                <td>{p.closerOverallTotal.sDQ}</td>
+                <td>{p.closerOverallTotal.cDQ}</td>
+                <td>{p.closerOverallTotal.prosSQ}</td>
+                <td>{p.closerOverallTotal.showsSQ}</td>
+                <td>{p.closerOverallTotal.showsCQ}</td>
+                <td>{p.closerOverallTotal.deals}</td>
+                <td>{p.closerOverallTotal.cash}</td>
+                <td>{p.closerOverallTotal.show}</td>
+                <td>{p.closerOverallTotal.close}</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <div className={styles.fn}>
-          All metrics on appointment_date_time basis — matches Looker Studio. Show% = Shows (SQ) / Prospects (SQ). Close% = Deals / Shows (CQ).
-        </div>
         <br />
-        <div className={styles.sh} style={{ marginBottom: 12 }}>
-          WoW Closer Comparison
-        </div>
+        <div className={styles.sh} style={{ marginBottom: 12 }}>WoW Closer Comparison</div>
         <div className={styles.tw}>
           <table className={styles.dt}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left" }}>Closer</th>
-                <th className={styles.lhh}>May 3–9 Deals</th>
-                <th className={styles.lhh}>May 3–9 Cash</th>
-                <th>
-                  <Tip tip="Prior week figures on booking_week_sun='2026-04-26' basis.\nFull appt_date_time re-query for prior week per-closer pending.">
-                    Apr 26–May 2 Deals †
-                  </Tip>
-                </th>
-                <th>Apr 26–May 2 Cash †</th>
+                <th className={styles.lhh}>This wk Deals</th>
+                <th className={styles.lhh}>This wk Cash</th>
+                <th>Prior Deals</th>
+                <th>Prior Cash</th>
               </tr>
             </thead>
             <tbody>
-              {CLOSER_WOW.map((r) => (
+              {p.closerWoW.map((r) => (
                 <tr key={r.closer}>
                   <td>{r.closer}</td>
                   <td className={`${styles.lh} ${r.upDeals ? styles.up : r.dnDeals ? styles.dn : ""}`}>{r.deals}</td>
@@ -585,9 +555,6 @@ function Tab2() {
               ))}
             </tbody>
           </table>
-        </div>
-        <div className={styles.fn}>
-          <span className={styles.fnHi}>†</span> Prior week per-closer is on booking_week_sun basis — week-level totals in WoW table above are on appt_date_time basis for both weeks.
         </div>
       </section>
 
@@ -601,20 +568,20 @@ function Tab2() {
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left" }}>Source</th>
-                    <th><Tip tip="COUNT DISTINCT prospect_email_lc">Prospects</Tip></th>
-                    <th><Tip tip="Prospects (SQ)\nCOUNT DISTINCT WHERE is_show_rate_eligible">Pros (SQ)</Tip></th>
-                    <th><Tip tip="Shows (SQ)\nCOUNT DISTINCT WHERE is_show_up">Shows (SQ)</Tip></th>
-                    <th><Tip tip="Shows (SQ) / Prospects (SQ)">Show%</Tip></th>
-                    <th><Tip tip="Shows (CQ)\nCOUNT DISTINCT WHERE is_close_rate_eligible">Shows (CQ)</Tip></th>
+                    <th>Prospects</th>
+                    <th>Pros (SQ)</th>
+                    <th>Shows (SQ)</th>
+                    <th>Show%</th>
+                    <th>Shows (CQ)</th>
                     <th>Deals</th>
                     <th>Cash</th>
-                    <th><Tip tip="Deals / Shows (CQ)">Close%</Tip></th>
+                    <th>Close%</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {BOOKING_MODE.map((r) => (
+                  {p.bookingMode.map((r) => (
                     <tr key={r.source}>
-                      <td>{r.tip ? <Tip tip={r.tip}>{r.source}</Tip> : r.source}</td>
+                      <td>{r.source}</td>
                       <td>{r.prospects}</td>
                       <td>{r.prosSQ}</td>
                       <td>{r.showsSQ}</td>
@@ -628,37 +595,29 @@ function Tab2() {
                 </tbody>
               </table>
             </div>
-            <div className={styles.fn}>
-              appointment_date_time basis. Setter-booked show rate (71.4%) outperforms webinar-booked (64.7%). Webinar-booked close rate higher (44.4% vs 35.7%) once qualified. Cash nearly split: webinar $22,785 / setter $18,988.
-            </div>
           </div>
           <div>
-            <div className={styles.sh} style={{ marginBottom: 12 }}>
-              Setter Performance — Prospects (SQ) &amp; Show Rate by Booking Mode
-            </div>
+            <div className={styles.sh} style={{ marginBottom: 12 }}>Setter Performance — by Booking Mode</div>
             <div className={styles.tw}>
               <table className={styles.dt} style={{ fontSize: 11 }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left" }}>Setter</th>
                     <th>Mode</th>
-                    <th><Tip tip="Prospects (SQ) for this mode">Pros (SQ)</Tip></th>
-                    <th><Tip tip="Shows (SQ) for this mode">Shows (SQ)</Tip></th>
-                    <th><Tip tip="Shows (SQ) / Prospects (SQ) — per mode">Show%</Tip></th>
+                    <th>Pros (SQ)</th>
+                    <th>Shows (SQ)</th>
+                    <th>Show%</th>
                     <th>Deals</th>
                     <th>Cash</th>
                     <th><Tip tip="$300/week bonus: 80%+ overall show rate AND 20+ Prospects (SQ)">Bonus</Tip></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {SETTER_PERF.map((s) => (
+                  {p.setterPerf.map((s) => (
                     <SetterBlock key={s.name} setter={s} />
                   ))}
                 </tbody>
               </table>
-            </div>
-            <div className={styles.fn}>
-              appointment_date_time basis. Bonus: 80%+ SR AND 20+ Pros (SQ). No setter qualified. Sal clears SR (85.7%) but volume short (7, post-trip). Swapnil has volume but SR 70%. Hania misses both — webinar-sourced SR 40% is the key concern.
             </div>
           </div>
         </div>
@@ -667,13 +626,7 @@ function Tab2() {
   );
 }
 
-function PerWebinarTable({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: typeof PER_WEBINAR_MAY3;
-}) {
+function PerWebinarTable({ title, rows }: { title: string; rows: ReturnType<typeof buildCloserPerWebinar> }) {
   return (
     <div>
       <div className={styles.sh} style={{ marginBottom: 12 }}>{title}</div>
@@ -691,6 +644,9 @@ function PerWebinarTable({
             </tr>
           </thead>
           <tbody>
+            {rows.length === 0 ? (
+              <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)" }}>No data</td></tr>
+            ) : null}
             {rows.map((r) => (
               <tr key={r.closer}>
                 <td>{r.closer}</td>
@@ -698,7 +654,7 @@ function PerWebinarTable({
                 <td>{r.prosSQ}</td>
                 <td>{r.showsSQ}</td>
                 <td>{r.showsCQ}</td>
-                <td className={r.upDeals ? styles.up : r.dnDeals ? styles.dn : ""}>{r.deals}</td>
+                <td className={r.upDeals ? styles.up : ""}>{r.deals}</td>
                 <td className={r.upClose ? styles.up : r.dnClose ? styles.dn : r.ntClose ? styles.nt : ""}>{r.close}</td>
               </tr>
             ))}
@@ -709,39 +665,29 @@ function PerWebinarTable({
   );
 }
 
-function SetterBlock({ setter }: { setter: (typeof SETTER_PERF)[number] }) {
-  const toneClass = setter.bonus.tone === "dn" ? styles.dn : setter.bonus.tone === "amb" ? styles.amb : "";
+function SetterBlock({ setter }: { setter: ReturnType<typeof buildSetterPerformance>[number] }) {
+  const toneClass = setter.bonus.tone === "dn" ? styles.dn : setter.bonus.tone === "amb" ? styles.amb : styles.up;
   return (
     <>
       {setter.rows.map((row, idx) => (
         <tr key={row.mode}>
-          {idx === 0 ? (
-            <td rowSpan={2} style={{ fontWeight: 600 }}>
-              {setter.name}
-            </td>
-          ) : null}
+          {idx === 0 ? <td rowSpan={2} style={{ fontWeight: 600 }}>{setter.name}</td> : null}
           <td>{row.mode}</td>
           <td>{row.prosSQ}</td>
           <td>{row.showsSQ}</td>
           <td className={row.upShow ? styles.up : row.dnShow ? styles.dn : ""}>{row.show}</td>
           <td>{row.deals}</td>
           <td>{row.cash}</td>
-          {idx === 0 ? (
-            <td rowSpan={2} className={toneClass}>
-              <Tip tip={setter.bonus.tip}>{setter.bonus.label}</Tip>
-            </td>
-          ) : null}
+          {idx === 0 ? <td rowSpan={2} className={toneClass}><Tip tip={setter.bonus.tip}>{setter.bonus.label}</Tip></td> : null}
         </tr>
       ))}
-      <tr className={styles.divRow}>
-        <td colSpan={7}>{setter.combined}</td>
-      </tr>
+      <tr className={styles.divRow}><td colSpan={7}>{setter.combined}</td></tr>
     </>
   );
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  TAB 3 — Insights
+//  TAB 3 — Strategic Insights (static commentary)
 // ════════════════════════════════════════════════════════════════════════
 
 function Tab3() {
@@ -753,29 +699,19 @@ function Tab3() {
       <div className={styles.insGrid}>
         {INSIGHTS.map((ins, i) => {
           const cls =
-            ins.tone === "win"
-              ? styles.insWin
-              : ins.tone === "watch"
-              ? styles.insWatch
-              : ins.tone === "flag"
-              ? styles.insFlag
-              : ins.tone === "fix"
-              ? styles.insFix
-              : ins.tone === "fwd"
-              ? styles.insFwd
-              : styles.insCtx;
+            ins.tone === "win" ? styles.insWin :
+            ins.tone === "watch" ? styles.insWatch :
+            ins.tone === "flag" ? styles.insFlag :
+            ins.tone === "fix" ? styles.insFix :
+            ins.tone === "fwd" ? styles.insFwd :
+            styles.insCtx;
           const tagCls =
-            ins.tone === "win"
-              ? styles.insWinTag
-              : ins.tone === "watch"
-              ? styles.insWatchTag
-              : ins.tone === "flag"
-              ? styles.insFlagTag
-              : ins.tone === "fix"
-              ? styles.insFixTag
-              : ins.tone === "fwd"
-              ? styles.insFwdTag
-              : styles.insCtxTag;
+            ins.tone === "win" ? styles.insWinTag :
+            ins.tone === "watch" ? styles.insWatchTag :
+            ins.tone === "flag" ? styles.insFlagTag :
+            ins.tone === "fix" ? styles.insFixTag :
+            ins.tone === "fwd" ? styles.insFwdTag :
+            styles.insCtxTag;
           return (
             <div key={i} className={`${styles.ins} ${cls}`}>
               <div className={`${styles.insTag} ${tagCls}`}>{ins.tag}</div>
@@ -791,56 +727,11 @@ function Tab3() {
 
 // ─── helpers ────────────────────────────────────────────────────────────
 
-function classesFor(cls: string): string {
-  if (!cls) return "";
-  return cls
-    .split(" ")
-    .map((c) => {
-      switch (c) {
-        case "lh":
-          return styles.lh;
-        case "lhh":
-          return styles.lhh;
-        case "up":
-          return styles.up;
-        case "dn":
-          return styles.dn;
-        case "nt":
-          return styles.nt;
-        case "amb":
-          return styles.amb;
-        case "tag-p":
-          return styles.tagP;
-        case "tag-g":
-          return styles.tagG;
-        default:
-          return "";
-      }
-    })
-    .filter(Boolean)
-    .join(" ");
-}
-
-function renderValueCell(value: string, cls: string) {
-  if (cls.includes("tag-p")) return <span className={styles.tagP}>{value}</span>;
-  if (cls.includes("tag-g")) return <span className={styles.tagG}>{value}</span>;
-  return value;
-}
-
-function classByFlag(flag: string | undefined) {
-  if (!flag) return "";
-  if (flag === "up") return styles.up;
-  if (flag === "dn") return styles.dn;
-  if (flag === "nt") return styles.nt;
-  return "";
-}
-
 function colorRgba(name: string, alpha: number): string {
   const map: Record<string, [number, number, number]> = {
     blue: [96, 165, 250],
     green: [74, 222, 128],
     amber: [251, 191, 36],
-    red: [248, 113, 113],
     purple: [167, 139, 250],
   };
   const c = map[name] ?? map.blue;

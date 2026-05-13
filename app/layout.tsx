@@ -1,11 +1,32 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, JetBrains_Mono, Outfit, Syne } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Inter,
+  JetBrains_Mono,
+  Outfit,
+  Syne,
+} from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Suspense } from "react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { NavProgress } from "@/components/NavProgress";
 import "./globals.css";
 
+// Inter is the primary UI font (closest open match to SF Pro). The
+// font-sans CSS var puts -apple-system / "SF Pro Text" ahead of Inter so
+// macOS / iOS get native SF rendering, then Windows / Linux fall to Inter.
+// See app/globals.css :root --font-sans.
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  // Inter's variable axes (weight/optical) auto-pick; explicit weights
+  // declared so we can use 300/400/500/600/700 without extra fetches.
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+// Kept as a fallback in the font-sans stack — Geist is already cached for
+// any returning visitor on the dashboards.
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -52,7 +73,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html
         lang="en"
-        className={`${geistSans.variable} ${geistMono.variable} ${syne.variable} ${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
+        className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} ${syne.variable} ${outfit.variable} ${jetbrainsMono.variable} h-full antialiased`}
         // Browser extensions (screen recorders, etc.) inject attributes onto
         // <html> before React hydrates — ignore the resulting attribute diff.
         suppressHydrationWarning

@@ -27,7 +27,7 @@ const TABLE = table("weekly_report_solutions");
 // Editor emails — overridable via env so we don't have to redeploy to change.
 // Default to the names the user gave us.
 export const MARKETING_EDITOR = (
-  process.env.MARKETING_SOLUTIONS_EDITOR ?? "alvero@nomoremondays.io"
+  process.env.MARKETING_SOLUTIONS_EDITOR ?? "alvaro@nomoremondays.io"
 ).toLowerCase();
 export const SALES_EDITOR = (
   process.env.SALES_SOLUTIONS_EDITOR ?? "ben@nomoremondays.io"

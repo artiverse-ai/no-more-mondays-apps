@@ -9,8 +9,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { useReportTransition } from "@/lib/nav-progress-context";
 import { cn } from "@/lib/utils";
+import type { ViewTabOption } from "@/lib/view-tabs";
 
-export type ViewTabOption = { key: string; label: string };
+export type { ViewTabOption };
 
 export function ViewTabs({
   pathname,
@@ -74,12 +75,6 @@ export function ViewTabs({
   );
 }
 
-/** Validate a `?view=` param against an allowed option set; default if invalid. */
-export function parseViewTab(
-  raw: string | string[] | undefined,
-  allowed: ViewTabOption[],
-  fallback: string,
-): string {
-  const v = typeof raw === "string" ? raw : "";
-  return allowed.some((o) => o.key === v) ? v : fallback;
-}
+// parseViewTab now lives in `lib/view-tabs.ts` so server pages can import
+// it without Next 16 treating it as a client-only function. Import from
+// `@/lib/view-tabs` directly in your server pages.

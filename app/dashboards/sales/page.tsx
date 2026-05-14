@@ -26,7 +26,8 @@ import { DataFreshness } from "@/components/DataFreshness";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DevModeToggle } from "@/components/DevModeToggle";
 import { Kpi } from "@/components/webinar/Kpi";
-import { ViewTabs, parseViewTab } from "@/components/ui/view-tabs";
+import { ViewTabs } from "@/components/ui/view-tabs";
+import { parseViewTab } from "@/lib/view-tabs";
 import { cn } from "@/lib/utils";
 import { fmt } from "@/components/webinar/format";
 

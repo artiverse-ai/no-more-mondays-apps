@@ -1,52 +1,64 @@
 "use client";
 
-// Per-setter leaderboard for /dashboards/setter.
-// Aligns with the same Apple-feel hairline table as the closer one.
+// Per-setter leaderboard for /dashboards/setter (D3 rebuild). Mirrors
+// CloserLeaderboard but with setter-emphasis columns (DQ rate, show
+// rate, cash per booking). Click a setter to set the cross-filter chip.
 
-import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
+import { useReportTransition } from "@/lib/nav-progress-context";
 import { cn } from "@/lib/utils";
 import { fmt } from "@/components/webinar/format";
-import type { SetterRow } from "@/lib/setter";
+import type { SetterRollup } from "@/lib/calls";
 
 type Align = "left" | "right";
 
 const COLUMNS: Array<{
-  key: keyof SetterRow | "rank";
+  key: keyof SetterRollup | "rank";
   label: string;
   align: Align;
 }> = [
   { key: "rank", label: "#", align: "left" },
   { key: "setter", label: "Setter", align: "left" },
   { key: "bookings", label: "Bookings", align: "right" },
-  { key: "active_bookings", label: "Active", align: "right" },
-  { key: "show_ups", label: "Shows", align: "right" },
+  { key: "dispositioned", label: "Disposed", align: "right" },
+  { key: "setter_dq", label: "Setter DQ", align: "right" },
+  { key: "setter_dq_rate", label: "DQ %", align: "right" },
+  { key: "prospects_sq", label: "SQ", align: "right" },
+  { key: "shows_sq", label: "Shows", align: "right" },
   { key: "show_rate", label: "Show %", align: "right" },
-  { key: "setter_dq_rate", label: "Setter DQ %", align: "right" },
-  { key: "qualified_shows", label: "Qual. Shows", align: "right" },
-  { key: "qualified_rate", label: "Qual. %", align: "right" },
-  { key: "closer_dq_rate", label: "Closer DQ %", align: "right" },
+  { key: "shows_cq", label: "CQ Shows", align: "right" },
+  { key: "closer_dq", label: "Closer DQ", align: "right" },
   { key: "deals", label: "Deals", align: "right" },
-  { key: "cash_attributed", label: "Cash", align: "right" },
-  { key: "cash_per_booking", label: "Cash/Bk", align: "right" },
+  { key: "cash", label: "Cash", align: "right" },
+  { key: "cash_per_booking", label: "Cash / Bk", align: "right" },
 ];
 
-const SETTER_DQ_HOT = 0.4; // > 40% Setter DQ is a red flag
-const QUALIFIED_HOT = 0.7;
-const QUALIFIED_COLD = 0.5;
+const shortName = (email: string) =>
+  email.includes("@") ? email.split("@")[0] : email;
 
 export function SetterLeaderboard({
   rows,
   sort,
   dir,
+  pathname,
 }: {
-  rows: SetterRow[];
+  rows: SetterRollup[];
   sort: string;
   dir: "asc" | "desc";
+  pathname: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  useReportTransition(pending);
+
+  const sorted = sortRows(rows, sort, dir);
+
+  const navigate = (next: URLSearchParams) =>
+    startTransition(() =>
+      router.push(`${pathname}?${next.toString()}`, { scroll: false }),
+    );
 
   const setSort = (key: string) => {
     if (key === "rank") return;
@@ -54,31 +66,31 @@ export function SetterLeaderboard({
     const nextDir = sort === key && dir === "desc" ? "asc" : "desc";
     next.set("sort", key);
     next.set("dir", nextDir);
-    startTransition(() =>
-      router.push(`/dashboards/setter?${next.toString()}`, { scroll: false }),
-    );
+    navigate(next);
+  };
+
+  const setSetterFilter = (setter: string) => {
+    const next = new URLSearchParams(params);
+    next.set("setter", setter);
+    navigate(next);
   };
 
   const dqClass = (rate: number | null): string => {
     if (rate == null) return "";
-    if (rate >= SETTER_DQ_HOT) return "text-alert-red";
-    return "";
-  };
-  const qualClass = (rate: number | null): string => {
-    if (rate == null) return "";
-    if (rate >= QUALIFIED_HOT) return "font-semibold text-alert-green";
-    if (rate < QUALIFIED_COLD) return "text-alert-red";
+    if (rate >= 0.3) return "text-alert-red";
+    if (rate >= 0.15) return "text-alert-orange";
     return "";
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2.5">
         <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
           Setter leaderboard
         </span>
         <span className="text-[11px] text-muted-foreground">
-          {rows.length} setter{rows.length === 1 ? "" : "s"} · click header to sort
+          {sorted.length} setter{sorted.length === 1 ? "" : "s"} · click header
+          to sort, name to filter
         </span>
       </div>
       <div className="overflow-x-auto">
@@ -109,7 +121,7 @@ export function SetterLeaderboard({
             data-pending={pending ? "" : undefined}
             className="data-[pending]:opacity-60 data-[pending]:transition-opacity"
           >
-            {rows.length === 0 ? (
+            {sorted.length === 0 ? (
               <tr>
                 <td
                   colSpan={COLUMNS.length}
@@ -119,7 +131,7 @@ export function SetterLeaderboard({
                 </td>
               </tr>
             ) : (
-              rows.map((r, i) => (
+              sorted.map((r, i) => (
                 <tr
                   key={r.setter}
                   className="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
@@ -128,12 +140,18 @@ export function SetterLeaderboard({
                     {i + 1}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
-                    {r.setter}
+                    <button
+                      type="button"
+                      onClick={() => setSetterFilter(r.setter)}
+                      className="rounded-md px-1.5 py-0.5 hover:bg-secondary"
+                      title={`Filter to ${r.setter}`}
+                    >
+                      {shortName(r.setter)}
+                    </button>
                   </td>
                   <Num value={fmt.int(r.bookings)} />
-                  <Num value={fmt.int(r.active_bookings)} />
-                  <Num value={fmt.int(r.show_ups)} />
-                  <Num value={fmt.pct(r.show_rate)} />
+                  <Num value={fmt.int(r.dispositioned)} />
+                  <Num value={fmt.int(r.setter_dq)} />
                   <td
                     className={cn(
                       "whitespace-nowrap px-3 py-2 text-right tabular-nums",
@@ -142,26 +160,14 @@ export function SetterLeaderboard({
                   >
                     {fmt.pct(r.setter_dq_rate)}
                   </td>
-                  <Num value={fmt.int(r.qualified_shows)} />
-                  <td
-                    className={cn(
-                      "whitespace-nowrap px-3 py-2 text-right tabular-nums",
-                      qualClass(r.qualified_rate),
-                    )}
-                  >
-                    {fmt.pct(r.qualified_rate)}
-                  </td>
-                  <td
-                    className={cn(
-                      "whitespace-nowrap px-3 py-2 text-right tabular-nums",
-                      dqClass(r.closer_dq_rate),
-                    )}
-                  >
-                    {fmt.pct(r.closer_dq_rate)}
-                  </td>
+                  <Num value={fmt.int(r.prospects_sq)} />
+                  <Num value={fmt.int(r.shows_sq)} />
+                  <Num value={fmt.pct(r.show_rate)} />
+                  <Num value={fmt.int(r.shows_cq)} />
+                  <Num value={fmt.int(r.closer_dq)} />
                   <Num value={fmt.int(r.deals)} />
-                  <Num value={fmt.money(r.cash_attributed)} />
-                  <Num value={fmt.money2(r.cash_per_booking)} />
+                  <Num value={fmt.money(r.cash)} />
+                  <Num value={fmt.money(r.cash_per_booking)} />
                 </tr>
               ))
             )}
@@ -178,4 +184,22 @@ function Num({ value }: { value: React.ReactNode }) {
       {value}
     </td>
   );
+}
+
+function sortRows(
+  rows: SetterRollup[],
+  key: string,
+  dir: "asc" | "desc",
+): SetterRollup[] {
+  if (key === "rank" || !rows.length) return rows;
+  const m = dir === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const av = (a as unknown as Record<string, unknown>)[key];
+    const bv = (b as unknown as Record<string, unknown>)[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * m;
+    return String(av).localeCompare(String(bv)) * m;
+  });
 }

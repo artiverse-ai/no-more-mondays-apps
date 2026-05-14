@@ -163,20 +163,22 @@ def fetch_webinar_comparison(week_end: str, same_weekday_only: bool) -> list[dic
 
 
 def fetch_week_funnel(start: str, end: str) -> dict[str, Any]:
+    """Mirrors lib/weekly-report-bq.ts::fetchWeekFunnel. Counts DISTINCT
+    prospect_email_lc and uses is_* boolean columns from int_calls_enriched."""
     sql = f"""
       SELECT
-        COUNT(*) AS prospects,
-        COUNTIF(disqualified = TRUE) AS disqualified,
-        COUNTIF(disqualified_by = 'setter') AS setter_dq,
-        COUNTIF(disqualified_by = 'closer') AS closer_dq,
-        COUNTIF(disqualified = FALSE) AS sales_qualified,
-        COUNTIF(disqualified = FALSE AND showed_up = TRUE) AS shows_sq,
-        COUNTIF(disqualified = FALSE AND showed_up = TRUE AND closer_disqualified = FALSE) AS shows_cq,
-        COUNTIF(deal_closed = TRUE) AS deals,
-        COALESCE(SUM(cash_collected), 0) AS cash,
-        COALESCE(SUM(contract_value), 0) AS contract_value
+        COUNT(DISTINCT prospect_email_lc) AS prospects,
+        COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)) AS pros_d,
+        COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)) AS setter_dq,
+        COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)) AS closer_dq,
+        COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL)) AS pros_sq,
+        COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)) AS shows_sq,
+        COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL)) AS shows_cq,
+        COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
+        SUM(IF(is_deal, cash_collected, 0)) AS cash,
+        SUM(IF(is_deal, revenue_generated, 0)) AS revenue
       FROM {ENRICHED}
-      WHERE DATE(booking_week_sun) BETWEEN DATE(@start) AND DATE(@end)
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
     """
     rows = _rows(sql, [
         bigquery.ScalarQueryParameter("start", "STRING", start),
@@ -186,28 +188,29 @@ def fetch_week_funnel(start: str, end: str) -> dict[str, Any]:
 
 
 def fetch_closer_overall(start: str, end: str) -> list[dict[str, Any]]:
+    """Mirrors lib/weekly-report-bq.ts::fetchCloserOverall."""
     sql = f"""
-      SELECT closer_name AS closer,
-             COUNT(*) AS prospects,
-             COUNTIF(disqualified = TRUE) AS prospects_dq,
-             COUNTIF(disqualified_by = 'setter') AS setter_dq,
-             COUNTIF(disqualified_by = 'closer') AS closer_dq,
-             COUNTIF(disqualified = FALSE) AS prospects_sq,
-             COUNTIF(disqualified = FALSE AND showed_up = TRUE) AS shows_sq,
-             COUNTIF(disqualified = FALSE AND showed_up = TRUE AND closer_disqualified = FALSE) AS shows_cq,
-             COUNTIF(deal_closed = TRUE) AS deals,
-             COALESCE(SUM(cash_collected), 0) AS cash,
+      SELECT closer_owner AS closer,
+             COUNT(DISTINCT prospect_email_lc) AS prospects,
+             COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)) AS pros_d,
+             COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)) AS setter_dq,
+             COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)) AS closer_dq,
+             COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL)) AS pros_sq,
+             COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)) AS shows_sq,
+             COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL)) AS shows_cq,
+             COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
+             SUM(IF(is_deal, cash_collected, 0)) AS cash,
              SAFE_DIVIDE(
-               COUNTIF(disqualified = FALSE AND showed_up = TRUE),
-               COUNTIF(disqualified = FALSE)
+               COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+               COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))
              ) AS show_rate,
              SAFE_DIVIDE(
-               COUNTIF(deal_closed = TRUE),
-               COUNTIF(disqualified = FALSE AND showed_up = TRUE AND closer_disqualified = FALSE)
+               COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)),
+               COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))
              ) AS close_rate
       FROM {ENRICHED}
       WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
-        AND closer_name IS NOT NULL
+        AND closer_owner IS NOT NULL
       GROUP BY closer
       ORDER BY deals DESC, cash DESC
     """
@@ -218,27 +221,32 @@ def fetch_closer_overall(start: str, end: str) -> list[dict[str, Any]]:
 
 
 def fetch_booking_mode(start: str, end: str) -> list[dict[str, Any]]:
+    """Mirrors lib/weekly-report-bq.ts::fetchBookingMode."""
     sql = f"""
       SELECT
-        CASE WHEN booked_via_setter = TRUE THEN 'Setter' ELSE 'Webinar' END AS source,
-        COUNT(*) AS prospects,
-        COUNTIF(disqualified = FALSE) AS prospects_sq,
-        COUNTIF(disqualified = FALSE AND showed_up = TRUE) AS shows_sq,
-        COUNTIF(disqualified = FALSE AND showed_up = TRUE AND closer_disqualified = FALSE) AS shows_cq,
-        COUNTIF(deal_closed = TRUE) AS deals,
-        COALESCE(SUM(cash_collected), 0) AS cash,
+        CASE
+          WHEN is_webinar_flow THEN 'Webinar Booked'
+          WHEN is_setter_flow THEN 'Setter Booked'
+          ELSE 'Other'
+        END AS source,
+        COUNT(DISTINCT prospect_email_lc) AS prospects,
+        COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL)) AS pros_sq,
+        COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)) AS shows_sq,
+        COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL)) AS shows_cq,
+        COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
+        SUM(IF(is_deal, cash_collected, 0)) AS cash,
         SAFE_DIVIDE(
-          COUNTIF(disqualified = FALSE AND showed_up = TRUE),
-          COUNTIF(disqualified = FALSE)
+          COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+          COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))
         ) AS show_rate,
         SAFE_DIVIDE(
-          COUNTIF(deal_closed = TRUE),
-          COUNTIF(disqualified = FALSE AND showed_up = TRUE AND closer_disqualified = FALSE)
+          COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)),
+          COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))
         ) AS close_rate
       FROM {ENRICHED}
-      WHERE DATE(booking_week_sun) BETWEEN DATE(@start) AND DATE(@end)
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
       GROUP BY source
-      ORDER BY source
+      ORDER BY prospects DESC
     """
     return _rows(sql, [
         bigquery.ScalarQueryParameter("start", "STRING", start),
@@ -247,22 +255,26 @@ def fetch_booking_mode(start: str, end: str) -> list[dict[str, Any]]:
 
 
 def fetch_setter_performance(start: str, end: str) -> list[dict[str, Any]]:
+    """Mirrors lib/weekly-report-bq.ts::fetchSetterPerformance."""
     sql = f"""
-      SELECT setter_name AS setter,
-             CASE WHEN booked_via_setter = TRUE THEN 'Setter' ELSE 'Webinar' END AS mode,
-             COUNTIF(disqualified = FALSE) AS prospects_sq,
-             COUNTIF(disqualified = FALSE AND showed_up = TRUE) AS shows_sq,
-             COUNTIF(deal_closed = TRUE) AS deals,
-             COALESCE(SUM(cash_collected), 0) AS cash,
-             SAFE_DIVIDE(
-               COUNTIF(disqualified = FALSE AND showed_up = TRUE),
-               COUNTIF(disqualified = FALSE)
-             ) AS show_rate
+      SELECT
+        setter_owner AS setter,
+        CASE WHEN is_setter_flow THEN 'Setter' WHEN is_webinar_flow THEN 'Webinar' ELSE 'Other' END AS mode,
+        COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL)) AS pros_sq,
+        COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)) AS shows_sq,
+        COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
+        SUM(IF(is_deal, cash_collected, 0)) AS cash,
+        SAFE_DIVIDE(
+          COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+          COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))
+        ) AS show_rate
       FROM {ENRICHED}
-      WHERE DATE(booking_week_sun) BETWEEN DATE(@start) AND DATE(@end)
-        AND setter_name IS NOT NULL
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+        AND setter_owner IS NOT NULL
+        AND (is_setter_flow OR is_webinar_flow)
       GROUP BY setter, mode
-      ORDER BY setter, mode
+      HAVING pros_sq > 0
+      ORDER BY pros_sq DESC, setter, mode
     """
     return _rows(sql, [
         bigquery.ScalarQueryParameter("start", "STRING", start),

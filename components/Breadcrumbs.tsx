@@ -12,6 +12,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   "calendly-search": "Calendly Note Search",
   dashboards: "Dashboards",
   webinar: "Webinar Performance",
+  "high-level": "High-Level",
   admin: "Admin",
   access: "Site access",
   closers: "Closers",

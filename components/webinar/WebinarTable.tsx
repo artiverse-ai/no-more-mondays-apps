@@ -9,16 +9,27 @@ import { dayBadgeClass, eraBadgeClass, eraLabel, fmt } from "./format";
 
 type Align = "left" | "right";
 
-const COLUMNS: Array<{ key: string; label: string; align: Align }> = [
+const COLUMNS: Array<{
+  key: string;
+  label: string;
+  align: Align;
+  title?: string;
+}> = [
   { key: "webinar_date", label: "Date", align: "left" },
   { key: "webinar_day", label: "Day", align: "left" },
   { key: "data_era", label: "Era", align: "left" },
-  { key: "ad_spend", label: "Spend", align: "right" },
+  { key: "total_webinar_ad_spend", label: "Spend", align: "right" },
   { key: "total_registrants", label: "Regs", align: "right" },
   { key: "unique_attendees", label: "Attendees", align: "right" },
   { key: "pitched_attendees", label: "Pitched", align: "right" },
   { key: "calls_booked", label: "Booked", align: "right" },
-  { key: "calls_held", label: "Held", align: "right" },
+  {
+    key: "shows",
+    label: "Shows",
+    align: "right",
+    title:
+      "Show-ups. PR #43 excludes Setter DQs — historical values may be smaller than the pre-fix 'Calls Held'.",
+  },
   { key: "deals_closed", label: "Deals", align: "right" },
   { key: "cash_collected", label: "Cash", align: "right" },
   { key: "revenue_generated", label: "Revenue", align: "right" },
@@ -72,6 +83,7 @@ export function WebinarTable({
                 <th
                   key={c.key}
                   onClick={() => setSort(c.key)}
+                  title={c.title}
                   className={cn(
                     "cursor-pointer select-none whitespace-nowrap px-3 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground hover:text-foreground",
                     c.align === "right" ? "text-right" : "text-left",
@@ -118,12 +130,12 @@ export function WebinarTable({
                       {eraLabel(r.data_era)}
                     </Badge>
                   </td>
-                  <Num value={fmt.money(r.ad_spend)} />
+                  <Num value={fmt.money(r.total_webinar_ad_spend)} />
                   <Num value={fmt.int(r.total_registrants)} />
                   <Num value={fmt.int(r.unique_attendees)} />
                   <Num value={fmt.int(r.pitched_attendees)} />
                   <Num value={fmt.int(r.calls_booked)} />
-                  <Num value={fmt.int(r.calls_held)} />
+                  <Num value={fmt.int(r.shows)} />
                   <Num value={fmt.int(r.deals_closed)} />
                   <Num value={fmt.money(r.cash_collected)} />
                   <Num value={fmt.money(r.revenue_generated)} />

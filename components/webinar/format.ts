@@ -5,6 +5,16 @@ type Maybe = number | null | undefined;
 
 export const fmt = {
   int: (n: Maybe) => (n == null ? "—" : Number(n).toLocaleString("en-US")),
+  /** Like `int` but preserves up to N decimals — for fractional values like
+   *  Sunday-split Meta-funnel counts and the Hammer-Them frequency. Do NOT
+   *  round these; they're attribution-split values, not bugs. */
+  number: (n: Maybe, frac = 1) =>
+    n == null
+      ? "—"
+      : Number(n).toLocaleString("en-US", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: frac,
+        }),
   money: (n: Maybe) =>
     n == null
       ? "—"

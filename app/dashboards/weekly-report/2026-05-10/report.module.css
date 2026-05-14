@@ -1,0 +1,513 @@
+/* Lifted near-verbatim from the original HTML report so the look matches
+   exactly. Scoped via CSS modules so it can't leak into the rest of the
+   app's light theme. */
+
+.bg {
+  --bg: #0a0a0a;
+  --surface: #121212;
+  --surface-2: #191919;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.04);
+  --text-primary: #f0f0f0;
+  --text-secondary: #9a9a9a;
+  --text-muted: #555;
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --red: #f87171;
+  --blue: #60a5fa;
+  --purple: #a78bfa;
+
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+.bg :global(h1),
+.bg :global(h2),
+.bg :global(h3),
+.bg :global(h4) {
+  font-family: var(--font-syne), sans-serif;
+}
+.bg :global(*) {
+  box-sizing: border-box;
+}
+
+.hdr {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 32px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.hdr :global(h1) {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.sub {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.badge {
+  margin-left: auto;
+  background: rgba(167, 139, 250, 0.1);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  color: var(--purple);
+  font-size: 10px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  padding: 3px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.tabNav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  padding: 0 32px;
+}
+.tb {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 13px 18px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tb:hover {
+  color: var(--text-primary);
+}
+.tbActive {
+  color: var(--purple);
+  border-bottom-color: var(--purple);
+}
+
+.pane {
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.sh {
+  font-family: var(--font-syne), sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+.section {
+  margin-bottom: 40px;
+}
+
+.ctxBanner {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.05), rgba(167, 139, 250, 0.05));
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-left: 4px solid var(--blue);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 32px;
+}
+.ctxTag {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  color: var(--blue);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.ctxBanner :global(h3) {
+  font-family: var(--font-syne), sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.ctxList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 12px;
+  padding: 0;
+}
+.ctxList li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding-left: 16px;
+  position: relative;
+  line-height: 1.55;
+}
+.ctxList li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: var(--blue);
+}
+.code {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text-secondary);
+}
+.ctxNote {
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 9px;
+  margin-top: 9px;
+}
+
+.tw {
+  overflow-x: auto;
+}
+.ct,
+.dt {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ct th,
+.dt th {
+  font-family: var(--font-syne), sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 9px 14px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ct th:first-child,
+.dt th:first-child {
+  text-align: left;
+}
+.ct td,
+.dt td {
+  padding: 9px 14px;
+  text-align: right;
+  border-bottom: 1px solid var(--border-light);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.ct td:first-child,
+.dt td:first-child {
+  text-align: left;
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.ct tr:hover td,
+.dt tr:hover td {
+  background: rgba(255, 255, 255, 0.013);
+}
+.lh {
+  background: rgba(167, 139, 250, 0.07) !important;
+  color: var(--purple) !important;
+}
+.lhh {
+  background: rgba(167, 139, 250, 0.04) !important;
+  color: var(--purple) !important;
+}
+.divRow td {
+  background: var(--surface-2) !important;
+  font-family: var(--font-syne), sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  color: var(--text-muted) !important;
+  padding: 7px 14px !important;
+  text-align: left !important;
+}
+
+.up {
+  color: var(--green);
+}
+.dn {
+  color: var(--red);
+}
+.nt {
+  color: var(--text-secondary);
+}
+.amb {
+  color: var(--amber);
+}
+
+.tagP {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  color: var(--amber);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.tagG {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  color: var(--green);
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.kpiLbl {
+  font-family: var(--font-syne), sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.kpiVal {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.kpiCh {
+  font-size: 11px;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0 auto 32px;
+  max-width: 680px;
+}
+.fRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.fBar {
+  height: 46px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  min-width: 120px;
+}
+.fLabel {
+  font-family: var(--font-syne), sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.fVal {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 15px;
+  font-weight: 600;
+}
+.fConn {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 0 3px 14px;
+}
+.fRate {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.fDrop {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.chName {
+  font-size: 12px;
+  color: var(--text-secondary);
+  width: 110px;
+  flex-shrink: 0;
+}
+.chBg {
+  flex: 1;
+  height: 18px;
+  background: var(--surface-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.chFill {
+  height: 100%;
+  border-radius: 3px;
+}
+.chN {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 44px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.chP {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.insGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ins {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.insWin {
+  border-left-color: var(--green);
+}
+.insWatch {
+  border-left-color: var(--amber);
+}
+.insFlag {
+  border-left-color: var(--red);
+}
+.insFix {
+  border-left-color: var(--purple);
+}
+.insFwd {
+  border-left-color: var(--blue);
+}
+.insCtx {
+  border-left-color: rgba(96, 165, 250, 0.45);
+}
+.insTag {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+.insWinTag {
+  background: rgba(74, 222, 128, 0.1);
+  color: var(--green);
+}
+.insWatchTag {
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--amber);
+}
+.insFlagTag {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--red);
+}
+.insFixTag {
+  background: rgba(167, 139, 250, 0.12);
+  color: var(--purple);
+}
+.insFwdTag {
+  background: rgba(96, 165, 250, 0.1);
+  color: var(--blue);
+}
+.insCtxTag {
+  background: rgba(96, 165, 250, 0.08);
+  color: var(--blue);
+}
+.ins :global(h4) {
+  font-family: var(--font-syne), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.ins :global(p) {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .twoCol {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fn {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  border-top: 1px solid var(--border-light);
+  padding-top: 8px;
+  line-height: 1.6;
+}
+.fnHi {
+  color: var(--amber);
+}
+
+.spendAdjNote {
+  background: rgba(251, 191, 36, 0.04);
+  border: 1px solid rgba(251, 191, 36, 0.18);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 11px;
+  color: var(--amber);
+  margin-top: 8px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  line-height: 1.6;
+}

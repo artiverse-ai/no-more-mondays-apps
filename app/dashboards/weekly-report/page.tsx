@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { listSnapshots, type Snapshot } from "@/lib/weekly-report-snapshots";
+import { NewSnapshotForm } from "./_components/NewSnapshotForm";
+import { SnapshotRow } from "./_components/SnapshotRow";
 
 export const metadata = {
   title: "Weekly Reports · No More Mondays",
 };
 
 // Snapshots come from BQ now. revalidate=0 keeps the list fresh as admins
-// create new entries via /admin/weekly-reports.
+// create new entries inline on this page.
 export const revalidate = 0;
 
 const REPORT_TYPE_LABEL: Record<string, string> = {
@@ -47,32 +49,22 @@ export default async function WeeklyReportsIndex() {
     error = (e as Error).message;
   }
 
+  const isAdmin = Boolean(user?.isAdmin);
+
   return (
     <main className="mx-auto w-full max-w-4xl space-y-8 p-6 md:p-10">
       <header className="space-y-2 border-b border-border pb-6">
         <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
           No More Mondays
         </p>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">
-              Weekly Reports
-            </h1>
-            <p className="max-w-2xl text-sm text-muted-foreground">
-              One snapshot per Monday and Thursday. Mondays are a full recap of
-              the prior Sun-Sat week; Thursdays are a midweek check on Sun-Wed
-              of the current week.
-            </p>
-          </div>
-          {user?.isAdmin ? (
-            <Link
-              href="/admin/weekly-reports"
-              className="shrink-0 rounded-lg border border-accent bg-accent/10 px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-accent transition hover:bg-accent/20"
-            >
-              + New snapshot
-            </Link>
-          ) : null}
-        </div>
+        <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-4xl">
+          Weekly Reports
+        </h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          One snapshot per Monday and Thursday. Mondays are a full recap of
+          the prior Sun-Sat week; Thursdays are a midweek check on Sun-Wed
+          of the current week.
+        </p>
       </header>
 
       {error ? (
@@ -81,42 +73,61 @@ export default async function WeeklyReportsIndex() {
         </div>
       ) : null}
 
+      {isAdmin ? (
+        <section className="space-y-3">
+          <h2 className="font-heading text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            Create a new snapshot
+          </h2>
+          <NewSnapshotForm />
+        </section>
+      ) : null}
+
       <section className="space-y-3">
+        <h2 className="font-heading text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          {isAdmin ? "Existing snapshots" : "Snapshots"}
+        </h2>
         {snapshots.length === 0 && !error ? (
           <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            No snapshots yet.
-            {user?.isAdmin ? (
-              <>
-                {" "}
-                <Link href="/admin/weekly-reports" className="text-accent underline">
-                  Create the first one →
-                </Link>
-              </>
-            ) : null}
+            No snapshots yet.{isAdmin ? " Use the form above to create the first one." : ""}
           </div>
+        ) : isAdmin ? (
+          <ul className="space-y-2">
+            {snapshots.map((s) => (
+              <SnapshotRow
+                key={s.slug}
+                slug={s.slug}
+                runOn={s.runOn}
+                reportType={s.reportType}
+                weekStart={s.weekStart}
+                weekEnd={s.weekEnd}
+              />
+            ))}
+          </ul>
         ) : (
-          snapshots.map((s) => (
-            <Link
-              key={s.slug}
-              href={`/dashboards/weekly-report/${s.slug}`}
-              className="group block rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-accent hover:shadow-md"
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <div className="space-y-1">
-                  <h2 className="font-heading text-lg font-semibold tracking-tight">
-                    {fmtRunOn(s.runOn)}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {REPORT_TYPE_LABEL[s.reportType] ?? s.reportType} · Week{" "}
-                    {fmtRange(s.weekStart, s.weekEnd)}
-                  </p>
+          <div className="space-y-3">
+            {snapshots.map((s) => (
+              <Link
+                key={s.slug}
+                href={`/dashboards/weekly-report/${s.slug}`}
+                className="group block rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-accent hover:shadow-md"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <div className="space-y-1">
+                    <h2 className="font-heading text-lg font-semibold tracking-tight">
+                      {fmtRunOn(s.runOn)}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {REPORT_TYPE_LABEL[s.reportType] ?? s.reportType} · Week{" "}
+                      {fmtRange(s.weekStart, s.weekEnd)}
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
+                    Open →
+                  </span>
                 </div>
-                <span className="text-xs font-medium uppercase tracking-[0.18em] text-accent">
-                  Open →
-                </span>
-              </div>
-            </Link>
-          ))
+              </Link>
+            ))}
+          </div>
         )}
       </section>
     </main>

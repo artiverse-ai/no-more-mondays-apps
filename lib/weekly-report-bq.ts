@@ -139,10 +139,23 @@ export type SetterModeRow = {
 
 // ─── fetchers ───────────────────────────────────────────────────────────
 
-/** Most recent 3 webinars with webinar_date <= weekEnd. */
-export async function fetchWebinarComparison(weekEnd: string): Promise<WebinarRow[]> {
+/**
+ * Most recent 3 webinars with webinar_date <= weekEnd.
+ *
+ * When `sameWeekdayOnly` is true (used for Thursday midweek snapshots),
+ * the result is constrained to the same DAYOFWEEK as the most recent
+ * webinar in the window — so a Thu midweek report compares Wed-vs-Wed,
+ * not Wed-vs-Sun-vs-Wed.
+ */
+export async function fetchWebinarComparison(
+  weekEnd: string,
+  sameWeekdayOnly = false,
+): Promise<WebinarRow[]> {
   const [rows] = await bq().query({
-    query: `SELECT
+    query: `WITH latest AS (
+        SELECT MAX(webinar_date) AS d FROM ${MART} WHERE webinar_date <= DATE(@weekEnd)
+      )
+      SELECT
         webinar_date, total_registrants, meta_registrants, manychat_registrants,
         setter_registrants, other_organic_registrants,
         unique_attendees, pitched_attendees, reg_to_attend_rate, attend_to_pitched_rate,
@@ -155,10 +168,15 @@ export async function fetchWebinarComparison(weekEnd: string): Promise<WebinarRo
         reactivation_pool_size, reactivations_attended, reactivations_booked
       FROM ${MART}
       WHERE webinar_date <= DATE(@weekEnd)
+        AND (
+          NOT @sameWeekday
+          OR EXTRACT(DAYOFWEEK FROM webinar_date) =
+             EXTRACT(DAYOFWEEK FROM (SELECT d FROM latest))
+        )
       ORDER BY webinar_date DESC
       LIMIT 3`,
-    params: { weekEnd },
-    types: { weekEnd: "STRING" },
+    params: { weekEnd, sameWeekday: sameWeekdayOnly },
+    types: { weekEnd: "STRING", sameWeekday: "BOOL" },
   });
   return (rows as Record<string, unknown>[]).map((r) => ({
     webinarDate: String(unwrap(r.webinar_date) ?? ""),
@@ -454,6 +472,7 @@ export type WeeklyReportData = {
 export async function fetchWeeklyReport(
   weekStart: Date | string,
   weekEnd?: Date | string,
+  reportType: "weekly_recap" | "midweek_check" = "weekly_recap",
 ): Promise<WeeklyReportData> {
   const start = typeof weekStart === "string" ? weekStart : isoDate(weekStart);
   const startDate = new Date(start + "T00:00:00Z");
@@ -478,7 +497,7 @@ export async function fetchWeeklyReport(
     bookingMode,
     setterPerformance,
   ] = await Promise.all([
-    fetchWebinarComparison(end),
+    fetchWebinarComparison(end, reportType === "midweek_check"),
     fetchWeekFunnel(start, end),
     fetchWeekFunnel(priorStart, priorEnd),
     fetchCloserOverall(start, end),

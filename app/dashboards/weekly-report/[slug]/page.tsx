@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
   MARKETING_EDITOR,
@@ -21,33 +22,19 @@ import {
   buildWoWComparison,
   fetchWeeklyReport,
 } from "@/lib/weekly-report-bq";
-import { SolutionsTab } from "./SolutionsTab";
-import { Tabs } from "./Tabs";
-import { Tip, TooltipLayer } from "./Tooltip";
-import styles from "./report.module.css";
-import {
-  INSIGHTS,
-  MAIN_CAMPAIGN_CPL_TREND,
-  MAY_10_CONTEXT,
-  META_CAMPAIGNS,
-  META_CAMPAIGN_TOTAL,
-  REPORT_META,
-} from "./data";
-
-// Snapshot identity = run date. Used as the URL slug + the per-snapshot
-// key for the Marketing/Sales Solutions tab.
-const SNAPSHOT_SLUG = "2026-05-14";
-// Thursday midweek check covers Sun → Wed (current week through yesterday).
-// WoW comparison auto-shifts back 7 days (May 3 → May 6).
-const WEEK_START = "2026-05-10"; // Sun
-const WEEK_END = "2026-05-13"; // Wed
+import { getSnapshot, listInsights, type Insight } from "@/lib/weekly-report-snapshots";
+import { ContextBannerEditor } from "../_components/ContextBannerEditor";
+import { InsightsEditor, type EditableInsight } from "../_components/InsightsEditor";
+import { SolutionsTab } from "../_components/SolutionsTab";
+import { Tabs } from "../_components/Tabs";
+import { Tip, TooltipLayer } from "../_components/Tooltip";
+import styles from "../_components/report.module.css";
 
 export const metadata = {
-  title: "Midweek Check — May 10-16, 2026 · No More Mondays",
+  title: "Weekly Report · No More Mondays",
 };
 
-// Re-fetch on every request — BQ data moves as deals close. The render is
-// cheap and our internal-tool traffic is tiny.
+// Re-fetch on every request — BQ data moves as deals close.
 export const revalidate = 0;
 
 const COLORS = {
@@ -57,15 +44,37 @@ const COLORS = {
   purple: "var(--purple)",
 } as const;
 
-export default async function Page() {
+
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
   const me = await getCurrentUser();
 
-  // All BQ fetches in parallel.
-  const [reportData, mktInitial, salesInitial] = await Promise.all([
-    fetchWeeklyReport(WEEK_START, WEEK_END),
-    listSolutions(SNAPSHOT_SLUG, "marketing").catch(() => []),
-    listSolutions(SNAPSHOT_SLUG, "sales").catch(() => []),
+  const snapshot = await getSnapshot(slug);
+  if (!snapshot) notFound();
+
+  const [reportData, insights, mktInitial, salesInitial] = await Promise.all([
+    fetchWeeklyReport(snapshot.weekStart, snapshot.weekEnd, snapshot.reportType),
+    listInsights(slug),
+    listSolutions(slug, "marketing").catch(() => []),
+    listSolutions(slug, "sales").catch(() => []),
   ]);
+
+  const REPORT_META = {
+    weekLabel: snapshot.weekLabel,
+    latestWebinar: snapshot.latestWebinar ?? "—",
+    badge: snapshot.badge,
+  };
+  const MAY_10_CONTEXT = {
+    tag: snapshot.contextTag ?? "",
+    title: snapshot.contextTitle ?? "",
+    body: snapshot.contextBody ?? "",
+  };
+  const INSIGHTS: Insight[] = insights;
+  const SNAPSHOT_SLUG = slug;
 
   // Build the shapes the tab components consume.
   const topOfFunnel = buildTopOfFunnelRows(reportData.webinars);
@@ -85,7 +94,11 @@ export default async function Page() {
   const bookingMode = buildBookingMode(reportData.bookingMode);
   const setterPerf = buildSetterPerformance(reportData.setterPerformance);
 
+  const isAdmin = Boolean(me?.isAdmin);
   const t1Data = {
+    ctx: MAY_10_CONTEXT,
+    snapshotSlug: SNAPSHOT_SLUG,
+    canEdit: isAdmin,
     topOfFunnel,
     channelMix,
     channelMixTrend,
@@ -129,7 +142,17 @@ export default async function Page() {
         panels={{
           t1: <Tab1 {...t1Data} />,
           t2: <Tab2 {...t2Data} />,
-          t3: <Tab3 />,
+          t3: (
+            <InsightsEditor
+              snapshotSlug={SNAPSHOT_SLUG}
+              weekLabel={snapshot.weekLabel}
+              latestWebinar={snapshot.latestWebinar}
+              canEdit={isAdmin}
+              initial={INSIGHTS as EditableInsight[]}
+              initialStatus={snapshot.insightsGenerationStatus}
+              initialError={snapshot.insightsGenerationError}
+            />
+          ),
           t4: (
             <SolutionsTab
               reportWeek={SNAPSHOT_SLUG}
@@ -161,6 +184,9 @@ export default async function Page() {
 // ════════════════════════════════════════════════════════════════════════
 
 type Tab1Props = {
+  ctx: { tag: string; title: string; body: string };
+  snapshotSlug: string;
+  canEdit: boolean;
   topOfFunnel: ReturnType<typeof buildTopOfFunnelRows>;
   channelMix: ReturnType<typeof buildChannelMix>;
   channelMixTrend: ReturnType<typeof buildChannelMixTrend>;
@@ -168,7 +194,7 @@ type Tab1Props = {
   webinarDates: string[];
 };
 
-function Tab1({ topOfFunnel, channelMix, channelMixTrend, reactivation, webinarDates }: Tab1Props) {
+function Tab1({ ctx, snapshotSlug, canEdit, topOfFunnel, channelMix, channelMixTrend, reactivation, webinarDates }: Tab1Props) {
   const headers = webinarDates.length >= 3
     ? webinarDates.slice(0, 3)
     : [...webinarDates, "—", "—", "—"].slice(0, 3);
@@ -176,25 +202,13 @@ function Tab1({ topOfFunnel, channelMix, channelMixTrend, reactivation, webinarD
 
   return (
     <>
-      {/* Context banner — narrative, stays static. Skip the bullet list
-          if empty so the banner doesn't render with a stub. */}
-      <div className={styles.ctxBanner}>
-        <div className={styles.ctxTag}>⚙ {MAY_10_CONTEXT.tag}</div>
-        <h3>{MAY_10_CONTEXT.title}</h3>
-        {MAY_10_CONTEXT.bullets.length > 0 ? (
-          <ul className={styles.ctxList}>
-            {MAY_10_CONTEXT.bullets.map((b, i) => (
-              <li key={i}>
-                <strong>{b.lead}</strong> {b.body}
-                {b.code ? <code className={styles.code}>{b.code}</code> : null}
-                {b.strong ? <strong>{b.strong}</strong> : null}
-                {b.bodyAfter ?? ""}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <div className={styles.ctxNote}>{MAY_10_CONTEXT.note}</div>
-      </div>
+      <ContextBannerEditor
+        snapshotSlug={snapshotSlug}
+        initialTag={ctx.tag}
+        initialTitle={ctx.title}
+        initialBody={ctx.body}
+        canEdit={canEdit}
+      />
 
       {/* Top-of-Funnel comparison */}
       <section className={styles.section}>
@@ -275,75 +289,6 @@ function Tab1({ topOfFunnel, channelMix, channelMixTrend, reactivation, webinarD
           </div>
         </div>
       </section>
-
-      {/* Meta Campaigns — still static (different table grain, see
-          backlog). Skip the whole section if no data was provided. */}
-      {META_CAMPAIGNS.length > 0 ? (
-      <section className={styles.section}>
-        <div className={styles.sh}>Meta Campaigns — Week of {headers[0]} Promo Window (static — backlog)</div>
-        <div className={styles.tw}>
-          <table className={styles.dt}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>Campaign</th>
-                <th>Spend</th>
-                <th>Impr.</th>
-                <th>Clicks</th>
-                <th>Conv.</th>
-                <th>CPL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {META_CAMPAIGNS.map((c) => (
-                <tr key={c.name}>
-                  <td>{c.name}</td>
-                  <td className={c.amber ? styles.amb : ""}>{c.spend}</td>
-                  <td>{c.impr}</td>
-                  <td>{c.clicks}</td>
-                  <td className={c.dn ? styles.dn : ""}>{c.conv}</td>
-                  <td className={c.dn ? styles.dn : ""}>{c.cpl}</td>
-                </tr>
-              ))}
-              <tr className={styles.divRow}>
-                <td colSpan={6}>Lead-gen Total (excl. retargeting)</td>
-              </tr>
-              <tr>
-                <td>{META_CAMPAIGN_TOTAL.label}</td>
-                <td><strong>{META_CAMPAIGN_TOTAL.spend}</strong></td>
-                <td>{META_CAMPAIGN_TOTAL.impr}</td>
-                <td>{META_CAMPAIGN_TOTAL.clicks}</td>
-                <td>{META_CAMPAIGN_TOTAL.conv}</td>
-                <td>{META_CAMPAIGN_TOTAL.cpl}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <br />
-        <div className={styles.sh} style={{ marginBottom: 12 }}>Main Campaign CPL Trend</div>
-        <div className={styles.tw}>
-          <table className={styles.dt}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>Campaign</th>
-                <th className={styles.lhh}>May 10 wk</th>
-                <th>May 3 wk</th>
-                <th>Apr 26 wk</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MAIN_CAMPAIGN_CPL_TREND.map((r) => (
-                <tr key={r.name}>
-                  <td>{r.name}</td>
-                  <td className={`${styles.lh} ${r.may10Class === "up" ? styles.up : r.may10Class === "dn" ? styles.dn : r.may10Class === "nt" ? styles.nt : ""}`}>{r.may10}</td>
-                  <td>{r.may3}</td>
-                  <td className={r.apr26Class === "dn" ? styles.dn : ""}>{r.apr26}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      ) : null}
 
       {/* Reactivation */}
       <section className={styles.section}>
@@ -694,55 +639,6 @@ function SetterBlock({ setter }: { setter: ReturnType<typeof buildSetterPerforma
         </tr>
       ))}
       <tr className={styles.divRow}><td colSpan={7}>{setter.combined}</td></tr>
-    </>
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════════
-//  TAB 3 — Strategic Insights (static commentary)
-// ════════════════════════════════════════════════════════════════════════
-
-function Tab3() {
-  if (INSIGHTS.length === 0) {
-    return (
-      <div className={styles.sh} style={{ marginBottom: 20 }}>
-        Strategic Insights — Week May 10–16 / Latest Webinar Wed May 13
-        <p style={{ marginTop: 16, fontFamily: "var(--font-outfit), sans-serif", fontSize: 13, fontWeight: 400, letterSpacing: "normal", textTransform: "none", color: "var(--text-muted)" }}>
-          No insights authored for this snapshot yet.
-        </p>
-      </div>
-    );
-  }
-  return (
-    <>
-      <div className={styles.sh} style={{ marginBottom: 20 }}>
-        Strategic Insights — Week May 10–16 / Latest Webinar Wed May 13
-      </div>
-      <div className={styles.insGrid}>
-        {INSIGHTS.map((ins, i) => {
-          const cls =
-            ins.tone === "win" ? styles.insWin :
-            ins.tone === "watch" ? styles.insWatch :
-            ins.tone === "flag" ? styles.insFlag :
-            ins.tone === "fix" ? styles.insFix :
-            ins.tone === "fwd" ? styles.insFwd :
-            styles.insCtx;
-          const tagCls =
-            ins.tone === "win" ? styles.insWinTag :
-            ins.tone === "watch" ? styles.insWatchTag :
-            ins.tone === "flag" ? styles.insFlagTag :
-            ins.tone === "fix" ? styles.insFixTag :
-            ins.tone === "fwd" ? styles.insFwdTag :
-            styles.insCtxTag;
-          return (
-            <div key={i} className={`${styles.ins} ${cls}`}>
-              <div className={`${styles.insTag} ${tagCls}`}>{ins.tag}</div>
-              <h4>{ins.title}</h4>
-              <p>{ins.body}</p>
-            </div>
-          );
-        })}
-      </div>
     </>
   );
 }

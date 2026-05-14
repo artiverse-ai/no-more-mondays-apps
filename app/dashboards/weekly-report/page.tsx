@@ -77,14 +77,6 @@ export default function WeeklyReportsIndex() {
           ))
         )}
       </section>
-
-      <p className="border-t border-border pt-4 text-xs text-muted-foreground">
-        New report? Drop a folder at{" "}
-        <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
-          app/dashboards/weekly-report/&lt;slug&gt;/
-        </code>{" "}
-        and add an entry to the <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">SNAPSHOTS</code> list in this file.
-      </p>
     </main>
   );
 }

@@ -18,6 +18,14 @@ import {
 } from "@/components/webinar/CallsFilterBar";
 import { FunnelChart } from "@/components/webinar/FunnelChart";
 import { Kpi } from "@/components/webinar/Kpi";
+import { ViewTabs, parseViewTab } from "@/components/ui/view-tabs";
+
+const DRILL_VIEW_OPTIONS = [
+  { key: "summary", label: "Summary" },
+  { key: "funnel", label: "Funnel" },
+  { key: "calls", label: "Calls" },
+  { key: "raw", label: "Raw" },
+];
 import {
   dayBadgeClass,
   eraBadgeClass,
@@ -65,6 +73,7 @@ export default async function WebinarDetailPage(
   const setterFilter = pickStr(sp.setter);
   const flowFilter = pickStr(sp.flow);
   const statusFilter = pickStatus(sp.status);
+  const view = parseViewTab(sp.view, DRILL_VIEW_OPTIONS, "summary");
 
   const [w, user, devMode] = await Promise.all([
     getWebinar(date),
@@ -181,6 +190,14 @@ export default async function WebinarDetailPage(
           </div>
         </div>
       </header>
+
+      <ViewTabs
+        pathname={`/dashboards/webinar/${w.webinar_date}`}
+        value={view}
+        options={DRILL_VIEW_OPTIONS}
+      />
+
+      {view === "summary" ? <>
 
       {/* Marketing */}
       <Group title="Marketing">
@@ -367,14 +384,18 @@ export default async function WebinarDetailPage(
         <Kpi label="Pitch → Book Rate" metric="pitch_to_book_rate" devMode={devMode} value={fmt.pct(w.pitch_to_book_rate)} />
       </Group>
 
-      {/* Funnel chart */}
-      <FunnelChart
-        stages={funnelStages(w)}
-        title="Funnel"
-        subtitle="bar = count at each stage; hover for stage-to-stage conversion"
-      />
+      </> : null}
 
-      {/* Calls drill-through */}
+      {view === "funnel" ? (
+        <FunnelChart
+          stages={funnelStages(w)}
+          title="Funnel"
+          subtitle="bar = count at each stage; hover for stage-to-stage conversion"
+        />
+      ) : null}
+
+      {view === "calls" ? (
+      /* Calls drill-through */
       <section className="space-y-3">
         <CallsFilterBar
           closer={closerFilter}
@@ -484,16 +505,21 @@ export default async function WebinarDetailPage(
           )}
         </div>
       </section>
+      ) : null}
 
-      {/* Raw mart row */}
-      <details className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <summary className="cursor-pointer text-sm font-medium text-foreground">
-          View raw mart row (JSON)
-        </summary>
-        <pre className="mt-3 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-relaxed text-muted-foreground">
-          {JSON.stringify(w.raw, null, 2)}
-        </pre>
-      </details>
+      {view === "raw" ? (
+        <details
+          className="rounded-xl border border-border bg-card p-4 shadow-sm"
+          open
+        >
+          <summary className="cursor-pointer text-sm font-medium text-foreground">
+            Raw mart row (JSON)
+          </summary>
+          <pre className="mt-3 overflow-auto rounded-lg border border-border bg-muted/40 p-3 text-[11px] leading-relaxed text-muted-foreground">
+            {JSON.stringify(w.raw, null, 2)}
+          </pre>
+        </details>
+      ) : null}
     </main>
   );
 }

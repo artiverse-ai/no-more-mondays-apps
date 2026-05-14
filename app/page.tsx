@@ -58,10 +58,10 @@ const dashboards: Tile[] = [
     status: "live",
   },
   {
-    href: "/dashboards/weekly-report/2026-05-03",
-    title: "Weekly Report — May 3-9, 2026",
+    href: "/dashboards/weekly-report",
+    title: "Weekly Reports",
     description:
-      "Monday recap: latest webinar performance, last week's sales funnel, and strategic insights. Static port of the Mon May 11 report.",
+      "Monday recap + Thursday midweek snapshots. Each report is its own page — webinar performance, sales funnel, closer perf, and strategic insights. Live from BigQuery.",
     status: "live",
   },
 ];

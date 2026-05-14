@@ -28,15 +28,7 @@ const SEGMENT_LABELS: Record<string, string> = {
 
 // Paths that appear in the URL hierarchy but have no page of their own —
 // render them as plain text instead of links.
-const NON_NAVIGABLE = new Set([
-  "/apps",
-  "/dashboards",
-  "/apps/calendar/team",
-  // `/dashboards/weekly-report` is a directory of dated reports; the index
-  // doesn't exist as a page, so render the breadcrumb segment as plain text
-  // instead of a (broken) link.
-  "/dashboards/weekly-report",
-]);
+const NON_NAVIGABLE = new Set(["/apps", "/dashboards", "/apps/calendar/team"]);
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 

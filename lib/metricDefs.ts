@@ -1,24 +1,37 @@
 // Central registry of metric definitions used across the dashboards.
 // Every <InfoTip metric="…" /> on a KPI label or chart axis looks up here.
 //
-// Each entry has three layers of disclosure:
+// Each entry has these disclosure layers, surfaced in order in the popover:
 //   1. label        — human-readable name shown in the popover header
 //   2. description  — plain-English business definition (always shown)
 //   3. formula      — plain-English calculation (always shown)
-//   4. sql          — actual SQL snippet from the dbt mart (devMode only)
-//   5. source       — fully-qualified BQ table / view (devMode only)
+//   4. period       — what time slice the metric is computed across
+//                     (e.g. "Across selected date range", "Single webinar event",
+//                      "Sunday-anchored booking week"). Always shown.
+//   5. dateDim      — which date column drives the period filter
+//                     (e.g. "appointment_date_time", "date_closed",
+//                      "webinar_date", "metric_date", "booking_week_sun").
+//                     Always shown.
+//   6. sql          — actual SQL snippet from the dbt mart (devMode only)
+//   7. source       — fully-qualified BQ table / view (devMode only)
+//
+// `period` and `dateDim` are optional on the type but the <InfoTip> falls
+// back to sensible defaults inferred from `source` when they're missing —
+// see `defaultPeriodFor` / `defaultDateDimFor` in `components/ui/info-tip.tsx`.
 //
 // Treat this as a living source of truth — when the analytics repo
 // (no-more-mondays-analytics) changes a column, update the corresponding
-// entry here in the same commit. Seeded for Phase A with the columns the
-// existing webinar + CEO dashboards already render; remaining tiles
-// added as Phase B touches each component.
+// entry here in the same commit.
 
 export type MetricDef = {
   key: string;
   label: string;
   description: string;
   formula: string;
+  /** What time slice the metric is computed across. */
+  period?: string;
+  /** Which date column drives the period filter. */
+  dateDim?: string;
   sql?: string;
   source?: string;
 };

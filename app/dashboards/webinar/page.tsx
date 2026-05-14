@@ -10,6 +10,7 @@ import {
   getWebinars,
   sortWebinars,
 } from "@/lib/webinar";
+import { DataFreshness } from "@/components/DataFreshness";
 import { DealsChart } from "@/components/webinar/DealsChart";
 import { DevModeToggle } from "@/components/DevModeToggle";
 import { FunnelChart } from "@/components/webinar/FunnelChart";
@@ -72,15 +73,14 @@ export default async function WebinarDashboardPage(
     day: "per day",
   };
 
-  const updatedAt = all[0]?.dbt_updated_at;
-  const updatedStr =
-    updatedAt && !isNaN(new Date(updatedAt).getTime())
-      ? new Date(updatedAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : null;
+  // Latest dbt freshness across all webinars — drives the auto-refreshing
+  // `<DataFreshness>` indicator in the hero.
+  const updatedAt =
+    all
+      .map((w) => w.dbt_updated_at)
+      .filter((s): s is string => !!s && !isNaN(new Date(s).getTime()))
+      .sort()
+      .at(-1) ?? null;
 
   return (
     <main className="mx-auto max-w-7xl space-y-8 p-4 md:p-8 lg:p-10">
@@ -103,9 +103,9 @@ export default async function WebinarDashboardPage(
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <p className="text-sm text-muted-foreground">
+          <DataFreshness asOf={updatedAt} />
+          <p className="text-xs text-muted-foreground">
             {all.length} webinar{all.length === 1 ? "" : "s"}
-            {updatedStr ? ` · dbt updated ${updatedStr}` : ""}
           </p>
           <div className="flex items-center gap-2">
             {user?.isAdmin ? <DevModeToggle current={devMode} /> : null}

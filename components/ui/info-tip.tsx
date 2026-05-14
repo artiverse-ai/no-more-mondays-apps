@@ -1,21 +1,29 @@
 "use client";
 
-// Apple-style info-icon popover. Click or keyboard-focus opens a small
-// popup that explains the metric in three layers:
+// Apple-style info-icon tooltip. Hovers (200ms open / 100ms close) and
+// keyboard-focuses to reveal the metric definition in five layers:
 //
 //   1. label + description  (always — what the number means)
 //   2. formula              (always — plain English calculation)
-//   3. sql + source         (devMode only — for developers)
+//   3. period               (always — what time slice it covers,
+//                             e.g. "Across selected date range",
+//                             "Single webinar event")
+//   4. date dimension       (always — which column drives the period,
+//                             e.g. "appointment_date_time", "date_closed",
+//                             "webinar_date")
+//   5. sql + source         (devMode only — for developers)
 //
-// Lookup-by-key from lib/metricDefs.ts keeps every label/formula in one
-// source of truth. Passing `metricDef` directly is supported for one-off
-// inline definitions (e.g. ad-hoc derived metrics inside a chart card).
+// When a MetricDef omits `period` / `dateDim`, sensible defaults are
+// inferred from `source` (see `defaultPeriodFor` / `defaultDateDimFor`
+// below). Override per-metric by setting them explicitly in
+// `lib/metricDefs.ts`.
 //
-// Built on @base-ui/react/popover to match the existing UI stack
-// (components/ui/{button,badge,select}.tsx). Stays out of Radix.
+// Built on @base-ui/react/tooltip (hover-first, keyboard-accessible) to
+// match the existing UI stack (components/ui/{button,badge,select}.tsx).
+// Stays out of Radix.
 
 import { InfoIcon } from "lucide-react";
-import { Popover } from "@base-ui/react/popover";
+import { Tooltip } from "@base-ui/react/tooltip";
 import { cn } from "@/lib/utils";
 import { getMetricDef, type MetricDef } from "@/lib/metricDefs";
 
@@ -48,9 +56,15 @@ export function InfoTip({
     return null;
   }
 
+  const period = def.period ?? defaultPeriodFor(def);
+  const dateDim = def.dateDim ?? defaultDateDimFor(def);
+
   return (
-    <Popover.Root>
-      <Popover.Trigger
+    // delay / closeDelay are set globally on <Tooltip.Provider> in
+    // app/layout.tsx so adjacent tooltips share the group-instant
+    // open behavior (Apple-feel hover-through across a row of icons).
+    <Tooltip.Root>
+      <Tooltip.Trigger
         aria-label={`Definition of ${def.label}`}
         className={cn(
           "inline-flex shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground/65 transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
@@ -58,17 +72,17 @@ export function InfoTip({
         )}
       >
         <InfoIcon style={{ width: size, height: size }} aria-hidden />
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Positioner sideOffset={8} align="center" className="z-50">
-          <Popover.Popup
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Positioner sideOffset={8} className="z-50">
+          <Tooltip.Popup
             className={cn(
-              "w-[min(20rem,calc(100vw-2rem))] origin-[var(--transform-origin)] rounded-xl bg-popover p-3.5 text-[12.5px] leading-relaxed text-popover-foreground outline-none",
+              "w-[min(22rem,calc(100vw-2rem))] origin-[var(--transform-origin)] rounded-xl bg-popover p-3.5 text-[12.5px] leading-relaxed text-popover-foreground outline-none",
               "shadow-[var(--shadow-elevated)]",
+              "data-[instant]:duration-0",
               "data-[open]:animate-in data-[open]:fade-in-0 data-[open]:zoom-in-95",
               "data-[closed]:animate-out data-[closed]:fade-out-0 data-[closed]:zoom-out-95",
             )}
-            // Smooth Apple-feel motion via our easing token.
             style={{ transitionTimingFunction: "var(--ease-out)" }}
           >
             <div className="text-[13px] font-semibold tracking-[-0.005em] text-foreground">
@@ -79,6 +93,18 @@ export function InfoTip({
             <Section label="Formula">
               <p className="text-foreground">{def.formula}</p>
             </Section>
+
+            <Section label="Period">
+              <p className="text-foreground">{period}</p>
+            </Section>
+
+            {dateDim ? (
+              <Section label="Date dimension">
+                <code className="rounded bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                  {dateDim}
+                </code>
+              </Section>
+            ) : null}
 
             {devMode && def.sql ? (
               <Section label="SQL">
@@ -95,10 +121,10 @@ export function InfoTip({
                 ) : null}
               </Section>
             ) : null}
-          </Popover.Popup>
-        </Popover.Positioner>
-      </Popover.Portal>
-    </Popover.Root>
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 
@@ -117,4 +143,37 @@ function Section({
       {children}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------
+// Defaults inferred from the metric's source mart/view. Keeps every
+// existing MetricDef working without an explicit `period` / `dateDim`
+// until someone overrides them per-metric. Override priority: explicit
+// fields on the MetricDef > these defaults.
+// ---------------------------------------------------------------------
+
+function defaultPeriodFor(def: MetricDef): string {
+  const src = def.source ?? "";
+  const key = def.key ?? "";
+  if (src.includes("mart_webinar_events")) return "Single webinar event";
+  if (src.includes("mart_high_level_daily")) return "Across selected date range";
+  if (src.includes("int_closer_performance")) return "Across selected date range";
+  if (src.includes("int_calls_enriched")) {
+    if (key.startsWith("median_")) return "Deals closed in the selected range";
+    return "Calls in the selected date range";
+  }
+  return "Across the selected date range";
+}
+
+function defaultDateDimFor(def: MetricDef): string {
+  const src = def.source ?? "";
+  const key = def.key ?? "";
+  if (src.includes("mart_webinar_events")) return "webinar_date";
+  if (src.includes("mart_high_level_daily")) return "metric_date";
+  if (src.includes("int_closer_performance")) return "appt_date";
+  if (src.includes("int_calls_enriched")) {
+    if (key.startsWith("median_") || key.includes("roas") || key === "total_cash_collected" || key === "total_revenue_contracted" || key === "total_deals_closed" || key === "pif_rate" || key === "aov" || key === "acv") return "date_closed";
+    return "appointment_date_time";
+  }
+  return "";
 }

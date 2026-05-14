@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useReportTransition } from "@/lib/nav-progress-context";
 import { cn } from "@/lib/utils";
 import type { PeriodKey } from "@/lib/highLevel";
 
@@ -30,6 +31,7 @@ export function PeriodFilter({
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  useReportTransition(pending);
 
   const apply = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);

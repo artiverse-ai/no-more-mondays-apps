@@ -47,12 +47,19 @@ function labelFor(segment: string): string {
   return value.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function Breadcrumbs() {
+export function Breadcrumbs({
+  rightSlot,
+}: {
+  /** Optional content rendered on the right side of the bar (e.g. dark-mode toggle). */
+  rightSlot?: React.ReactNode;
+} = {}) {
   const pathname = usePathname() ?? "/";
-  // Home is the launcher — it has its own branding, no breadcrumb needed.
-  if (pathname === "/") return null;
 
-  const segments = pathname.split("/").filter(Boolean);
+  // On `/` we still show the bar (brand + rightSlot) so the dark-mode
+  // toggle is reachable from the launcher. Crumbs are empty.
+  const isHome = pathname === "/";
+
+  const segments = isHome ? [] : pathname.split("/").filter(Boolean);
   const crumbs = segments.map((segment, i) => {
     const href = "/" + segments.slice(0, i + 1).join("/");
     const isCurrent = i === segments.length - 1;
@@ -69,7 +76,7 @@ export function Breadcrumbs() {
     <header className="border-b border-border bg-card">
       <nav
         aria-label="Breadcrumb"
-        className="mx-auto flex w-full max-w-[1600px] items-center gap-2 overflow-x-auto px-4 py-2.5 text-sm whitespace-nowrap md:px-8 lg:px-10"
+        className="mx-auto flex w-full max-w-[1600px] items-center gap-2 px-4 py-2.5 text-sm md:px-8 lg:px-10"
       >
         <Link
           href="/"
@@ -83,27 +90,34 @@ export function Breadcrumbs() {
           </span>
           <span className="hidden sm:inline">No More Mondays</span>
         </Link>
-        {crumbs.map((crumb) => (
-          <span key={crumb.key} className="flex shrink-0 items-center gap-2">
-            <span aria-hidden className="text-muted-foreground/50">
-              /
-            </span>
-            {crumb.isCurrent ? (
-              <span aria-current="page" className="font-medium text-foreground">
-                {crumb.label}
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap">
+          {crumbs.map((crumb) => (
+            <span key={crumb.key} className="flex shrink-0 items-center gap-2">
+              <span aria-hidden className="text-muted-foreground/50">
+                /
               </span>
-            ) : crumb.isLink ? (
-              <Link
-                href={crumb.href}
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {crumb.label}
-              </Link>
-            ) : (
-              <span className="text-muted-foreground">{crumb.label}</span>
-            )}
-          </span>
-        ))}
+              {crumb.isCurrent ? (
+                <span aria-current="page" className="font-medium text-foreground">
+                  {crumb.label}
+                </span>
+              ) : crumb.isLink ? (
+                <Link
+                  href={crumb.href}
+                  className="text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {crumb.label}
+                </Link>
+              ) : (
+                <span className="text-muted-foreground">{crumb.label}</span>
+              )}
+            </span>
+          ))}
+        </div>
+        {rightSlot ? (
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {rightSlot}
+          </div>
+        ) : null}
       </nav>
     </header>
   );

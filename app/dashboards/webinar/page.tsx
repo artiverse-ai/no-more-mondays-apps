@@ -21,7 +21,13 @@ import { WebinarFilters } from "@/components/webinar/WebinarFilters";
 import { WebinarTable } from "@/components/webinar/WebinarTable";
 import { fmt } from "@/components/webinar/format";
 import { GranularityPicker } from "@/components/ui/granularity-picker";
+import { ViewTabs, parseViewTab } from "@/components/ui/view-tabs";
 import { GRANS_WEBINAR, parseGranularity } from "@/lib/granularity";
+
+const VIEW_OPTIONS = [
+  { key: "overview", label: "Overview" },
+  { key: "table", label: "Per-webinar table" },
+];
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +49,7 @@ export default async function WebinarDashboardPage(
   const sort = pickStr(sp.sort, "webinar_date");
   const dir: "asc" | "desc" = pickStr(sp.dir, "desc") === "asc" ? "asc" : "desc";
   const gran = parseGranularity(sp.gran, GRANS_WEBINAR, "webinar");
+  const view = parseViewTab(sp.view, VIEW_OPTIONS, "overview");
 
   const [all, user, devMode] = await Promise.all([
     getWebinars(),
@@ -135,7 +142,14 @@ export default async function WebinarDashboardPage(
         next to any metric for the formula.
       </p>
 
-      {/* Filters */}
+      {/* View tabs — sit above filters so users see what they're toggling */}
+      <ViewTabs
+        pathname="/dashboards/webinar"
+        value={view}
+        options={VIEW_OPTIONS}
+      />
+
+      {/* Filters — always visible regardless of tab so they persist on switch */}
       <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
         <WebinarFilters
           days={days}
@@ -147,65 +161,64 @@ export default async function WebinarDashboardPage(
         />
       </section>
 
-      {/* Hero KPIs — 4 big primary metrics */}
-      <HeroKPIs kpis={kpis} devMode={devMode} />
+      {view === "overview" ? (
+        <>
+          {/* Hero KPIs — 4 big primary metrics */}
+          <HeroKPIs kpis={kpis} devMode={devMode} />
 
-      {/* Collapsible "All metrics" with the rest */}
-      <AllMetrics kpis={kpis} rowCount={filtered.length} devMode={devMode} />
+          {/* Collapsible "All metrics" with the rest */}
+          <AllMetrics kpis={kpis} rowCount={filtered.length} devMode={devMode} />
 
-      {/* Charts */}
-      {filtered.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
-          No webinars match these filters.
-        </p>
+          {/* Charts */}
+          {filtered.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
+              No webinars match these filters.
+            </p>
+          ) : (
+            <section className="space-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    Trends
+                  </p>
+                  <h2 className="font-heading text-2xl font-semibold tracking-tight">
+                    Over time
+                  </h2>
+                </div>
+                <GranularityPicker
+                  pathname="/dashboards/webinar"
+                  value={gran}
+                  options={GRANS_WEBINAR}
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <SpendCashChart points={chartPoints} subtitle={granLabel[gran]} />
+                <DealsChart
+                  points={chartPoints}
+                  title={`Deals closed ${granLabel[gran]}`}
+                />
+                <RoasChart points={chartPoints} />
+                {latest ? (
+                  <FunnelChart
+                    stages={funnelStages(latest)}
+                    title="Funnel — most recent webinar"
+                    subtitle={`${fmt.date(latest.webinar_date)} · ${latest.webinar_day}`}
+                    height="h-64"
+                  />
+                ) : null}
+              </div>
+            </section>
+          )}
+        </>
       ) : (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                Trends
-              </p>
-              <h2 className="font-heading text-2xl font-semibold tracking-tight">
-                Over time
-              </h2>
-            </div>
-            <GranularityPicker
-              pathname="/dashboards/webinar"
-              value={gran}
-              options={GRANS_WEBINAR}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <SpendCashChart points={chartPoints} subtitle={granLabel[gran]} />
-            <DealsChart
-              points={chartPoints}
-              title={`Deals closed ${granLabel[gran]}`}
-            />
-            <RoasChart points={chartPoints} />
-            {latest ? (
-              <FunnelChart
-                stages={funnelStages(latest)}
-                title="Funnel — most recent webinar"
-                subtitle={`${fmt.date(latest.webinar_date)} · ${latest.webinar_day}`}
-                height="h-64"
-              />
-            ) : null}
-          </div>
-        </section>
+        <WebinarTable
+          rows={sorted}
+          sort={sort}
+          dir={dir}
+          total={all.length}
+          devMode={devMode}
+        />
       )}
-
-      {/* Per-webinar table */}
-      <section className="space-y-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Detail
-          </p>
-          <h2 className="font-heading text-2xl font-semibold tracking-tight">
-            Per-webinar breakdown
-          </h2>
-        </div>
-        <WebinarTable rows={sorted} sort={sort} dir={dir} total={all.length} />
-      </section>
     </main>
   );
 }

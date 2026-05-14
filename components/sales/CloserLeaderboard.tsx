@@ -1,62 +1,81 @@
 "use client";
 
-// Per-closer leaderboard for /dashboards/sales. URL-driven sort.
-// Apple-feel hairline table; semantic alert-* coloring for ROAS-style
-// signals (close rate ≥ 30 = green, < 15 = red).
+// Per-closer leaderboard for /dashboards/sales (D2 rebuild). Sortable
+// URL-driven columns; click a closer's name to set the closer cross-filter.
+// Columns reflect the canonical lib/calls.ts CloserRollup shape — no more
+// is_call_held derivations.
 
-import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
+import { useReportTransition } from "@/lib/nav-progress-context";
 import { cn } from "@/lib/utils";
 import { fmt } from "@/components/webinar/format";
-import type { CloserAggregate } from "@/lib/sales";
+import type { CloserRollup } from "@/lib/calls";
 
 type Align = "left" | "right";
 
 const COLUMNS: Array<{
-  key: keyof CloserAggregate | "rank";
+  key: keyof CloserRollup | "rank";
   label: string;
   align: Align;
 }> = [
   { key: "rank", label: "#", align: "left" },
-  { key: "closer_name", label: "Closer", align: "left" },
-  { key: "prospects_on_the_calendar", label: "Prospects", align: "right" },
-  { key: "unique_calls_held", label: "Held", align: "right" },
-  { key: "show_rate", label: "Show %", align: "right" },
-  { key: "deals_closed_won", label: "Deals", align: "right" },
+  { key: "closer", label: "Closer", align: "left" },
+  { key: "prospects", label: "Prospects", align: "right" },
+  { key: "dispositioned", label: "Disposed", align: "right" },
+  { key: "prospects_sq", label: "SQ", align: "right" },
+  { key: "shows_sq", label: "Shows", align: "right" },
+  { key: "shows_cq", label: "CQ Shows", align: "right" },
+  { key: "deposits", label: "Deposits", align: "right" },
+  { key: "deals", label: "Deals", align: "right" },
   { key: "close_rate", label: "Close %", align: "right" },
-  { key: "deposits_taken", label: "Deposits", align: "right" },
-  { key: "cash_collected", label: "Cash", align: "right" },
-  { key: "revenue_generated", label: "Revenue", align: "right" },
+  { key: "cash", label: "Cash", align: "right" },
+  { key: "tcv", label: "TCV", align: "right" },
   { key: "aov", label: "AOV", align: "right" },
   { key: "acv", label: "ACV", align: "right" },
-  { key: "collection_rate", label: "Collection %", align: "right" },
 ];
 
 const CLOSE_RATE_HOT = 0.3;
 const CLOSE_RATE_COLD = 0.15;
 
+const shortName = (email: string) => (email.includes("@") ? email.split("@")[0] : email);
+
 export function CloserLeaderboard({
   rows,
   sort,
   dir,
+  pathname,
 }: {
-  rows: CloserAggregate[];
+  rows: CloserRollup[];
   sort: string;
   dir: "asc" | "desc";
+  pathname: string;
 }) {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  useReportTransition(pending);
+
+  const sorted = sortRows(rows, sort, dir);
+
+  const navigate = (next: URLSearchParams) =>
+    startTransition(() =>
+      router.push(`${pathname}?${next.toString()}`, { scroll: false }),
+    );
 
   const setSort = (key: string) => {
-    if (key === "rank") return; // rank isn't sortable
+    if (key === "rank") return;
     const next = new URLSearchParams(params);
     const nextDir = sort === key && dir === "desc" ? "asc" : "desc";
     next.set("sort", key);
     next.set("dir", nextDir);
-    startTransition(() =>
-      router.push(`/dashboards/sales?${next.toString()}`, { scroll: false }),
-    );
+    navigate(next);
+  };
+
+  const setCloserFilter = (closer: string) => {
+    const next = new URLSearchParams(params);
+    next.set("closer", closer);
+    navigate(next);
   };
 
   const closeRateClass = (rate: number | null): string => {
@@ -67,13 +86,13 @@ export function CloserLeaderboard({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
       <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2.5">
         <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
           Closer leaderboard
         </span>
         <span className="text-[11px] text-muted-foreground">
-          {rows.length} closer{rows.length === 1 ? "" : "s"} · click header to sort
+          {sorted.length} closer{sorted.length === 1 ? "" : "s"} · click header to sort, name to filter
         </span>
       </div>
       <div className="overflow-x-auto">
@@ -104,7 +123,7 @@ export function CloserLeaderboard({
             data-pending={pending ? "" : undefined}
             className="data-[pending]:opacity-60 data-[pending]:transition-opacity"
           >
-            {rows.length === 0 ? (
+            {sorted.length === 0 ? (
               <tr>
                 <td
                   colSpan={COLUMNS.length}
@@ -114,26 +133,31 @@ export function CloserLeaderboard({
                 </td>
               </tr>
             ) : (
-              rows.map((r, i) => (
+              sorted.map((r, i) => (
                 <tr
-                  key={r.closer_name}
+                  key={r.closer}
                   className="border-b border-border/60 last:border-b-0 hover:bg-muted/40"
                 >
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground tabular-nums">
                     {i + 1}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 font-medium">
-                    {r.closer_name}
-                    {r.has_legacy ? (
-                      <span className="ml-2 rounded-full border border-border bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                        legacy
-                      </span>
-                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setCloserFilter(r.closer)}
+                      className="rounded-md px-1.5 py-0.5 hover:bg-secondary"
+                      title={`Filter to ${r.closer}`}
+                    >
+                      {shortName(r.closer)}
+                    </button>
                   </td>
-                  <Num value={fmt.int(r.prospects_on_the_calendar)} />
-                  <Num value={fmt.int(r.unique_calls_held)} />
-                  <Num value={fmt.pct(r.show_rate)} />
-                  <Num value={fmt.int(r.deals_closed_won)} />
+                  <Num value={fmt.int(r.prospects)} />
+                  <Num value={fmt.int(r.dispositioned)} />
+                  <Num value={fmt.int(r.prospects_sq)} />
+                  <Num value={fmt.int(r.shows_sq)} />
+                  <Num value={fmt.int(r.shows_cq)} />
+                  <Num value={fmt.int(r.deposits)} />
+                  <Num value={fmt.int(r.deals)} />
                   <td
                     className={cn(
                       "whitespace-nowrap px-3 py-2 text-right tabular-nums",
@@ -142,12 +166,10 @@ export function CloserLeaderboard({
                   >
                     {fmt.pct(r.close_rate)}
                   </td>
-                  <Num value={fmt.int(r.deposits_taken)} />
-                  <Num value={fmt.money(r.cash_collected)} />
-                  <Num value={fmt.money(r.revenue_generated)} />
+                  <Num value={fmt.money(r.cash)} />
+                  <Num value={fmt.money(r.tcv)} />
                   <Num value={fmt.money(r.aov)} />
                   <Num value={fmt.money(r.acv)} />
-                  <Num value={fmt.pct(r.collection_rate)} />
                 </tr>
               ))
             )}
@@ -164,4 +186,18 @@ function Num({ value }: { value: React.ReactNode }) {
       {value}
     </td>
   );
+}
+
+function sortRows(rows: CloserRollup[], key: string, dir: "asc" | "desc"): CloserRollup[] {
+  if (key === "rank" || !rows.length) return rows;
+  const m = dir === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const av = (a as unknown as Record<string, unknown>)[key];
+    const bv = (b as unknown as Record<string, unknown>)[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "number" && typeof bv === "number") return (av - bv) * m;
+    return String(av).localeCompare(String(bv)) * m;
+  });
 }

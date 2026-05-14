@@ -154,7 +154,7 @@ export async function fetchWebinarComparison(weekEnd: string): Promise<WebinarRo
         roas_cash, roas_revenue, cac,
         reactivation_pool_size, reactivations_attended, reactivations_booked
       FROM ${MART}
-      WHERE webinar_date <= DATE @weekEnd
+      WHERE webinar_date <= DATE(@weekEnd)
       ORDER BY webinar_date DESC
       LIMIT 3`,
     params: { weekEnd },
@@ -210,7 +210,7 @@ export async function fetchWeekFunnel(
         SUM(IF(is_deal, cash_collected, 0)) AS cash,
         SUM(IF(is_deal, revenue_generated, 0)) AS revenue
       FROM ${CALLS}
-      WHERE DATE(appointment_date_time) BETWEEN DATE @start AND DATE @end`,
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)`,
     params: { start, end },
     types: { start: "STRING", end: "STRING" },
   });
@@ -246,7 +246,7 @@ export async function fetchCloserOverall(
         COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
         SUM(IF(is_deal, cash_collected, 0)) AS cash
       FROM ${CALLS}
-      WHERE DATE(appointment_date_time) BETWEEN DATE @start AND DATE @end
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
         AND closer_owner IS NOT NULL
       GROUP BY closer_owner
       ORDER BY deals DESC, cash DESC`,
@@ -279,7 +279,7 @@ export async function fetchCloserPerWebinar(
         COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL)) AS shows_cq,
         COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals
       FROM ${CALLS}
-      WHERE booking_week_sun = DATE @date
+      WHERE booking_week_sun = DATE(@date)
         AND closer_owner IS NOT NULL
       GROUP BY closer_owner
       ORDER BY deals DESC, prospects DESC`,
@@ -310,7 +310,7 @@ export async function fetchCloserWoW(
           COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
           SUM(IF(is_deal, cash_collected, 0)) AS cash
         FROM ${CALLS}
-        WHERE DATE(appointment_date_time) BETWEEN DATE @thisStart AND DATE @thisEnd
+        WHERE DATE(appointment_date_time) BETWEEN DATE(@thisStart) AND DATE(@thisEnd)
           AND closer_owner IS NOT NULL
         GROUP BY closer_owner
       ),
@@ -319,7 +319,7 @@ export async function fetchCloserWoW(
           COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
           SUM(IF(is_deal, cash_collected, 0)) AS cash
         FROM ${CALLS}
-        WHERE DATE(appointment_date_time) BETWEEN DATE @priorStart AND DATE @priorEnd
+        WHERE DATE(appointment_date_time) BETWEEN DATE(@priorStart) AND DATE(@priorEnd)
           AND closer_owner IS NOT NULL
         GROUP BY closer_owner
       )
@@ -367,7 +367,7 @@ export async function fetchBookingMode(
         COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
         SUM(IF(is_deal, cash_collected, 0)) AS cash
       FROM ${CALLS}
-      WHERE DATE(appointment_date_time) BETWEEN DATE @start AND DATE @end
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
       GROUP BY source
       ORDER BY prospects DESC`,
     params: { start, end },
@@ -398,7 +398,7 @@ export async function fetchSetterPerformance(
         COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)) AS deals,
         SUM(IF(is_deal, cash_collected, 0)) AS cash
       FROM ${CALLS}
-      WHERE DATE(appointment_date_time) BETWEEN DATE @start AND DATE @end
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
         AND setter_owner IS NOT NULL
         AND (is_setter_flow OR is_webinar_flow)
       GROUP BY setter, mode

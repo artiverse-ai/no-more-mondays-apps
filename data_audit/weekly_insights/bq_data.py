@@ -15,7 +15,7 @@ from typing import Any
 from google.cloud import bigquery
 
 # All NMM dashboards point at the same project/dataset.
-PROJECT = os.environ.get("BQ_PROJECT", "customgpt-analytics")
+PROJECT = os.environ.get("BQ_PROJECT", "no-more-mondays-analytics")
 DATASET = os.environ.get("BQ_DATASET", "nmm_calendar")
 MART_DATASET = os.environ.get("BQ_MART_DATASET", "dbt_tuddin")
 

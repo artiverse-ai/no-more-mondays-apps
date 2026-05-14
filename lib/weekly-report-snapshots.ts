@@ -21,6 +21,11 @@ export type Snapshot = {
   contextTag: string | null;
   contextTitle: string | null;
   contextBody: string | null; // optional narrative
+  // Tab 2 banner — same shape as the Tab 1 context_* fields, separate columns
+  // so each tab's narrative can be edited independently.
+  tab2NarrativeTag: string | null;
+  tab2NarrativeTitle: string | null;
+  tab2NarrativeBody: string | null;
   insightsGenerationStatus: InsightsGenStatus;
   insightsGeneratedAt: string | null;
   insightsGenerationError: string | null;
@@ -72,7 +77,10 @@ async function ensure(): Promise<void> {
     query: `ALTER TABLE ${SNAPSHOTS}
       ADD COLUMN IF NOT EXISTS insights_generation_status STRING,
       ADD COLUMN IF NOT EXISTS insights_generated_at TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS insights_generation_error STRING`,
+      ADD COLUMN IF NOT EXISTS insights_generation_error STRING,
+      ADD COLUMN IF NOT EXISTS tab2_narrative_tag STRING,
+      ADD COLUMN IF NOT EXISTS tab2_narrative_title STRING,
+      ADD COLUMN IF NOT EXISTS tab2_narrative_body STRING`,
   });
   await bq().query({
     query: `CREATE TABLE IF NOT EXISTS ${INSIGHTS} (
@@ -201,8 +209,19 @@ async function seedMay11Insights() {
   }
 }
 
+type MergeSnapshotInput = Omit<
+  Snapshot,
+  | "createdAt" | "updatedAt"
+  | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
+  | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
+> & {
+  tab2NarrativeTag?: string | null;
+  tab2NarrativeTitle?: string | null;
+  tab2NarrativeBody?: string | null;
+};
+
 async function mergeSnapshot(
-  s: Omit<Snapshot, "createdAt" | "updatedAt" | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError">,
+  s: MergeSnapshotInput,
   initialStatus: InsightsGenStatus = "pending",
 ) {
   await bq().query({
@@ -212,10 +231,12 @@ async function mergeSnapshot(
             WHEN NOT MATCHED THEN
               INSERT (slug, run_on, week_start, week_end, report_type, week_label, badge,
                       latest_webinar, context_tag, context_title, context_body,
+                      tab2_narrative_tag, tab2_narrative_title, tab2_narrative_body,
                       insights_generation_status, created_at)
               VALUES (@slug, DATE(@runOn), DATE(@weekStart), DATE(@weekEnd), @reportType,
                       @weekLabel, @badge, @latestWebinar, @contextTag, @contextTitle,
-                      @contextBody, @initialStatus, CURRENT_TIMESTAMP())`,
+                      @contextBody, @t2Tag, @t2Title, @t2Body,
+                      @initialStatus, CURRENT_TIMESTAMP())`,
     params: {
       slug: s.slug,
       runOn: s.runOn,
@@ -228,12 +249,16 @@ async function mergeSnapshot(
       contextTag: s.contextTag,
       contextTitle: s.contextTitle,
       contextBody: s.contextBody,
+      t2Tag: s.tab2NarrativeTag ?? null,
+      t2Title: s.tab2NarrativeTitle ?? null,
+      t2Body: s.tab2NarrativeBody ?? null,
       initialStatus,
     },
     types: {
       slug: "STRING", runOn: "STRING", weekStart: "STRING", weekEnd: "STRING",
       reportType: "STRING", weekLabel: "STRING", badge: "STRING",
       latestWebinar: "STRING", contextTag: "STRING", contextTitle: "STRING", contextBody: "STRING",
+      t2Tag: "STRING", t2Title: "STRING", t2Body: "STRING",
       initialStatus: "STRING",
     },
   });
@@ -266,6 +291,9 @@ type RawSnap = {
   context_tag: string | null;
   context_title: string | null;
   context_body: string | null;
+  tab2_narrative_tag: string | null;
+  tab2_narrative_title: string | null;
+  tab2_narrative_body: string | null;
   insights_generation_status: string | null;
   insights_generated_at: string | null;
   insights_generation_error: string | null;
@@ -290,6 +318,9 @@ function rowToSnapshot(r: RawSnap): Snapshot {
     contextTag: r.context_tag,
     contextTitle: r.context_title,
     contextBody: r.context_body,
+    tab2NarrativeTag: r.tab2_narrative_tag,
+    tab2NarrativeTitle: r.tab2_narrative_title,
+    tab2NarrativeBody: r.tab2_narrative_body,
     insightsGenerationStatus: (r.insights_generation_status as InsightsGenStatus | null) ?? "pending",
     insightsGeneratedAt: r.insights_generated_at,
     insightsGenerationError: r.insights_generation_error,
@@ -304,6 +335,7 @@ const SNAPSHOT_FIELDS = `slug,
   FORMAT_DATE('%F', week_end) AS week_end,
   report_type, week_label, badge, latest_webinar,
   context_tag, context_title, context_body,
+  tab2_narrative_tag, tab2_narrative_title, tab2_narrative_body,
   insights_generation_status,
   FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', insights_generated_at, 'UTC') AS insights_generated_at,
   insights_generation_error,
@@ -332,12 +364,29 @@ export async function getSnapshot(slug: string): Promise<Snapshot | null> {
   return r ? rowToSnapshot(r) : null;
 }
 
-export async function createSnapshot(
-  s: Omit<Snapshot, "createdAt" | "updatedAt" | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError">,
-): Promise<void> {
+// The tab2 narrative + context_* fields are *optional* at create time — the
+// VM cron fills them in from Claude's response. Callers can omit; we default
+// to null so the INSERT has every column.
+type CreateSnapshotInput = Omit<
+  Snapshot,
+  | "createdAt" | "updatedAt"
+  | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
+  | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
+> & {
+  tab2NarrativeTag?: string | null;
+  tab2NarrativeTitle?: string | null;
+  tab2NarrativeBody?: string | null;
+};
+
+export async function createSnapshot(s: CreateSnapshotInput): Promise<void> {
   await ensure();
   // New snapshots start 'pending' — the VM cron will pick them up.
-  await mergeSnapshot(s, "pending");
+  await mergeSnapshot({
+    ...s,
+    tab2NarrativeTag: s.tab2NarrativeTag ?? null,
+    tab2NarrativeTitle: s.tab2NarrativeTitle ?? null,
+    tab2NarrativeBody: s.tab2NarrativeBody ?? null,
+  }, "pending");
 }
 
 export async function updateSnapshot(
@@ -353,6 +402,9 @@ export async function updateSnapshot(
     reportType: "report_type", weekLabel: "week_label", badge: "badge",
     latestWebinar: "latest_webinar", contextTag: "context_tag",
     contextTitle: "context_title", contextBody: "context_body",
+    tab2NarrativeTag: "tab2_narrative_tag",
+    tab2NarrativeTitle: "tab2_narrative_title",
+    tab2NarrativeBody: "tab2_narrative_body",
   };
   const dateFields = new Set(["runOn", "weekStart", "weekEnd"]);
   for (const [k, v] of Object.entries(patch)) {

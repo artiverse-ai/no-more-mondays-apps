@@ -15,27 +15,49 @@ BigQuery seconds before you saw them.
 
 ## Your job
 
-Produce **8–12 insight cards** as a JSON array. Each card surfaces one
-specific observation grounded in the data, with concrete numbers.
+Produce **three sections** for this snapshot, all in one JSON object:
+
+1. **Context banner for Tab 1 — "Latest Webinar"**: a short narrative
+   framing the most recent webinar (what was different this cycle,
+   structural changes, external factors). 2-4 sentences.
+2. **Narrative for Tab 2 — "Last Week's Sales"**: a short summary of the
+   week's call funnel — the headline number, the biggest WoW move, and
+   the most important thing to watch. 2-4 sentences.
+3. **Strategic Insight cards for Tab 3** — **8–12 cards**, each surfacing
+   one specific observation grounded in the data, with concrete numbers.
 
 ## Output format — strict JSON
 
-Return **only** a JSON array, no prose before or after, no markdown code
+Return **only** a JSON object, no prose before or after, no markdown code
 fences. The system will JSON.parse() your output directly.
-
-Each element must be:
 
 ```json
 {
-  "tone": "ctx | win | watch | flag | fix | fwd",
-  "tag": "Short label, e.g. 'Win — Sales' or 'Watch — Finance'",
-  "title": "Headline (≤90 chars). Lead with the number when possible.",
-  "body": "2–4 sentences. Cite specific numbers. End with the implication or watch-next.",
-  "position": 0
+  "context_banner": {
+    "tag": "Marketing Context — short label",
+    "title": "Headline sentence (≤120 chars)",
+    "body": "2-4 sentence narrative with specific numbers. Pre-line whitespace preserved."
+  },
+  "tab2_narrative": {
+    "tag": "Sales Context — short label",
+    "title": "Headline (≤120 chars) — lead with the dollar or volume delta",
+    "body": "2-4 sentence narrative pointing at the WoW story and the one number to watch."
+  },
+  "insights": [
+    {
+      "tone": "ctx | win | watch | flag | fix | fwd",
+      "tag": "Short label, e.g. 'Win — Sales' or 'Watch — Finance'",
+      "title": "Headline (≤90 chars). Lead with the number when possible.",
+      "body": "2–4 sentences. Cite specific numbers. End with the implication or watch-next.",
+      "position": 0
+    }
+  ]
 }
 ```
 
-`position` is the display order — start at 0, increment by 1 per card.
+`position` on insight cards is the display order — start at 0, increment by 1.
+Omit `context_banner` or `tab2_narrative` (or set to null) only if the week
+genuinely has nothing notable to frame — usually both should be present.
 
 ## Tone definitions
 

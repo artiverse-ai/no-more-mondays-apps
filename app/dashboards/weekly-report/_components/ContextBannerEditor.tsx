@@ -3,18 +3,30 @@
 import { useState } from "react";
 import styles from "./report.module.css";
 
+// "kind" selects which set of snapshot columns this banner edits.
+//   context  → context_tag / context_title / context_body         (Tab 1)
+//   tab2     → tab2_narrative_tag / _title / _body                (Tab 2)
+type BannerKind = "context" | "tab2";
+
+const FIELD_MAP: Record<BannerKind, { tag: string; title: string; body: string }> = {
+  context: { tag: "contextTag", title: "contextTitle", body: "contextBody" },
+  tab2: { tag: "tab2NarrativeTag", title: "tab2NarrativeTitle", body: "tab2NarrativeBody" },
+};
+
 export function ContextBannerEditor({
   snapshotSlug,
   initialTag,
   initialTitle,
   initialBody,
   canEdit,
+  kind = "context",
 }: {
   snapshotSlug: string;
   initialTag: string;
   initialTitle: string;
   initialBody: string;
   canEdit: boolean;
+  kind?: BannerKind;
 }) {
   const [tag, setTag] = useState(initialTag);
   const [title, setTitle] = useState(initialTitle);
@@ -26,10 +38,16 @@ export function ContextBannerEditor({
   const save = async () => {
     setBusy(true); setError(null);
     try {
+      const fields = FIELD_MAP[kind];
+      const payload: Record<string, string> = {
+        [fields.tag]: tag,
+        [fields.title]: title,
+        [fields.body]: body,
+      };
       const res = await fetch(`/api/weekly-reports/${snapshotSlug}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contextTag: tag, contextTitle: title, contextBody: body }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const d: { error?: string } = await res.json().catch(() => ({}));
@@ -49,7 +67,7 @@ export function ContextBannerEditor({
     return (
       <div className={styles.ctxBanner}>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Tag (e.g. Marketing Context — …)" style={input} />
+          <input value={tag} onChange={(e) => setTag(e.target.value)} placeholder={kind === "tab2" ? "Tag (e.g. Sales Context — …)" : "Tag (e.g. Marketing Context — …)"} style={input} />
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" style={input} />
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} placeholder="Body — supports newlines" style={{ ...input, resize: "vertical" }} />
           {error ? <div style={errorBox}>{error}</div> : null}
@@ -67,8 +85,8 @@ export function ContextBannerEditor({
   return (
     <div className={styles.ctxBanner}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-        {tag ? <div className={styles.ctxTag}>⚙ {tag}</div> : <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{empty ? "No context banner — admin can add one" : null}</span>}
-        {canEdit ? <button type="button" onClick={() => setEditing(true)} style={btnGhost}>{empty ? "Add context" : "Edit"}</button> : null}
+        {tag ? <div className={styles.ctxTag}>⚙ {tag}</div> : <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{empty ? (kind === "tab2" ? "No sales narrative — admin can add one" : "No context banner — admin can add one") : null}</span>}
+        {canEdit ? <button type="button" onClick={() => setEditing(true)} style={btnGhost}>{empty ? (kind === "tab2" ? "Add narrative" : "Add context") : "Edit"}</button> : null}
       </div>
       {title ? <h3>{title}</h3> : null}
       {body ? (

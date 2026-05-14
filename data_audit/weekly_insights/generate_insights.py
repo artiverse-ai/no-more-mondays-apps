@@ -87,33 +87,68 @@ def run_claude(prompt: str) -> str:
     return proc.stdout
 
 
-def extract_json_array(raw: str) -> list[dict[str, Any]]:
+def extract_json_object(raw: str) -> dict[str, Any]:
     """
-    Find and parse the first top-level JSON array in Claude's response.
+    Find and parse the first top-level JSON object in Claude's response.
 
-    Claude sometimes wraps output in markdown code fences despite the prompt,
-    so we strip those before parsing. If parsing fails, we return the raw
-    error along with the offending text so the failure message is useful.
+    Claude sometimes wraps output in markdown code fences despite the
+    prompt — strip those first. We also handle legacy/fallback cases
+    where Claude returns just a bare array (old single-section format)
+    by wrapping it as { "insights": [...] }.
     """
     text = raw.strip()
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
 
-    # Locate the outermost [ ... ] if there's surrounding prose.
-    start = text.find("[")
-    end = text.rfind("]")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError(f"Could not locate a JSON array in output:\n{raw[:500]}")
-    candidate = text[start : end + 1]
-    try:
-        parsed = json.loads(candidate)
-    except json.JSONDecodeError as e:
-        raise ValueError(
-            f"JSON parse failed: {e}. Candidate (first 500 chars):\n{candidate[:500]}"
-        ) from e
-    if not isinstance(parsed, list):
-        raise ValueError("Top-level value is not an array")
-    return parsed
+    # Try object first (current format).
+    obj_start = text.find("{")
+    obj_end = text.rfind("}")
+    if obj_start != -1 and obj_end > obj_start:
+        candidate = text[obj_start : obj_end + 1]
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            pass
+
+    # Fallback: bare array of insights.
+    arr_start = text.find("[")
+    arr_end = text.rfind("]")
+    if arr_start != -1 and arr_end > arr_start:
+        candidate = text[arr_start : arr_end + 1]
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, list):
+                return {"insights": parsed}
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"JSON parse failed: {e}. Candidate (first 500 chars):\n{candidate[:500]}"
+            ) from e
+
+    raise ValueError(f"Could not locate a JSON object or array in output:\n{raw[:500]}")
+
+
+def _validate_banner(b: Any, name: str) -> dict[str, str] | None:
+    """Banners are optional. If present, they must have tag/title/body strings."""
+    if b is None:
+        return None
+    if not isinstance(b, dict):
+        raise ValueError(f"{name}: expected object, got {type(b).__name__}")
+    out = {}
+    for k in ("tag", "title", "body"):
+        v = b.get(k)
+        if v is None:
+            continue
+        if not isinstance(v, str):
+            raise ValueError(f"{name}.{k}: expected string")
+        out[k] = v.strip()
+    if not out:
+        return None
+    # All three keys must be present together once we decide to render.
+    for k in ("tag", "title", "body"):
+        out.setdefault(k, "")
+    return out
 
 
 def validate_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -154,10 +189,19 @@ def process_one() -> int:
         prompt = assemble_prompt(template, payload)
 
         raw = run_claude(prompt)
-        items = validate_items(extract_json_array(raw))
+        obj = extract_json_object(raw)
+        items = validate_items(obj.get("insights", []))
+        context_banner = _validate_banner(obj.get("context_banner"), "context_banner")
+        tab2_narrative = _validate_banner(obj.get("tab2_narrative"), "tab2_narrative")
+
+        bq_data.update_snapshot_narratives(slug, context_banner, tab2_narrative)
         n = bq_data.insert_insights(slug, items)
         bq_data.mark_succeeded(slug)
-        _log(f"OK: {n} insights written for {slug}")
+        _log(
+            f"OK: {n} insights + "
+            f"{'context_banner' if context_banner else 'no-ctx'} + "
+            f"{'tab2_narrative' if tab2_narrative else 'no-t2'} for {slug}"
+        )
         return 0
     except Exception as e:  # noqa: BLE001
         msg = f"{type(e).__name__}: {e}"

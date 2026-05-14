@@ -105,6 +105,11 @@ export default async function Page({
     reactivation,
     webinarDates: reportData.window.webinarDates,
   };
+  const TAB2_BANNER = {
+    tag: snapshot.tab2NarrativeTag ?? "",
+    title: snapshot.tab2NarrativeTitle ?? "",
+    body: snapshot.tab2NarrativeBody ?? "",
+  };
   const t2Data = {
     funnelStages,
     funnelConnectors,
@@ -118,6 +123,9 @@ export default async function Page({
     bookingMode,
     setterPerf,
     webinarDates: reportData.window.webinarDates,
+    banner: TAB2_BANNER,
+    snapshotSlug: SNAPSHOT_SLUG,
+    canEdit: isAdmin,
   };
 
   return (
@@ -341,11 +349,22 @@ type Tab2Props = {
   bookingMode: ReturnType<typeof buildBookingMode>;
   setterPerf: ReturnType<typeof buildSetterPerformance>;
   webinarDates: string[];
+  banner: { tag: string; title: string; body: string };
+  snapshotSlug: string;
+  canEdit: boolean;
 };
 
 function Tab2(p: Tab2Props) {
   return (
     <>
+      <ContextBannerEditor
+        snapshotSlug={p.snapshotSlug}
+        initialTag={p.banner.tag}
+        initialTitle={p.banner.title}
+        initialBody={p.banner.body}
+        canEdit={p.canEdit}
+        kind="tab2"
+      />
       <section className={styles.section}>
         <div className={styles.sh}>Sales Funnel — Week May 3–9, 2026 (live)</div>
         <div className={styles.funnel}>

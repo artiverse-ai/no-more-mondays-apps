@@ -106,6 +106,48 @@ def mark_succeeded(slug: str) -> None:
     )).result()
 
 
+def update_snapshot_narratives(
+    slug: str,
+    context_banner: dict[str, str] | None,
+    tab2_narrative: dict[str, str] | None,
+) -> None:
+    """Persists Claude's AI-generated tab banners onto the snapshot row.
+    Passing None for a banner leaves the existing values untouched so a
+    human-edited banner isn't overwritten by an empty AI response.
+    """
+    set_clauses: list[str] = ["updated_at = CURRENT_TIMESTAMP()"]
+    params: list[bigquery.ScalarQueryParameter] = [
+        bigquery.ScalarQueryParameter("slug", "STRING", slug),
+    ]
+    if context_banner is not None:
+        set_clauses.append("context_tag = @ctx_tag")
+        set_clauses.append("context_title = @ctx_title")
+        set_clauses.append("context_body = @ctx_body")
+        params.extend([
+            bigquery.ScalarQueryParameter("ctx_tag", "STRING", context_banner.get("tag", "")),
+            bigquery.ScalarQueryParameter("ctx_title", "STRING", context_banner.get("title", "")),
+            bigquery.ScalarQueryParameter("ctx_body", "STRING", context_banner.get("body", "")),
+        ])
+    if tab2_narrative is not None:
+        set_clauses.append("tab2_narrative_tag = @t2_tag")
+        set_clauses.append("tab2_narrative_title = @t2_title")
+        set_clauses.append("tab2_narrative_body = @t2_body")
+        params.extend([
+            bigquery.ScalarQueryParameter("t2_tag", "STRING", tab2_narrative.get("tag", "")),
+            bigquery.ScalarQueryParameter("t2_title", "STRING", tab2_narrative.get("title", "")),
+            bigquery.ScalarQueryParameter("t2_body", "STRING", tab2_narrative.get("body", "")),
+        ])
+    if len(set_clauses) == 1:
+        return
+    cli = _client()
+    sql = (
+        f"UPDATE {SNAPSHOTS} SET "
+        + ", ".join(set_clauses)
+        + " WHERE slug = @slug AND deleted_at IS NULL"
+    )
+    cli.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=params)).result()
+
+
 def mark_failed(slug: str, message: str) -> None:
     cli = _client()
     sql = f"""

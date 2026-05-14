@@ -22,9 +22,9 @@ type Snapshot = {
 
 const SNAPSHOTS: Snapshot[] = [
   {
-    slug: "2026-05-10",
+    slug: "2026-05-14",
     runOn: "Thu, May 14, 2026",
-    weekCovered: "May 10–16, 2026",
+    weekCovered: "Sun May 10 – Wed May 13, 2026",
     type: "Midweek check",
     sortKey: "2026-05-14",
   },

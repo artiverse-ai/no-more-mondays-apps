@@ -438,16 +438,34 @@ export type WeeklyReportData = {
   };
 };
 
-/** Pull every section of the report for a given Sunday-anchored week. */
+/**
+ * Pull every section of the report for the (start, end) window.
+ *
+ * Cadence:
+ *   - Monday recap: Mon → Sun (7 days, previous full week)
+ *   - Thursday midweek check: Sun → Wed (4 days, current week through yesterday)
+ *
+ * If `end` is omitted it defaults to start+6d (the 7-day recap shape) so
+ * older callers that just passed a week-start keep working.
+ *
+ * Prior-period (for WoW) is the same window shape shifted back 7 days, so
+ * a 4-day Thursday window compares to the prior week's same 4 days.
+ */
 export async function fetchWeeklyReport(
   weekStart: Date | string,
+  weekEnd?: Date | string,
 ): Promise<WeeklyReportData> {
   const start = typeof weekStart === "string" ? weekStart : isoDate(weekStart);
   const startDate = new Date(start + "T00:00:00Z");
-  const endDate = new Date(startDate.getTime() + 6 * 86400000);
+  const endDate =
+    weekEnd === undefined
+      ? new Date(startDate.getTime() + 6 * 86400000)
+      : typeof weekEnd === "string"
+      ? new Date(weekEnd + "T00:00:00Z")
+      : weekEnd;
   const end = isoDate(endDate);
   const priorStartDate = new Date(startDate.getTime() - 7 * 86400000);
-  const priorEndDate = new Date(startDate.getTime() - 1 * 86400000);
+  const priorEndDate = new Date(endDate.getTime() - 7 * 86400000);
   const priorStart = isoDate(priorStartDate);
   const priorEnd = isoDate(priorEndDate);
 

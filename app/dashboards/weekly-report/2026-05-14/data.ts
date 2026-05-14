@@ -7,7 +7,7 @@
 // rows in weekly_report_snapshots + weekly_report_insights.
 
 export const REPORT_META = {
-  weekLabel: "Week May 10–16, 2026",
+  weekLabel: "Sun May 10 – Wed May 13, 2026 (week-to-date)",
   latestWebinar: "Wed May 13",
   badge: "THU MAY 14, 2026 · MIDWEEK",
 };

@@ -34,7 +34,13 @@ import {
   REPORT_META,
 } from "./data";
 
-const REPORT_WEEK = "2026-05-10";
+// Snapshot identity = run date. Used as the URL slug + the per-snapshot
+// key for the Marketing/Sales Solutions tab.
+const SNAPSHOT_SLUG = "2026-05-14";
+// Thursday midweek check covers Sun → Wed (current week through yesterday).
+// WoW comparison auto-shifts back 7 days (May 3 → May 6).
+const WEEK_START = "2026-05-10"; // Sun
+const WEEK_END = "2026-05-13"; // Wed
 
 export const metadata = {
   title: "Midweek Check — May 10-16, 2026 · No More Mondays",
@@ -56,9 +62,9 @@ export default async function Page() {
 
   // All BQ fetches in parallel.
   const [reportData, mktInitial, salesInitial] = await Promise.all([
-    fetchWeeklyReport(REPORT_WEEK),
-    listSolutions(REPORT_WEEK, "marketing").catch(() => []),
-    listSolutions(REPORT_WEEK, "sales").catch(() => []),
+    fetchWeeklyReport(WEEK_START, WEEK_END),
+    listSolutions(SNAPSHOT_SLUG, "marketing").catch(() => []),
+    listSolutions(SNAPSHOT_SLUG, "sales").catch(() => []),
   ]);
 
   // Build the shapes the tab components consume.
@@ -126,7 +132,7 @@ export default async function Page() {
           t3: <Tab3 />,
           t4: (
             <SolutionsTab
-              reportWeek={REPORT_WEEK}
+              reportWeek={SNAPSHOT_SLUG}
               tab="marketing"
               editorEmail={MARKETING_EDITOR}
               initial={mktInitial}
@@ -136,7 +142,7 @@ export default async function Page() {
           ),
           t5: (
             <SolutionsTab
-              reportWeek={REPORT_WEEK}
+              reportWeek={SNAPSHOT_SLUG}
               tab="sales"
               editorEmail={SALES_EDITOR}
               initial={salesInitial}

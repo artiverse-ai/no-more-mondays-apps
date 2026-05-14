@@ -323,41 +323,62 @@ def assemble_report_payload(slug: str) -> dict[str, Any]:
 def insert_insights(slug: str, items: list[dict[str, Any]]) -> int:
     """Wipes any existing AI-generated insights for the slug, then inserts.
 
-    Uses INSERT (not MERGE) — the prior cards are soft-deleted first so the
-    page shows the fresh batch only. Manual insights added through the UI
-    are preserved because they have non-ai IDs (uuid). The 'ai-{slug}-{i}'
-    naming makes the difference explicit.
+    Uses DML INSERT (not streaming insert) so the rows land in managed
+    storage immediately and can be UPDATE/DELETE'd by the UI right away.
+    Streaming inserts (insert_rows_json) put rows in BQ's streaming buffer
+    for ~30-90 min, during which any UPDATE/DELETE fails with
+    "would affect rows in the streaming buffer". That broke the inline
+    Edit/Delete UX on the dashboard.
+
+    The cleanup UPDATE may itself fail if prior rows are still in the
+    buffer from an old streaming-insert run — we swallow that and proceed
+    so the new batch still gets inserted. Once the buffer flushes for the
+    old rows, a regenerate will clean them out properly.
     """
     cli = _client()
-    # Soft-delete prior AI cards for this snapshot.
-    cli.query(
-        f"""
-        UPDATE {INSIGHTS}
-        SET deleted_at = CURRENT_TIMESTAMP()
-        WHERE snapshot_slug = @slug
-          AND id LIKE 'ai-%'
-          AND deleted_at IS NULL
-        """,
-        job_config=bigquery.QueryJobConfig(query_parameters=[
-            bigquery.ScalarQueryParameter("slug", "STRING", slug)
-        ]),
-    ).result()
+    # Soft-delete prior AI cards for this snapshot. Best-effort.
+    try:
+        cli.query(
+            f"""
+            UPDATE {INSIGHTS}
+            SET deleted_at = CURRENT_TIMESTAMP()
+            WHERE snapshot_slug = @slug
+              AND id LIKE 'ai-%'
+              AND deleted_at IS NULL
+            """,
+            job_config=bigquery.QueryJobConfig(query_parameters=[
+                bigquery.ScalarQueryParameter("slug", "STRING", slug)
+            ]),
+        ).result()
+    except Exception as e:  # noqa: BLE001
+        # Most common cause: prior rows are still in the streaming buffer.
+        # Don't fail the whole run — the new INSERT below still proceeds.
+        print(f"WARN: prior-row cleanup failed (likely streaming buffer): {e}")
 
-    rows = []
+    if not items:
+        return 0
+
+    # DML INSERT — single multi-VALUES statement, one DML quota slot.
+    placeholders: list[str] = []
+    params: list[bigquery.ScalarQueryParameter] = []
     for i, it in enumerate(items):
-        rows.append({
-            "id": f"ai-{slug}-{i:02d}",
-            "snapshot_slug": slug,
-            "tone": it["tone"],
-            "tag": it["tag"],
-            "title": it["title"],
-            "body": it["body"],
-            "position": int(it.get("position", i)),
-            "created_at": dt.datetime.utcnow().isoformat() + "Z",
-        })
+        placeholders.append(
+            f"(@id_{i}, @slug_{i}, @tone_{i}, @tag_{i}, @title_{i}, @body_{i}, @position_{i}, CURRENT_TIMESTAMP())"
+        )
+        params.extend([
+            bigquery.ScalarQueryParameter(f"id_{i}", "STRING", f"ai-{slug}-{i:02d}"),
+            bigquery.ScalarQueryParameter(f"slug_{i}", "STRING", slug),
+            bigquery.ScalarQueryParameter(f"tone_{i}", "STRING", it["tone"]),
+            bigquery.ScalarQueryParameter(f"tag_{i}", "STRING", it["tag"]),
+            bigquery.ScalarQueryParameter(f"title_{i}", "STRING", it["title"]),
+            bigquery.ScalarQueryParameter(f"body_{i}", "STRING", it["body"]),
+            bigquery.ScalarQueryParameter(f"position_{i}", "INT64", int(it.get("position", i))),
+        ])
 
-    table = cli.get_table(f"{PROJECT}.{DATASET}.weekly_report_insights")
-    errors = cli.insert_rows_json(table, rows)
-    if errors:
-        raise RuntimeError(f"BQ insert errors: {errors}")
+    sql = (
+        f"INSERT INTO {INSIGHTS} "
+        "(id, snapshot_slug, tone, tag, title, body, position, created_at) VALUES "
+        + ", ".join(placeholders)
+    )
+    cli.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=params)).result()
     return len(rows)

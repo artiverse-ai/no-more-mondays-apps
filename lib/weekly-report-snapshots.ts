@@ -88,9 +88,17 @@ async function ensure(): Promise<void> {
       deleted_at TIMESTAMP
     )`,
   });
-  // Idempotent seed of the two snapshots that previously lived in per-folder
-  // data.ts files. MERGE semantics — re-running is a no-op once they exist.
-  await seedInitialSnapshots();
+  // BigQuery enforces ~1,500 table-update operations per table per day.
+  // We previously seeded on every cold start which burned that quota fast
+  // (14 MERGE statements x N cold starts). Now we only seed when the
+  // snapshots table is genuinely empty — typical case is a fresh dev env.
+  const [seedCheck] = await bq().query({
+    query: `SELECT COUNT(*) AS n FROM ${SNAPSHOTS} WHERE deleted_at IS NULL`,
+  });
+  const existingCount = Number((seedCheck[0] as { n?: number | string })?.n ?? 0);
+  if (existingCount === 0) {
+    await seedInitialSnapshots();
+  }
   _ready = true;
 }
 

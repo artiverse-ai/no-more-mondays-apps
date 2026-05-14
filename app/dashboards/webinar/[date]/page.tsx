@@ -18,7 +18,8 @@ import {
 } from "@/components/webinar/CallsFilterBar";
 import { FunnelChart } from "@/components/webinar/FunnelChart";
 import { Kpi } from "@/components/webinar/Kpi";
-import { ViewTabs, parseViewTab } from "@/components/ui/view-tabs";
+import { ViewTabs } from "@/components/ui/view-tabs";
+import { parseViewTab } from "@/lib/view-tabs";
 
 const DRILL_VIEW_OPTIONS = [
   { key: "summary", label: "Summary" },

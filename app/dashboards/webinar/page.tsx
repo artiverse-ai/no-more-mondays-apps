@@ -21,7 +21,8 @@ import { WebinarFilters } from "@/components/webinar/WebinarFilters";
 import { WebinarTable } from "@/components/webinar/WebinarTable";
 import { fmt } from "@/components/webinar/format";
 import { GranularityPicker } from "@/components/ui/granularity-picker";
-import { ViewTabs, parseViewTab } from "@/components/ui/view-tabs";
+import { ViewTabs } from "@/components/ui/view-tabs";
+import { parseViewTab } from "@/lib/view-tabs";
 import { GRANS_WEBINAR, parseGranularity } from "@/lib/granularity";
 
 const VIEW_OPTIONS = [

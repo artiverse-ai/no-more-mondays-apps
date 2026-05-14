@@ -44,6 +44,20 @@ const dashboards: Tile[] = [
     status: "live",
   },
   {
+    href: "/dashboards/sales",
+    title: "Sales Performance",
+    description:
+      "Per-closer rollup — calls, shows, deals, close rate, AOV, ACV, collection rate. Live over the closer mart; replaces Looker's closer dashboard.",
+    status: "live",
+  },
+  {
+    href: "/dashboards/setter",
+    title: "Setter Performance",
+    description:
+      "Per-setter rollup — bookings, show rate, Setter DQ rate, qualified-show rate, deal contribution. Live over int_calls_enriched.",
+    status: "live",
+  },
+  {
     href: "/dashboards/weekly-report/2026-05-03",
     title: "Weekly Report — May 3-9, 2026",
     description:

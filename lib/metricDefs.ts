@@ -579,6 +579,227 @@ export const METRIC_DEFS: Record<string, MetricDef> = {
     sql: "-- close_type='FUC' := is_deal AND held_call_number > 1",
     source: "int_calls_enriched",
   },
+
+  // ===== mart_closer_weekly_performance — sales dashboard =====
+  // NOTE: the closer mart's volume columns (calls_held, unique_calls_held,
+  // show_rate, close_rate) still derive from the deprecated `is_call_held`
+  // flag — they over-count Setter DQs. Surface that caveat in the UI; a
+  // future upstream PR will rebuild the int model on `is_show_up`.
+
+  closer_calls_on_the_calendar: {
+    key: "closer_calls_on_the_calendar",
+    label: "Calls on Calendar",
+    description:
+      "All Airtable call rows assigned to this closer in the period, including cancellations.",
+    formula: "COUNTIF(is_call_booked) per closer",
+    sql: "-- per int_closer_performance_core: COUNTIF(is_call_booked)",
+    source: "int_closer_performance_core",
+  },
+  closer_prospects_on_the_calendar: {
+    key: "closer_prospects_on_the_calendar",
+    label: "Prospects",
+    description:
+      "Distinct prospects with at least one booked call assigned to this closer in the period.",
+    formula: "COUNT(DISTINCT prospect_email_lc) WHERE is_call_booked",
+    source: "int_closer_performance_core",
+  },
+  closer_dispositioned_prospects: {
+    key: "closer_dispositioned_prospects",
+    label: "Dispositioned",
+    description:
+      "Distinct prospects whose call has a final outcome recorded (shows up + DQs + cancellations).",
+    formula: "COUNT(DISTINCT prospect_email_lc) WHERE is_dispositioned",
+    source: "int_closer_performance_core",
+  },
+  closer_unique_calls_held: {
+    key: "closer_unique_calls_held",
+    label: "Calls Held",
+    description:
+      "Distinct prospects who actually showed up to a call with this closer. CAVEAT: still derived from the old is_call_held flag, so Setter DQs are over-counted until the mart is rebuilt on is_show_up.",
+    formula: "COUNT(DISTINCT prospect_email_lc) WHERE is_call_held",
+    sql: "-- TODO upstream: switch to COUNTIF(is_show_up)",
+    source: "int_closer_performance_core",
+  },
+  closer_deals_closed_won: {
+    key: "closer_deals_closed_won",
+    label: "Deals Closed Won",
+    description: "Deals the closer landed in the period.",
+    formula: "COUNTIF(is_deal) per closer",
+    source: "int_closer_performance_core",
+  },
+  closer_deposits_taken: {
+    key: "closer_deposits_taken",
+    label: "Deposits Taken",
+    description:
+      "Calls where a deposit was collected but the full deal isn't closed yet.",
+    formula: "COUNTIF(is_deposit AND NOT is_deal) per closer",
+    source: "int_closer_performance_core",
+  },
+  closer_acv: {
+    key: "closer_acv",
+    label: "ACV",
+    description:
+      "Average contracted value per deal for this closer (includes payment plans).",
+    formula: "SUM(revenue_generated) / SUM(deals_closed_won)",
+    source: "int_closer_performance_core.avg_revenue_per_deal_acv",
+  },
+  closer_aov: {
+    key: "closer_aov",
+    label: "AOV",
+    description:
+      "Average upfront cash per deal for this closer.",
+    formula: "SUM(cash_collected) / SUM(deals_closed_won)",
+    source: "int_closer_performance_core.avg_cash_per_deal_aov",
+  },
+  closer_avg_days_to_close: {
+    key: "closer_avg_days_to_close",
+    label: "Avg Days to Close",
+    description:
+      "Average days from initial Airtable record creation to date_closed for this closer's wins. Use sparingly — the median tells a better story (skewed by long-tail FUCs).",
+    formula: "AVG(DATE_DIFF(date_closed, created_date, DAY))",
+    source: "int_closer_performance_core.avg_days_to_close",
+  },
+  closer_show_rate: {
+    key: "closer_show_rate",
+    label: "Show Rate",
+    description:
+      "Closer's show rate. CAVEAT: still uses the old is_call_held numerator (over-counts Setter DQs) until the upstream mart is rebuilt.",
+    formula: "unique_calls_held / dispositioned_prospects",
+    source: "int_closer_performance_core.show_rate",
+  },
+  closer_close_rate: {
+    key: "closer_close_rate",
+    label: "Close Rate",
+    description:
+      "Deals divided by calls actually held. Same Setter-DQ caveat as Show Rate.",
+    formula: "deals_closed_won / unique_calls_held",
+    source: "int_closer_performance_core.close_rate",
+  },
+  closer_prospect_to_close_rate: {
+    key: "closer_prospect_to_close_rate",
+    label: "Prospect → Close",
+    description:
+      "End-to-end conversion from any booked prospect to a closed deal.",
+    formula: "deals_closed_won / prospects_on_the_calendar",
+    source: "int_closer_performance_core.prospect_to_close_rate",
+  },
+  closer_occ_rate: {
+    key: "closer_occ_rate",
+    label: "OCC Rate",
+    description:
+      "Share of wins that closed on the very first held call. High OCC = strong closer, especially for the Sunday webinar funnel.",
+    formula: "COUNTIF(close_type='OCC') / SUM(deals_closed_won)",
+    source: "int_closer_performance_core.occ_rate",
+  },
+  closer_collection_rate: {
+    key: "closer_collection_rate",
+    label: "Collection Rate",
+    description:
+      "How much of the contracted value the closer has actually banked. < 1 means money still owed via payment plans.",
+    formula: "cash_collected / revenue_generated",
+    source: "int_closer_performance_core.collection_rate",
+  },
+  closer_forecast_90d_remaining: {
+    key: "closer_forecast_90d_remaining",
+    label: "90-Day Forecast",
+    description:
+      "Contracted-but-not-collected money. Rough 90-day collection forecast.",
+    formula: "revenue_generated − cash_collected",
+    source: "int_closer_performance_core.forecast_90d_remaining",
+  },
+
+  // ===== setter performance (live GROUP BY over int_calls_enriched) =====
+
+  setter_bookings: {
+    key: "setter_bookings",
+    label: "Bookings",
+    description:
+      "Strategy calls this setter put on the calendar in the period, including ones later canceled.",
+    formula: "COUNTIF(is_call_booked) GROUPED BY setter",
+    sql: "COUNTIF(is_call_booked) AS bookings",
+    source: "int_calls_enriched (direct query)",
+  },
+  setter_active_bookings: {
+    key: "setter_active_bookings",
+    label: "Active Bookings",
+    description:
+      "Bookings that weren't canceled before the call could happen.",
+    formula: "COUNTIF(is_call_booked AND NOT is_canceled)",
+    source: "int_calls_enriched (direct query)",
+  },
+  setter_show_ups: {
+    key: "setter_show_ups",
+    label: "Shows",
+    description:
+      "Prospects who actually got on the call. Setter DQs are EXCLUDED (is_show_up uses the PR-#43 fix).",
+    formula: "COUNTIF(is_show_up)",
+    sql: "COUNTIF(is_show_up) AS show_ups",
+    source: "int_calls_enriched",
+  },
+  setter_show_rate: {
+    key: "setter_show_rate",
+    label: "Show Rate",
+    description:
+      "Share of dispositioned, eligible bookings that showed up. Setter-DQ-clean.",
+    formula: "show_ups / show_rate_eligible",
+    source: "int_calls_enriched",
+  },
+  setter_qualified_shows: {
+    key: "setter_qualified_shows",
+    label: "Qualified Shows",
+    description:
+      "Show-ups that survived both Setter DQ AND Closer DQ — the prospects who had a real shot at a deal.",
+    formula: "COUNTIF(is_close_rate_eligible)",
+    source: "int_calls_enriched",
+  },
+  setter_qualified_rate: {
+    key: "setter_qualified_rate",
+    label: "Qualified Rate",
+    description:
+      "Share of show-ups that were closer-qualified (i.e., NOT Closer DQ'd).",
+    formula: "qualified_shows / show_ups",
+    source: "int_calls_enriched",
+  },
+  setter_closer_dq_rate: {
+    key: "setter_closer_dq_rate",
+    label: "Closer DQ Rate",
+    description:
+      "Share of this setter's show-ups that were ultimately DQ'd by the closer. A high rate means setter is sending unqualified prospects through.",
+    formula: "COUNTIF(call_outcome='Closer DQ') / show_ups",
+    source: "int_calls_enriched",
+  },
+  setter_deals: {
+    key: "setter_deals",
+    label: "Deals Attributed",
+    description:
+      "Closed deals where this setter was the originator. Counts toward the setter even though the closer makes the close.",
+    formula: "COUNTIF(is_deal)",
+    source: "int_calls_enriched",
+  },
+  setter_deal_rate: {
+    key: "setter_deal_rate",
+    label: "Close-Rate Contribution",
+    description:
+      "Deals divided by qualified shows the setter sent — the setter's contribution to closer success rate.",
+    formula: "deals / qualified_shows",
+    source: "int_calls_enriched",
+  },
+  setter_cash_attributed: {
+    key: "setter_cash_attributed",
+    label: "Cash Attributed",
+    description:
+      "Upfront cash from deals where this setter was the originator.",
+    formula: "SUM(IF(is_deal, cash_collected, 0))",
+    source: "int_calls_enriched",
+  },
+  setter_cash_per_booking: {
+    key: "setter_cash_per_booking",
+    label: "Cash / Booking",
+    description:
+      "Average upfront cash generated per call this setter booked — the dollar efficiency metric.",
+    formula: "cash_attributed / bookings",
+    source: "int_calls_enriched",
+  },
 };
 
 export function getMetricDef(key: string): MetricDef | null {

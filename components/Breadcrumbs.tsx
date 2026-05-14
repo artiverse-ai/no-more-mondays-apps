@@ -13,6 +13,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   dashboards: "Dashboards",
   webinar: "Webinar Performance",
   "high-level": "High-Level",
+  sales: "Sales Performance",
+  setter: "Setter Performance",
   admin: "Admin",
   access: "Site access",
   closers: "Closers",

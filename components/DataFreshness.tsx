@@ -16,24 +16,44 @@
 // hydration mismatches (delays the first relative render to client
 // mount).
 
-import { useState, useSyncExternalStore, useTransition } from "react";
+import {
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { RefreshCwIcon } from "lucide-react";
 import { useAutoRefresh } from "@/lib/hooks/use-auto-refresh";
 import { useReportTransition } from "@/lib/nav-progress-context";
 import { cn } from "@/lib/utils";
 
-// Ticks the component once every 30 seconds using the React 19
-// idiomatic clock hook. `useSyncExternalStore` keeps the clock pure
-// (no setState in render, no setState in effect) and gives us a
-// server-safe snapshot of 0 so the SSR'd absolute-time fallback paints
-// without a hydration mismatch.
+// Ticks the component once every `intervalMs` using `useSyncExternalStore`.
+//
+// CRITICAL: `getSnapshot` MUST return the same reference between renders
+// unless the store has actually changed — otherwise React thinks the
+// store changed every render, schedules another render, and we hit
+// "Maximum update depth exceeded". A naive `() => Date.now()` returns a
+// fresh number on every call and triggers exactly that infinite loop.
+//
+// So we cache the latest tick in a ref. The subscribe callback writes a
+// new value + notifies React; getSnapshot just returns the cached ref.
+// Stable between ticks → no spurious re-renders. Server snapshot = 0 so
+// the SSR absolute-time fallback paints without a hydration mismatch.
 function useTick(intervalMs: number): number {
+  const cachedRef = useRef<number>(0);
   return useSyncExternalStore(
     (cb) => {
-      const id = setInterval(cb, intervalMs);
+      // Seed the snapshot on first subscribe so the very next render
+      // shows the real time, not 0.
+      cachedRef.current = Date.now();
+      cb();
+      const id = setInterval(() => {
+        cachedRef.current = Date.now();
+        cb();
+      }, intervalMs);
       return () => clearInterval(id);
     },
-    () => Date.now(),
+    () => cachedRef.current,
     () => 0,
   );
 }

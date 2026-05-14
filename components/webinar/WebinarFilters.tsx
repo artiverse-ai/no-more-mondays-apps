@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useReportTransition } from "@/lib/nav-progress-context";
 import { eraLabel } from "./format";
 
 const CONTROL_CLS =
@@ -25,6 +26,7 @@ export function WebinarFilters({
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  useReportTransition(pending);
 
   const apply = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);

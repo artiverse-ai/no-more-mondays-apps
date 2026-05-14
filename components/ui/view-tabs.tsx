@@ -1,40 +1,28 @@
 "use client";
 
-// Segmented control for time-axis granularity. URL-param driven so server
-// pages can rollup daily rows server-side. Reused across the Webinar,
-// CEO, Sales, and Setter dashboards.
-//
-// Types + option arrays + the parser live in lib/granularity.ts so
-// server pages can import them without crossing the RSC boundary.
+// Segmented control that switches which section of the page is visible.
+// URL-param driven so the active tab persists in the browser history
+// and survives reloads + can be linked-to. Modelled on
+// `<GranularityPicker>`. Reused on every dashboard's tab strip.
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { useReportTransition } from "@/lib/nav-progress-context";
 import { cn } from "@/lib/utils";
-import type {
-  Granularity,
-  GranularityOption,
-} from "@/lib/granularity";
 
-export type { Granularity, GranularityOption };
-// Re-exports for ergonomic call sites — both server and client.
-export {
-  GRANS_TIME,
-  GRANS_WEBINAR,
-  parseGranularity,
-} from "@/lib/granularity";
+export type ViewTabOption = { key: string; label: string };
 
-export function GranularityPicker({
+export function ViewTabs({
   pathname,
+  paramName = "view",
   value,
   options,
-  paramName = "gran",
   className,
 }: {
   pathname: string;
-  value: Granularity;
-  options: GranularityOption[];
   paramName?: string;
+  value: string;
+  options: ViewTabOption[];
   className?: string;
 }) {
   const router = useRouter();
@@ -42,7 +30,7 @@ export function GranularityPicker({
   const [pending, startTransition] = useTransition();
   useReportTransition(pending);
 
-  const pick = (next: Granularity) => {
+  const pick = (next: string) => {
     if (next === value) return;
     const sp = new URLSearchParams(params);
     sp.set(paramName, next);
@@ -54,7 +42,7 @@ export function GranularityPicker({
   return (
     <div
       role="tablist"
-      aria-label="Granularity"
+      aria-label="View"
       data-pending={pending ? "" : undefined}
       className={cn(
         "inline-flex rounded-xl border border-border bg-background p-1 shadow-sm data-[pending]:opacity-70 data-[pending]:transition-opacity",
@@ -71,7 +59,7 @@ export function GranularityPicker({
             aria-selected={active}
             onClick={() => pick(opt.key)}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+              "rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors",
               active
                 ? "bg-foreground text-background shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
@@ -84,4 +72,14 @@ export function GranularityPicker({
       })}
     </div>
   );
+}
+
+/** Validate a `?view=` param against an allowed option set; default if invalid. */
+export function parseViewTab(
+  raw: string | string[] | undefined,
+  allowed: ViewTabOption[],
+  fallback: string,
+): string {
+  const v = typeof raw === "string" ? raw : "";
+  return allowed.some((o) => o.key === v) ? v : fallback;
 }

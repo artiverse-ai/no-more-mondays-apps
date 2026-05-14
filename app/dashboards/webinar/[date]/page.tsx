@@ -10,6 +10,7 @@ import {
   type WebinarCall,
 } from "@/lib/webinar";
 import { Badge } from "@/components/ui/badge";
+import { DataFreshness } from "@/components/DataFreshness";
 import { DevModeToggle } from "@/components/DevModeToggle";
 import {
   CallsFilterBar,
@@ -175,11 +176,7 @@ export default async function WebinarDetailPage(
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            {w.dbt_updated_at ? (
-              <p className="text-xs text-muted-foreground">
-                dbt updated {fmt.dt(w.dbt_updated_at)}
-              </p>
-            ) : null}
+            <DataFreshness asOf={w.dbt_updated_at ?? null} />
             {user?.isAdmin ? <DevModeToggle current={devMode} /> : null}
           </div>
         </div>

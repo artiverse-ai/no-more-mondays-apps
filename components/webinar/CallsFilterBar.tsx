@@ -9,6 +9,7 @@
 import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { XIcon } from "lucide-react";
+import { useReportTransition } from "@/lib/nav-progress-context";
 import { cn } from "@/lib/utils";
 
 export type StatusFilter =
@@ -59,6 +60,7 @@ export function CallsFilterBar({
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  useReportTransition(pending);
 
   const apply = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params);

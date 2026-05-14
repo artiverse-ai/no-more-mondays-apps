@@ -13,6 +13,7 @@ import {
   type PeriodKey,
   type TrendGranularity,
 } from "@/lib/highLevel";
+import { DataFreshness } from "@/components/DataFreshness";
 import { DailyTrendChart } from "@/components/highLevel/DailyTrendChart";
 import { MarketingKpis } from "@/components/highLevel/MarketingKpis";
 import { PeriodFilter } from "@/components/highLevel/PeriodFilter";
@@ -72,14 +73,6 @@ export default async function HighLevelDashboardPage(
 
   const updatedAt =
     days.length > 0 ? days[days.length - 1].dbt_updated_at : null;
-  const updatedStr =
-    updatedAt && !isNaN(new Date(updatedAt).getTime())
-      ? new Date(updatedAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      : null;
 
   return (
     <main className="mx-auto max-w-7xl space-y-8 p-4 md:p-8 lg:p-10">
@@ -104,13 +97,13 @@ export default async function HighLevelDashboardPage(
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <p className="text-sm text-muted-foreground">
+          <DataFreshness asOf={updatedAt} />
+          <p className="text-xs text-muted-foreground">
             <span className="font-medium text-foreground">{resolved.label}</span>{" "}
             &middot;{" "}
             <span className="tabular-nums">
               {fmt.date(resolved.from)} → {fmt.date(resolved.to)}
             </span>
-            {updatedStr ? ` · dbt updated ${updatedStr}` : ""}
           </p>
           <div className="flex items-center gap-2">
             {user?.isAdmin ? <DevModeToggle current={devMode} /> : null}

@@ -209,6 +209,13 @@ def process_one() -> int:
         context_banner = _validate_banner(obj.get("context_banner"), "context_banner")
         tab2_narrative = _validate_banner(obj.get("tab2_narrative"), "tab2_narrative")
 
+        # Claude can take 1-4 minutes. The user may have deleted the snapshot
+        # or reset its status in the meantime — don't pollute a snapshot they
+        # already moved on from.
+        if not bq_data.verify_active_for_write(slug):
+            _log(f"ABORT {slug}: snapshot was deleted or status changed mid-run; discarding output")
+            return 0
+
         bq_data.update_snapshot_narratives(slug, context_banner, tab2_narrative)
         n = bq_data.insert_insights(slug, items)
         bq_data.mark_succeeded(slug)

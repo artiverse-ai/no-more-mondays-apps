@@ -398,6 +398,23 @@ type CreateSnapshotInput = Omit<
 
 export async function createSnapshot(s: CreateSnapshotInput): Promise<void> {
   await ensure();
+  // Idempotent cleanup: before creating, soft-delete any orphan insights or
+  // solutions for this slug. Closes the race where a Claude run finishes
+  // *after* an admin deleted the prior snapshot, leaving live rows behind
+  // for the next "Create Next" to inherit.
+  const SOLUTIONS = table("weekly_report_solutions");
+  await Promise.all([
+    bq().query({
+      query: `UPDATE ${INSIGHTS} SET deleted_at = CURRENT_TIMESTAMP() WHERE snapshot_slug = @slug AND deleted_at IS NULL`,
+      params: { slug: s.slug }, types: { slug: "STRING" },
+    }),
+    bq().query({
+      query: `UPDATE ${SOLUTIONS} SET deleted_at = CURRENT_TIMESTAMP() WHERE report_week = @slug AND deleted_at IS NULL`,
+      params: { slug: s.slug }, types: { slug: "STRING" },
+    }).catch(() => {
+      // weekly_report_solutions may not exist on a fresh env. Best effort.
+    }),
+  ]);
   // New snapshots start 'pending' — the VM cron will pick them up.
   await mergeSnapshot({
     ...s,

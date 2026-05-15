@@ -91,6 +91,33 @@ def claim_pending() -> dict[str, Any] | None:
     return fetch_snapshot(slug)
 
 
+def verify_active_for_write(slug: str, expected_status: str = "generating") -> bool:
+    """Re-fetch the snapshot row and confirm it's still the same one we
+    claimed at the start of the run. Returns False if the row has been
+    soft-deleted or had its status changed by someone else (e.g., the
+    admin clicked Delete in Vercel while Claude was responding).
+
+    Called immediately before any DML writes so a long-running Claude call
+    can't pollute a snapshot the user already moved on from.
+    """
+    cli = _client()
+    sql = f"""
+      SELECT insights_generation_status AS status
+      FROM {SNAPSHOTS}
+      WHERE slug = @slug AND deleted_at IS NULL
+      LIMIT 1
+    """
+    rows = list(cli.query(
+        sql,
+        job_config=bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("slug", "STRING", slug),
+        ]),
+    ).result())
+    if not rows:
+        return False  # row was soft-deleted while we were generating
+    return rows[0]["status"] == expected_status
+
+
 def mark_succeeded(slug: str) -> None:
     cli = _client()
     sql = f"""

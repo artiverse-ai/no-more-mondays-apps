@@ -114,6 +114,11 @@ export function InsightsEditor({
 
   const heading = `Strategic Insights — ${weekLabel}${latestWebinar ? ` / Latest Webinar ${latestWebinar}` : ""}`;
 
+  // While Claude is producing a fresh batch, hide the existing cards
+  // entirely so the user never sees a mix of stale and new. Cards reappear
+  // when status flips to 'succeeded' or 'failed'.
+  const isGenerating = genStatus === "pending" || genStatus === "generating";
+
   const upsertLocal = (next: EditableInsight) => {
     setInsights((prev) => {
       const idx = prev.findIndex((p) => p.id === next.id);
@@ -149,7 +154,7 @@ export function InsightsEditor({
         <span>{heading}</span>
         {canEdit ? (
           <div style={{ display: "flex", gap: 8 }}>
-            {!adding ? (
+            {!adding && !isGenerating ? (
               <button
                 type="button"
                 onClick={() => { setAdding(true); setEditingId(null); }}
@@ -161,11 +166,11 @@ export function InsightsEditor({
             <button
               type="button"
               onClick={() => void regenerate()}
-              disabled={busy || genStatus === "pending" || genStatus === "generating"}
+              disabled={busy || isGenerating}
               style={btnGhost}
               title="Mark for re-generation — VM cron will pick it up within ~1 min"
             >
-              {genStatus === "pending" || genStatus === "generating" ? "Queued…" : "Regenerate with AI"}
+              {isGenerating ? "Queued…" : "Regenerate with AI"}
             </button>
           </div>
         ) : null}
@@ -177,26 +182,33 @@ export function InsightsEditor({
         <div style={errorBox}>{error}</div>
       ) : null}
 
-      {adding ? (
-        <InsightForm
-          mode="create"
-          snapshotSlug={snapshotSlug}
-          nextPosition={(insights[insights.length - 1]?.position ?? -1) + 1}
-          onCancel={() => setAdding(false)}
-          onSaved={(ins) => { upsertLocal(ins); setAdding(false); }}
-          onError={setError}
-          busy={busy}
-          setBusy={setBusy}
-        />
-      ) : null}
+      {/* While Claude is generating, render only the banner above — no cards,
+          no add form, no empty-state line. They all reappear when status
+          flips to 'succeeded' or 'failed'. */}
+      {isGenerating ? null : (
+        <>
+          {adding ? (
+            <InsightForm
+              mode="create"
+              snapshotSlug={snapshotSlug}
+              nextPosition={(insights[insights.length - 1]?.position ?? -1) + 1}
+              onCancel={() => setAdding(false)}
+              onSaved={(ins) => { upsertLocal(ins); setAdding(false); }}
+              onError={setError}
+              busy={busy}
+              setBusy={setBusy}
+            />
+          ) : null}
 
-      {insights.length === 0 && !adding ? (
-        <p style={{ marginTop: 16, fontFamily: "var(--font-outfit), sans-serif", fontSize: 13, color: "var(--text-muted)" }}>
-          No insights authored for this snapshot yet.
-        </p>
-      ) : null}
+          {insights.length === 0 && !adding ? (
+            <p style={{ marginTop: 16, fontFamily: "var(--font-outfit), sans-serif", fontSize: 13, color: "var(--text-muted)" }}>
+              No insights authored for this snapshot yet.
+            </p>
+          ) : null}
+        </>
+      )}
 
-      <div className={styles.insGrid}>
+      <div className={styles.insGrid} style={{ display: isGenerating ? "none" : undefined }}>
         {insights.map((ins) => {
           const { card, tag } = classForTone(ins.tone);
           const isEditing = editingId === ins.id;

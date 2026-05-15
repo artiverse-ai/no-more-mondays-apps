@@ -100,8 +100,6 @@ export type CallRow = {
   // Cycle
   booking_to_close_days: number | null;
   first_call_to_close_days: number | null;
-  // Freshness
-  dbt_updated_at: string | null;
 };
 
 export type FilterOptions = {
@@ -187,7 +185,6 @@ function toCallRow(row: Record<string, unknown>): CallRow {
     deposit_collected: asNum(row.deposit_collected),
     booking_to_close_days: asNum(row.booking_to_close_days),
     first_call_to_close_days: asNum(row.first_call_to_close_days),
-    dbt_updated_at: asStr(row.dbt_updated_at),
   };
 }
 
@@ -208,8 +205,7 @@ const SELECT_LIST = `
   is_close_rate_eligible, is_deal, is_deposit, is_paid_in_full,
   is_canceled, is_canceled_by_prospect, is_rescheduled, is_ghosted,
   cash_collected, revenue_generated, deposit_collected,
-  booking_to_close_days, first_call_to_close_days,
-  dbt_updated_at
+  booking_to_close_days, first_call_to_close_days
 `;
 
 export async function getCalls(filter: CallsFilter): Promise<CallRow[]> {
@@ -589,15 +585,35 @@ export function medianFirstCallToClose(rows: CallRow[]): {
 }
 
 // =====================================================================
-// Freshness — latest dbt_updated_at across the rows. Server-side caller
-// passes the result to <DataFreshness>.
+// Freshness — `int_calls_enriched` doesn't carry a `dbt_updated_at`
+// column (it's an intermediate model, not a mart). Source freshness from
+// BigQuery's `__TABLES__` metadata instead so the <DataFreshness> pill
+// still has something accurate to show. Result is cached per-process
+// for 60 seconds so we don't hit metadata BQ on every page-load.
 // =====================================================================
 
-export function latestDbtUpdatedAt(rows: CallRow[]): string | null {
-  let latest: string | null = null;
-  for (const r of rows) {
-    if (!r.dbt_updated_at) continue;
-    if (!latest || r.dbt_updated_at > latest) latest = r.dbt_updated_at;
+let _freshnessCache: { value: string | null; expiresAt: number } | null = null;
+const FRESHNESS_TTL_MS = 60_000;
+
+export async function getCallsTableFreshness(): Promise<string | null> {
+  const now = Date.now();
+  if (_freshnessCache && _freshnessCache.expiresAt > now) {
+    return _freshnessCache.value;
   }
-  return latest;
+  try {
+    const [rows] = await bq().query({
+      query: `
+        SELECT TIMESTAMP_MILLIS(last_modified_time) AS last_modified
+        FROM \`no-more-mondays-analytics.dbt_tuddin.__TABLES__\`
+        WHERE table_id = 'int_calls_enriched'`,
+    });
+    const v = asStr(
+      (rows as Record<string, unknown>[])[0]?.last_modified,
+    );
+    _freshnessCache = { value: v, expiresAt: now + FRESHNESS_TTL_MS };
+    return v;
+  } catch {
+    _freshnessCache = { value: null, expiresAt: now + FRESHNESS_TTL_MS };
+    return null;
+  }
 }

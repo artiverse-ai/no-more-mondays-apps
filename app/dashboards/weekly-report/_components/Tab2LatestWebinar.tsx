@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import type { WebinarComparisonRowV2, MetaCampaignRow } from "@/lib/weekly-report-bq-v2";
+import { getResolvedSql, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
 import { ContextBannerEditor } from "./ContextBannerEditor";
+import { SqlInfoButton } from "./SqlInfoButton";
 import styles from "./report.module.css";
 
 const fmtInt = (n: number | null) => (n == null ? "—" : Math.round(n).toLocaleString());
@@ -20,6 +22,8 @@ export type Tab2LatestWebinarProps = {
   snapshotSlug: string;
   canEdit: boolean;
   contextBanner: { tag: string; title: string; body: string };
+  devMode?: boolean;
+  sqlCtx?: SqlCtx;
 };
 
 export function Tab2LatestWebinar({
@@ -29,12 +33,17 @@ export function Tab2LatestWebinar({
   snapshotSlug,
   canEdit,
   contextBanner,
+  devMode = false,
+  sqlCtx,
 }: Tab2LatestWebinarProps) {
   const headers = [
     webinars[0]?.webinarDate ?? "—",
     webinars[1]?.webinarDate ?? "—",
     webinars[2]?.webinarDate ?? "—",
   ];
+
+  const comparisonSql = devMode && sqlCtx ? getResolvedSql("webinarComparison", sqlCtx) : null;
+  const metaSql = devMode && sqlCtx ? getResolvedSql("metaCampaigns", sqlCtx) : null;
 
   return (
     <>
@@ -62,7 +71,7 @@ export function Tab2LatestWebinar({
 
       {/* 3. Top-of-Funnel Comparison */}
       <section className={styles.section}>
-        <div className={styles.sh}>Top-of-Funnel Comparison</div>
+        <div className={styles.sh}>Top-of-Funnel Comparison{comparisonSql ? <SqlInfoButton resolved={comparisonSql} /> : null}</div>
         <div className={styles.tw}>
           <table className={styles.ct}>
             <thead>
@@ -197,7 +206,7 @@ export function Tab2LatestWebinar({
       <ChannelMixTrend webinars={webinars} headers={headers} />
 
       {/* 6. Meta Campaigns */}
-      <MetaCampaignsTable campaigns={metaCampaigns} />
+      <MetaCampaignsTable campaigns={metaCampaigns} sqlInfo={metaSql} />
 
       {/* 7. Reactivation Funnel */}
       <ReactivationFunnel webinars={webinars} headers={headers} />
@@ -314,11 +323,11 @@ function ChannelMixTrend({ webinars, headers }: { webinars: WebinarComparisonRow
   );
 }
 
-function MetaCampaignsTable({ campaigns }: { campaigns: MetaCampaignRow[] }) {
+function MetaCampaignsTable({ campaigns, sqlInfo }: { campaigns: MetaCampaignRow[]; sqlInfo?: import("@/lib/dev-sql").ResolvedMetricSql | null }) {
   if (campaigns.length === 0) return null;
   return (
     <section className={styles.section}>
-      <div className={styles.sh}>Meta Campaigns — Promo Window</div>
+      <div className={styles.sh}>Meta Campaigns — Promo Window{sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}</div>
       <div className={styles.tw}>
         <table className={styles.dt}>
           <thead>

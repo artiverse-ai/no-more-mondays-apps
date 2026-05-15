@@ -145,7 +145,15 @@ export default async function Page({
         { id: "t6", label: "Sales Solutions" },
       ];
 
-  const sqlCtx = { kpiStart, kpiEnd };
+  const sqlCtx = {
+    kpiStart,
+    kpiEnd,
+    comparisonDates: compDates,
+    promoStart: promoWindow.start,
+    promoEnd: promoWindow.end,
+    priorWeekStart: isMonday ? priorWeekStart : undefined,
+    priorWeekEnd: isMonday ? priorWeekEnd : undefined,
+  };
   const sqlBundle = devMode && isAdmin ? getAllResolvedSql(sqlCtx) : "";
   const sqlFilename = `nmm-weekly-${slug}-${kpiStart}_${kpiEnd}.sql`;
 
@@ -159,6 +167,8 @@ export default async function Page({
         snapshotSlug={slug}
         canEdit={isAdmin}
         contextBanner={contextBanner}
+        devMode={devMode && isAdmin}
+        sqlCtx={sqlCtx}
       />
     ),
     t4ai: (
@@ -192,6 +202,8 @@ export default async function Page({
         setterOverall={setterOverall}
         setterByMode={setterByMode}
         bookingMode={bookingMode}
+        devMode={devMode && isAdmin}
+        sqlCtx={sqlCtx}
       />
     );
   }

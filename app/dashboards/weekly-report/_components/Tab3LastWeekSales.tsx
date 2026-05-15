@@ -6,7 +6,9 @@ import type {
   SetterByModeRow,
   BookingModeExtended,
 } from "@/lib/weekly-report-bq-v2";
+import { getResolvedSql, type MetricKey, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
+import { SqlInfoButton } from "./SqlInfoButton";
 import styles from "./report.module.css";
 
 const fmtInt = (n: number | null) => (n == null ? "—" : Math.round(n).toLocaleString());
@@ -28,25 +30,31 @@ export type Tab3LastWeekSalesProps = {
   setterOverall: SetterOverallRow[];   // §9.6 NEW
   setterByMode: SetterByModeRow[];     // §9.7
   bookingMode: BookingModeExtended[];  // §9.8
+  devMode?: boolean;
+  sqlCtx?: SqlCtx;
 };
 
 export function Tab3LastWeekSales(p: Tab3LastWeekSalesProps) {
+  const showSql = p.devMode && p.sqlCtx;
+  const sqlFor = (k: MetricKey) => (showSql ? getResolvedSql(k, p.sqlCtx!) : null);
   return (
     <>
-      <FunnelPlusKpis weekLabel={p.weekLabel} funnel={p.funnelData} money={p.sectionA} />
-      <WeekOverWeek thisWeek={p.thisWeek} priorWeek={p.priorWeek} />
-      <CloserOverallTable rows={p.closerOverall} />
-      <SetterOverallTable rows={p.setterOverall} />
-      <SetterByModeTable rows={p.setterByMode} />
-      <BookingModeTable rows={p.bookingMode} />
+      <FunnelPlusKpis weekLabel={p.weekLabel} funnel={p.funnelData} money={p.sectionA} sqlInfo={sqlFor("funnelProspects")} />
+      <WeekOverWeek thisWeek={p.thisWeek} priorWeek={p.priorWeek} sqlInfo={sqlFor("priorWeekFunnel")} />
+      <CloserOverallTable rows={p.closerOverall} sqlInfo={sqlFor("closerOverall")} />
+      <SetterOverallTable rows={p.setterOverall} sqlInfo={sqlFor("setterOverall")} />
+      <SetterByModeTable rows={p.setterByMode} sqlInfo={sqlFor("setterByMode")} />
+      <BookingModeTable rows={p.bookingMode} sqlInfo={sqlFor("bookingMode")} />
     </>
   );
 }
 
+type SqlInfo = import("@/lib/dev-sql").ResolvedMetricSql | null;
+
 // ----------------------------------------------------------------------------
 // §9.1 — Funnel + Money + Funnel Rates + Dollar Yield
 // ----------------------------------------------------------------------------
-function FunnelPlusKpis({ weekLabel, funnel, money }: { weekLabel: string; funnel: SectionCData; money: SectionAData }) {
+function FunnelPlusKpis({ weekLabel, funnel, money, sqlInfo }: { weekLabel: string; funnel: SectionCData; money: SectionAData; sqlInfo?: SqlInfo }) {
   const pros = funnel.prospects || 1;
   const stages = [
     { label: "Prospects", value: funnel.prospects, color: "var(--blue)", bg: "rgba(59,130,246,.06)", border: "rgba(59,130,246,.3)", tip: TIP.funnelProspects },
@@ -57,7 +65,7 @@ function FunnelPlusKpis({ weekLabel, funnel, money }: { weekLabel: string; funne
   ];
   return (
     <section className={styles.section}>
-      <div className={styles.sh}>Sales Funnel — {weekLabel}</div>
+      <div className={styles.sh}>Sales Funnel — {weekLabel}{sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}</div>
       <div className={styles.funnel}>
         {stages.map((s) => (
           <div key={s.label}>
@@ -104,7 +112,7 @@ function FunnelPlusKpis({ weekLabel, funnel, money }: { weekLabel: string; funne
 // ----------------------------------------------------------------------------
 // §9.4 — Week-over-Week comparison table
 // ----------------------------------------------------------------------------
-function WeekOverWeek({ thisWeek, priorWeek }: { thisWeek: SectionCData; priorWeek: SectionCData }) {
+function WeekOverWeek({ thisWeek, priorWeek, sqlInfo }: { thisWeek: SectionCData; priorWeek: SectionCData; sqlInfo?: SqlInfo }) {
   const dlt = (a: number | null, b: number | null): { abs: number | null; pct: number | null } => {
     if (a == null || b == null) return { abs: null, pct: null };
     const abs = a - b;
@@ -129,7 +137,7 @@ function WeekOverWeek({ thisWeek, priorWeek }: { thisWeek: SectionCData; priorWe
   };
   return (
     <section className={styles.section}>
-      <div className={styles.sh}>Week-over-Week Comparison</div>
+      <div className={styles.sh}>Week-over-Week Comparison{sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}</div>
       <div className={styles.tw}>
         <table className={styles.ct}>
           <thead>
@@ -172,7 +180,7 @@ function WeekOverWeek({ thisWeek, priorWeek }: { thisWeek: SectionCData; priorWe
 // ----------------------------------------------------------------------------
 // §9.5 — Closer Performance Overall (15 cols)
 // ----------------------------------------------------------------------------
-function CloserOverallTable({ rows }: { rows: CloserOverallExtended[] }) {
+function CloserOverallTable({ rows, sqlInfo }: { rows: CloserOverallExtended[]; sqlInfo?: SqlInfo }) {
   const totals = rows.reduce(
     (acc, r) => ({
       prospects: acc.prospects + r.prospects,
@@ -189,7 +197,7 @@ function CloserOverallTable({ rows }: { rows: CloserOverallExtended[] }) {
   );
   return (
     <section className={styles.section}>
-      <div className={styles.sh}>Closer Performance — Overall</div>
+      <div className={styles.sh}>Closer Performance — Overall{sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}</div>
       <div className={styles.tw}>
         <table className={styles.dt} style={{ fontSize: 11.5 }}>
           <thead>
@@ -259,10 +267,10 @@ function CloserOverallTable({ rows }: { rows: CloserOverallExtended[] }) {
 // ----------------------------------------------------------------------------
 // §9.6 — Setter Performance Overall (15 cols, NEW)
 // ----------------------------------------------------------------------------
-function SetterOverallTable({ rows }: { rows: SetterOverallRow[] }) {
+function SetterOverallTable({ rows, sqlInfo }: { rows: SetterOverallRow[]; sqlInfo?: SqlInfo }) {
   return (
     <section className={styles.section}>
-      <div className={styles.sh}>Setter Performance — Overall</div>
+      <div className={styles.sh}>Setter Performance — Overall{sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}</div>
       <div className={styles.tw}>
         <table className={styles.dt} style={{ fontSize: 11.5 }}>
           <thead>
@@ -314,7 +322,7 @@ function SetterOverallTable({ rows }: { rows: SetterOverallRow[] }) {
 // ----------------------------------------------------------------------------
 // §9.7 — Setter Performance by Booking Mode (page-width)
 // ----------------------------------------------------------------------------
-function SetterByModeTable({ rows }: { rows: SetterByModeRow[] }) {
+function SetterByModeTable({ rows, sqlInfo }: { rows: SetterByModeRow[]; sqlInfo?: SqlInfo }) {
   // Group rows by setter for row-spanned rendering
   const bySetter = new Map<string, SetterByModeRow[]>();
   for (const r of rows) {
@@ -324,7 +332,7 @@ function SetterByModeTable({ rows }: { rows: SetterByModeRow[] }) {
   }
   return (
     <section className={styles.section}>
-      <div className={styles.sh}>Setter Performance — by Booking Mode</div>
+      <div className={styles.sh}>Setter Performance — by Booking Mode{sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}</div>
       <div className={styles.tw}>
         <table className={styles.dt} style={{ fontSize: 11 }}>
           <thead>
@@ -399,10 +407,10 @@ function SetterByModeTable({ rows }: { rows: SetterByModeRow[] }) {
 // ----------------------------------------------------------------------------
 // §9.8 — Booking Mode Split (page-width, bottom)
 // ----------------------------------------------------------------------------
-function BookingModeTable({ rows }: { rows: BookingModeExtended[] }) {
+function BookingModeTable({ rows, sqlInfo }: { rows: BookingModeExtended[]; sqlInfo?: SqlInfo }) {
   return (
     <section className={styles.section}>
-      <div className={styles.sh}>Booking Mode Split</div>
+      <div className={styles.sh}>Booking Mode Split{sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}</div>
       <div className={styles.tw}>
         <table className={styles.dt} style={{ fontSize: 11.5 }}>
           <thead>

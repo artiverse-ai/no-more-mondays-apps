@@ -127,6 +127,184 @@ FROM ${ENRICHED}
 WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
   AND ${EMAIL_EXCLUSION}`;
 
+// Tab 2 — Latest Webinar comparison (3-webinar row set). @dates is an
+// ARRAY<STRING> of yyyy-mm-dd values; ${'\${dates_literal}'} is substituted
+// by the dev-sql resolver to "['2026-05-10','2026-05-06','2026-04-29']".
+export const SQL_WEBINAR_COMPARISON = `SELECT
+  FORMAT_DATE('%F', webinar_date) AS webinar_date,
+  webinar_day,
+  total_webinar_ad_spend, webinar_reg_ad_spend, webinar_hammer_them_ad_spend,
+  lp_page_views, lp_opt_ins, lp_opt_in_rate, lp_form_submissions,
+  total_registrants, meta_registrants, tiktok_registrants,
+  manychat_registrants, setter_registrants, other_organic_registrants,
+  unique_attendees, pitched_attendees, reg_to_attend_rate, attend_to_pitched_rate,
+  paid_cpr, blended_cpa, blended_cpbc, blended_cpbc_active,
+  blended_cost_per_show, blended_cost_per_qualified_show,
+  meta_impressions, meta_link_clicks, meta_ctr, meta_cvr, meta_cpl,
+  meta_reported_conversions,
+  calls_booked, calls_booked_active,
+  shows, qualified_shows, webinar_deposits, deals_closed,
+  cash_collected, deposit_collected, revenue_generated,
+  cash_collected_per_attendee, contract_value_per_attendee,
+  roas_cash, roas_cash_running, roas_revenue, cac,
+  reactivation_pool_size, reactivations_attended, reactivations_booked,
+  is_reactivation_data_available
+FROM ${MART_WEBINAR}
+WHERE webinar_date IN (SELECT DATE(d) FROM UNNEST(@dates) AS d)
+ORDER BY webinar_date DESC`;
+
+// Tab 2 — Per-campaign Meta data with Frequency.
+export const SQL_META_CAMPAIGNS = `SELECT
+  campaign_name, campaign_category,
+  SUM(spend_usd)                                            AS spend,
+  SUM(impressions)                                          AS impressions,
+  SUM(link_clicks)                                          AS link_clicks,
+  SAFE_DIVIDE(SUM(impressions), MAX(reach))                 AS frequency_window,
+  SUM(conversions)                                          AS conversions,
+  SAFE_DIVIDE(SUM(spend_usd), NULLIF(SUM(conversions), 0))  AS cpl,
+  SAFE_DIVIDE(SUM(link_clicks), NULLIF(SUM(impressions),0)) AS link_ctr,
+  SAFE_DIVIDE(SUM(conversions), NULLIF(SUM(link_clicks),0)) AS link_cvr
+FROM ${META_CAMPAIGNS}
+WHERE date_day BETWEEN DATE(@start) AND DATE(@end)
+  AND campaign_category IN ('webinar_registration', 'webinar_hammer_them')
+GROUP BY 1, 2
+ORDER BY spend DESC`;
+
+// Tab 3 — Closer Performance Overall (15-col extended; Monday §9.5).
+export const SQL_CLOSER_OVERALL = `SELECT
+  closer_owner,
+  COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
+  COUNT(DISTINCT IF(is_dispositioned,         prospect_email_lc, NULL))          AS prospects_dd,
+  COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
+  COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
+  COUNT(DISTINCT IF(is_show_rate_eligible,    prospect_email_lc, NULL))          AS prospects_sq,
+  COUNT(DISTINCT IF(is_show_up,               prospect_email_lc, NULL))          AS shows,
+  COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS qualified_shows,
+  COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
+  SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
+FROM ${ENRICHED}
+WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+  AND ${EMAIL_EXCLUSION}
+  AND closer_owner IS NOT NULL
+GROUP BY 1
+ORDER BY cash DESC`;
+
+// Tab 3 — Setter Performance Overall (Monday §9.6). Same shape, by setter_owner.
+export const SQL_SETTER_OVERALL = `SELECT
+  setter_owner,
+  COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
+  COUNT(DISTINCT IF(is_dispositioned,         prospect_email_lc, NULL))          AS prospects_dd,
+  COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
+  COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
+  COUNT(DISTINCT IF(is_show_rate_eligible,    prospect_email_lc, NULL))          AS prospects_sq,
+  COUNT(DISTINCT IF(is_show_up,               prospect_email_lc, NULL))          AS shows,
+  COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS qualified_shows,
+  COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
+  SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
+FROM ${ENRICHED}
+WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+  AND ${EMAIL_EXCLUSION}
+  AND setter_owner IS NOT NULL
+GROUP BY 1
+ORDER BY cash DESC`;
+
+// Tab 3 — Setter by Booking Mode (Monday §9.7). Joins to stg_ghl_form_submissions_flat
+// for the median time-to-book derivation.
+export const SQL_SETTER_BY_MODE = `WITH ghl_lead AS (
+    SELECT
+      LOWER(email)              AS prospect_email_lc,
+      DATE(MIN(created_at))     AS lead_created_date
+    FROM ${GHL_FORM_SUB}
+    WHERE email IS NOT NULL
+    GROUP BY 1
+  )
+  SELECT
+    c.setter_owner,
+    IF(c.is_setter_flow, 'Setter', IF(c.is_webinar_flow, 'Webinar', 'Other'))      AS mode,
+    COUNT(DISTINCT c.prospect_email_lc)                                            AS prospects,
+    COUNT(DISTINCT IF(c.is_dispositioned, c.prospect_email_lc, NULL))              AS prospects_dd,
+    COUNT(DISTINCT IF(c.call_outcome='Setter DQ', c.prospect_email_lc, NULL))      AS setter_dq,
+    COUNT(DISTINCT IF(c.call_outcome='Closer DQ', c.prospect_email_lc, NULL))      AS closer_dq,
+    COUNT(DISTINCT IF(c.is_show_rate_eligible, c.prospect_email_lc, NULL))         AS prospects_sq,
+    COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL))                    AS shows,
+    COUNT(DISTINCT IF(c.is_close_rate_eligible, c.prospect_email_lc, NULL))        AS qualified_shows,
+    COUNT(DISTINCT IF(c.is_deal, c.prospect_email_lc, NULL))                       AS deals,
+    SUM(IF(c.is_deal, c.cash_collected, 0))                                         AS cash,
+    APPROX_QUANTILES(
+      DATE_DIFF(DATE(c.calendly_created_ts, 'America/New_York'),
+                l.lead_created_date, DAY), 2
+    )[OFFSET(1)] AS median_time_to_book_days,
+    SAFE_DIVIDE(COUNT(DISTINCT IF(c.call_outcome='Setter DQ', c.prospect_email_lc, NULL)),
+                COUNT(DISTINCT IF(c.is_dispositioned, c.prospect_email_lc, NULL)))      AS setter_dq_rate,
+    SAFE_DIVIDE(COUNT(DISTINCT IF(c.call_outcome='Closer DQ', c.prospect_email_lc, NULL)),
+                COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)))            AS closer_dq_rate,
+    SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)),
+                COUNT(DISTINCT IF(c.is_show_rate_eligible, c.prospect_email_lc, NULL))) AS show_rate,
+    SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_close_rate_eligible AND c.is_deal, c.prospect_email_lc, NULL)),
+                COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)))            AS close_rate_shows,
+    SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_close_rate_eligible AND c.is_deal, c.prospect_email_lc, NULL)),
+                COUNT(DISTINCT IF(c.is_close_rate_eligible, c.prospect_email_lc, NULL))) AS close_rate_cq
+  FROM ${ENRICHED} c
+  LEFT JOIN ghl_lead l USING (prospect_email_lc)
+  WHERE DATE(c.appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+    AND c.setter_owner IS NOT NULL
+    AND c.prospect_email_lc NOT LIKE '%@nomoremondays.io%'
+    AND c.prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
+  GROUP BY 1, 2
+  ORDER BY setter_owner, mode`;
+
+// Tab 3 — Booking Mode Split (Monday §9.8). 3 rows: Webinar / Setter / Other.
+export const SQL_BOOKING_MODE = `SELECT
+  CASE
+    WHEN is_webinar_flow THEN 'Webinar Booked'
+    WHEN is_setter_flow  THEN 'Setter Booked'
+    ELSE 'Other'
+  END                                                                            AS booking_mode,
+  COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
+  COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL))                  AS prospects_dd,
+  COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
+  COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
+  COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))             AS prospects_sq,
+  COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL))                        AS shows,
+  COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))            AS qualified_shows,
+  COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL))                           AS deals,
+  SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
+  SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+              COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
+FROM ${ENRICHED}
+WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+  AND ${EMAIL_EXCLUSION}
+GROUP BY 1
+ORDER BY cash DESC`;
+
 // ============================================================================
 // SECTION 1 — PERSISTENT KPI STRIP (§2)
 // ============================================================================
@@ -463,28 +641,7 @@ export async function fetchWebinarComparisonV2(dates: string[]): Promise<Webinar
   if (dates.length === 0) return [];
   // Build a parameterized IN clause. BigQuery supports array params.
   const [rows] = await bq().query({
-    query: `SELECT
-        FORMAT_DATE('%F', webinar_date) AS webinar_date,
-        webinar_day,
-        total_webinar_ad_spend, webinar_reg_ad_spend, webinar_hammer_them_ad_spend,
-        lp_page_views, lp_opt_ins, lp_opt_in_rate, lp_form_submissions,
-        total_registrants, meta_registrants, tiktok_registrants,
-        manychat_registrants, setter_registrants, other_organic_registrants,
-        unique_attendees, pitched_attendees, reg_to_attend_rate, attend_to_pitched_rate,
-        paid_cpr, blended_cpa, blended_cpbc, blended_cpbc_active,
-        blended_cost_per_show, blended_cost_per_qualified_show,
-        meta_impressions, meta_link_clicks, meta_ctr, meta_cvr, meta_cpl,
-        meta_reported_conversions,
-        calls_booked, calls_booked_active,
-        shows, qualified_shows, webinar_deposits, deals_closed,
-        cash_collected, deposit_collected, revenue_generated,
-        cash_collected_per_attendee, contract_value_per_attendee,
-        roas_cash, roas_cash_running, roas_revenue, cac,
-        reactivation_pool_size, reactivations_attended, reactivations_booked,
-        is_reactivation_data_available
-      FROM ${MART_WEBINAR}
-      WHERE webinar_date IN (SELECT DATE(d) FROM UNNEST(@dates) AS d)
-      ORDER BY webinar_date DESC`,
+    query: SQL_WEBINAR_COMPARISON,
     params: { dates: dates.map((d) => d) },
     types: { dates: ["STRING"] },
   });
@@ -570,21 +727,7 @@ export type MetaCampaignRow = {
 /** §9 — per-campaign Meta data with Frequency. Promo window is caller-supplied. */
 export async function fetchMetaCampaigns(promoStart: string, promoEnd: string): Promise<MetaCampaignRow[]> {
   const [rows] = await bq().query({
-    query: `SELECT
-        campaign_name, campaign_category,
-        SUM(spend_usd)                                            AS spend,
-        SUM(impressions)                                          AS impressions,
-        SUM(link_clicks)                                          AS link_clicks,
-        SAFE_DIVIDE(SUM(impressions), MAX(reach))                 AS frequency_window,
-        SUM(conversions)                                          AS conversions,
-        SAFE_DIVIDE(SUM(spend_usd), NULLIF(SUM(conversions), 0))  AS cpl,
-        SAFE_DIVIDE(SUM(link_clicks), NULLIF(SUM(impressions),0)) AS link_ctr,
-        SAFE_DIVIDE(SUM(conversions), NULLIF(SUM(link_clicks),0)) AS link_cvr
-      FROM ${META_CAMPAIGNS}
-      WHERE date_day BETWEEN DATE(@start) AND DATE(@end)
-        AND campaign_category IN ('webinar_registration', 'webinar_hammer_them')
-      GROUP BY 1, 2
-      ORDER BY spend DESC`,
+    query: SQL_META_CAMPAIGNS,
     params: { start: promoStart, end: promoEnd },
     types: { start: "STRING", end: "STRING" },
   });
@@ -835,33 +978,7 @@ export type CloserOverallExtended = {
 export async function fetchCloserOverallExtended(prevSun: string, prevSat: string): Promise<CloserOverallExtended[]> {
   try {
   const [rows] = await bq().query({
-    query: `SELECT
-        closer_owner,
-        COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
-        COUNT(DISTINCT IF(is_dispositioned,         prospect_email_lc, NULL))          AS prospects_dd,
-        COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
-        COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
-        COUNT(DISTINCT IF(is_show_rate_eligible,    prospect_email_lc, NULL))          AS prospects_sq,
-        COUNT(DISTINCT IF(is_show_up,               prospect_email_lc, NULL))          AS shows,
-        COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS qualified_shows,
-        COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
-        SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
-      FROM ${ENRICHED}
-      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
-        AND ${EMAIL_EXCLUSION}
-        AND closer_owner IS NOT NULL
-      GROUP BY 1
-      ORDER BY cash DESC`,
+    query: SQL_CLOSER_OVERALL,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -897,33 +1014,7 @@ export type SetterOverallRow = CloserOverallExtended & { setterOwner: string };
 export async function fetchSetterOverall(prevSun: string, prevSat: string): Promise<SetterOverallRow[]> {
   try {
   const [rows] = await bq().query({
-    query: `SELECT
-        setter_owner,
-        COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
-        COUNT(DISTINCT IF(is_dispositioned,         prospect_email_lc, NULL))          AS prospects_dd,
-        COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
-        COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
-        COUNT(DISTINCT IF(is_show_rate_eligible,    prospect_email_lc, NULL))          AS prospects_sq,
-        COUNT(DISTINCT IF(is_show_up,               prospect_email_lc, NULL))          AS shows,
-        COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS qualified_shows,
-        COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
-        SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
-      FROM ${ENRICHED}
-      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
-        AND ${EMAIL_EXCLUSION}
-        AND setter_owner IS NOT NULL
-      GROUP BY 1
-      ORDER BY cash DESC`,
+    query: SQL_SETTER_OVERALL,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -983,48 +1074,7 @@ export async function fetchSetterByMode(prevSun: string, prevSat: string): Promi
   // carries `email` + `created_at` (raw_ghl.contacts has no analogue here).
   try {
   const [rows] = await bq().query({
-    query: `WITH ghl_lead AS (
-        SELECT
-          LOWER(email)              AS prospect_email_lc,
-          DATE(MIN(created_at))     AS lead_created_date
-        FROM ${GHL_FORM_SUB}
-        WHERE email IS NOT NULL
-        GROUP BY 1
-      )
-      SELECT
-        c.setter_owner,
-        IF(c.is_setter_flow, 'Setter', IF(c.is_webinar_flow, 'Webinar', 'Other'))      AS mode,
-        COUNT(DISTINCT c.prospect_email_lc)                                            AS prospects,
-        COUNT(DISTINCT IF(c.is_dispositioned, c.prospect_email_lc, NULL))              AS prospects_dd,
-        COUNT(DISTINCT IF(c.call_outcome='Setter DQ', c.prospect_email_lc, NULL))      AS setter_dq,
-        COUNT(DISTINCT IF(c.call_outcome='Closer DQ', c.prospect_email_lc, NULL))      AS closer_dq,
-        COUNT(DISTINCT IF(c.is_show_rate_eligible, c.prospect_email_lc, NULL))         AS prospects_sq,
-        COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL))                    AS shows,
-        COUNT(DISTINCT IF(c.is_close_rate_eligible, c.prospect_email_lc, NULL))        AS qualified_shows,
-        COUNT(DISTINCT IF(c.is_deal, c.prospect_email_lc, NULL))                       AS deals,
-        SUM(IF(c.is_deal, c.cash_collected, 0))                                         AS cash,
-        APPROX_QUANTILES(
-          DATE_DIFF(DATE(c.calendly_created_ts, 'America/New_York'),
-                    l.lead_created_date, DAY), 2
-        )[OFFSET(1)] AS median_time_to_book_days,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(c.call_outcome='Setter DQ', c.prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(c.is_dispositioned, c.prospect_email_lc, NULL)))      AS setter_dq_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(c.call_outcome='Closer DQ', c.prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)))            AS closer_dq_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(c.is_show_rate_eligible, c.prospect_email_lc, NULL))) AS show_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_close_rate_eligible AND c.is_deal, c.prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)))            AS close_rate_shows,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_close_rate_eligible AND c.is_deal, c.prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(c.is_close_rate_eligible, c.prospect_email_lc, NULL))) AS close_rate_cq
-      FROM ${ENRICHED} c
-      LEFT JOIN ghl_lead l USING (prospect_email_lc)
-      WHERE DATE(c.appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
-        AND c.setter_owner IS NOT NULL
-        AND c.prospect_email_lc NOT LIKE '%@nomoremondays.io%'
-        AND c.prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
-      GROUP BY 1, 2
-      ORDER BY setter_owner, mode`,
+    query: SQL_SETTER_BY_MODE,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -1062,36 +1112,7 @@ export type BookingModeExtended = CloserOverallExtended & { bookingMode: "Webina
 export async function fetchBookingModeExtended(prevSun: string, prevSat: string): Promise<BookingModeExtended[]> {
   try {
   const [rows] = await bq().query({
-    query: `SELECT
-        CASE
-          WHEN is_webinar_flow THEN 'Webinar Booked'
-          WHEN is_setter_flow  THEN 'Setter Booked'
-          ELSE 'Other'
-        END                                                                            AS booking_mode,
-        COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
-        COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL))                  AS prospects_dd,
-        COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
-        COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
-        COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))             AS prospects_sq,
-        COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL))                        AS shows,
-        COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))            AS qualified_shows,
-        COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL))                           AS deals,
-        SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
-        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
-                    COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
-      FROM ${ENRICHED}
-      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
-        AND ${EMAIL_EXCLUSION}
-      GROUP BY 1
-      ORDER BY cash DESC`,
+    query: SQL_BOOKING_MODE,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });

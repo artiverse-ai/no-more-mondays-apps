@@ -15,24 +15,45 @@
 import {
   SQL_AVG_WEBINAR_SHOW_RATE,
   SQL_BLENDED_CASH_ROAS,
+  SQL_BOOKING_MODE,
   SQL_CASH_PER_BOOKED_CALL,
+  SQL_CLOSER_OVERALL,
   SQL_FUC_CYCLE,
+  SQL_META_CAMPAIGNS,
   SQL_OCC_CYCLE,
   SQL_PCT_TIER_ONE_LEADS,
   SQL_SECTION_A_CASH,
   SQL_SECTION_A_HL,
   SQL_SECTION_B,
   SQL_SECTION_C,
+  SQL_SETTER_BY_MODE,
+  SQL_SETTER_OVERALL,
+  SQL_WEBINAR_COMPARISON,
 } from "./weekly-report-bq-v2";
 
-export type SqlCtx = { kpiStart: string; kpiEnd: string };
+export type SqlCtx = {
+  kpiStart: string;
+  kpiEnd: string;
+  // Tab 2 extras (Latest Webinar). Optional so Phase 1 callers can omit.
+  comparisonDates?: string[];   // 3 dates in YYYY-MM-DD order (latest first)
+  promoStart?: string;          // Meta campaign promo window start
+  promoEnd?: string;
+  // Tab 3 extras (Last Week's Sales, Monday only).
+  priorWeekStart?: string;
+  priorWeekEnd?: string;
+};
 
 export type SqlBlock = { label: string; sql: string };
+
+// Param value: either a plain string (will be inlined as a quoted BQ literal)
+// or `{ raw: string }` for values that already form a BQ expression — e.g.
+// an ARRAY literal like ['2026-05-10','2026-05-06'].
+export type SqlParamValue = string | { raw: string };
 
 export type MetricSqlEntry = {
   blocks: SqlBlock[];                  // one or more SQL queries
   derivation?: string;                  // for derived metrics (e.g. "Cash / Deals")
-  params: (ctx: SqlCtx) => Record<string, string>;
+  params: (ctx: SqlCtx) => Record<string, SqlParamValue>;
 };
 
 export type MetricKey =
@@ -79,7 +100,18 @@ export type MetricKey =
   | "dollarsCcPerPdd"
   | "dollarsCcPerShowsSq"
   | "dollarsTcvPerPdd"
-  | "dollarsTcvPerShowsSq";
+  | "dollarsTcvPerShowsSq"
+  // Tab 2 — Latest Webinar comparison (one SQL drives the entire table)
+  | "webinarComparison"
+  // Tab 2 — Meta campaigns table
+  | "metaCampaigns"
+  // Tab 3 — Last Week's Sales tables
+  | "closerOverall"
+  | "setterOverall"
+  | "setterByMode"
+  | "bookingMode"
+  // Tab 3 — prior-week funnel (for WoW comparison)
+  | "priorWeekFunnel";
 
 const kpiParams = (ctx: SqlCtx) => ({ start: ctx.kpiStart, end: ctx.kpiEnd });
 
@@ -189,7 +221,48 @@ export const METRIC_SQL: Record<MetricKey, MetricSqlEntry> = {
   dollarsCcPerShowsSq: { blocks: [{ label: "Section C funnel", sql: SQL_SECTION_C }], derivation: "cash_int_calls / shows_sq", params: kpiParams },
   dollarsTcvPerPdd: { blocks: [{ label: "Section C funnel", sql: SQL_SECTION_C }], derivation: "revenue / prospects_dd", params: kpiParams },
   dollarsTcvPerShowsSq: { blocks: [{ label: "Section C funnel", sql: SQL_SECTION_C }], derivation: "revenue / shows_sq", params: kpiParams },
+
+  // Tab 2 — Latest Webinar comparison ---------------------------------------
+  webinarComparison: {
+    blocks: [{ label: "3-Webinar comparison (mart_webinar_events)", sql: SQL_WEBINAR_COMPARISON }],
+    derivation: "One row per webinar in @dates. Every column on the Latest Webinar tab comes from this query.",
+    params: (ctx) => ({ dates: { raw: arrayLiteral(ctx.comparisonDates ?? []) } }),
+  },
+  metaCampaigns: {
+    blocks: [{ label: "Meta campaigns (Tab 2)", sql: SQL_META_CAMPAIGNS }],
+    derivation: "Promo-window aggregates per campaign — only webinar_registration + webinar_hammer_them categories.",
+    params: (ctx) => ({ start: ctx.promoStart ?? ctx.kpiStart, end: ctx.promoEnd ?? ctx.kpiEnd }),
+  },
+
+  // Tab 3 — Last Week's Sales tables ----------------------------------------
+  closerOverall: {
+    blocks: [{ label: "Closer Performance — Overall (Monday §9.5)", sql: SQL_CLOSER_OVERALL }],
+    params: kpiParams,
+  },
+  setterOverall: {
+    blocks: [{ label: "Setter Performance — Overall (Monday §9.6)", sql: SQL_SETTER_OVERALL }],
+    params: kpiParams,
+  },
+  setterByMode: {
+    blocks: [{ label: "Setter Performance — by Booking Mode (Monday §9.7)", sql: SQL_SETTER_BY_MODE }],
+    derivation: "Joins int_calls_enriched to stg_ghl_form_submissions_flat for time-to-book median.",
+    params: kpiParams,
+  },
+  bookingMode: {
+    blocks: [{ label: "Booking Mode Split (Monday §9.8)", sql: SQL_BOOKING_MODE }],
+    params: kpiParams,
+  },
+  priorWeekFunnel: {
+    blocks: [{ label: "Section C funnel — PRIOR Sun-Sat (for WoW)", sql: SQL_SECTION_C }],
+    derivation: "Re-runs the Section C funnel query on the prior Sun-Sat for WoW comparison.",
+    params: (ctx) => ({ start: ctx.priorWeekStart ?? ctx.kpiStart, end: ctx.priorWeekEnd ?? ctx.kpiEnd }),
+  },
 };
+
+// Format a JS string[] as a BQ ARRAY literal: ['2026-05-10','2026-05-06',...].
+function arrayLiteral(arr: string[]): string {
+  return `[${arr.map((s) => `'${s.replace(/'/g, "''")}'`).join(", ")}]`;
+}
 
 // Human-readable label for the modal title.
 const METRIC_LABEL: Record<MetricKey, string> = {
@@ -230,6 +303,13 @@ const METRIC_LABEL: Record<MetricKey, string> = {
   dollarsCcPerShowsSq: "$ (CC) / Shows (SQ)",
   dollarsTcvPerPdd: "$ (TCV) / Pros (D'd)",
   dollarsTcvPerShowsSq: "$ (TCV) / Shows (SQ)",
+  webinarComparison: "Latest Webinar — 3-Webinar Comparison",
+  metaCampaigns: "Meta Campaigns (Tab 2)",
+  closerOverall: "Closer Performance — Overall",
+  setterOverall: "Setter Performance — Overall",
+  setterByMode: "Setter Performance — by Booking Mode",
+  bookingMode: "Booking Mode Split",
+  priorWeekFunnel: "Section C funnel — PRIOR week (WoW)",
 };
 
 export function getMetricLabel(k: MetricKey): string {
@@ -238,11 +318,13 @@ export function getMetricLabel(k: MetricKey): string {
 
 // Replace @param placeholders with BQ literals. DATE wrappers in the
 // template (e.g. `DATE(@start)`) survive intact — only the @param slot
-// gets substituted to a quoted string literal.
-export function resolveSql(template: string, params: Record<string, string>): string {
+// gets substituted. Plain strings become quoted BQ literals; `{ raw }`
+// values are inlined verbatim (used for ARRAY[...] etc.).
+export function resolveSql(template: string, params: Record<string, SqlParamValue>): string {
   return template.replace(/@(\w+)/g, (whole, name) => {
     const v = params[name];
     if (v == null) return whole;
+    if (typeof v === "object" && "raw" in v) return v.raw;
     return `'${v.replace(/'/g, "''")}'`;
   });
 }

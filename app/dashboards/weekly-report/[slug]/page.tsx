@@ -12,6 +12,10 @@ import {
   fetchSectionC,
   fetchWebinarComparisonV2,
   fetchMetaCampaigns,
+  fetchCloserOverallExtended,
+  fetchSetterOverall,
+  fetchSetterByMode,
+  fetchBookingModeExtended,
   comparisonDatesForMode,
   metaPromoWindow,
 } from "@/lib/weekly-report-bq-v2";
@@ -21,6 +25,7 @@ import { PersistentKpiStrip } from "../_components/PersistentKpiStrip";
 import { SolutionsTab } from "../_components/SolutionsTab";
 import { Tab1Overview } from "../_components/Tab1Overview";
 import { Tab2LatestWebinar } from "../_components/Tab2LatestWebinar";
+import { Tab3LastWeekSales } from "../_components/Tab3LastWeekSales";
 import { Tabs } from "../_components/Tabs";
 import { TooltipLayer } from "../_components/Tooltip";
 import styles from "../_components/report.module.css";
@@ -57,18 +62,42 @@ export default async function Page({
   // Promo window for the Meta campaigns table — 4 days ending on latest.
   const promoWindow = metaPromoWindow(latestWebinarDate, reportType);
 
-  // Parallel fetch of every data source the dashboard needs.
-  const [kpiStrip, sectionA, sectionC, webinars, metaCampaigns, insights, mktSolutions, salesSolutions] =
-    await Promise.all([
-      fetchKpiStrip(kpiStart, kpiEnd),
-      fetchSectionA(kpiStart, kpiEnd),
-      fetchSectionC(kpiStart, kpiEnd),
-      fetchWebinarComparisonV2(compDates),
-      fetchMetaCampaigns(promoWindow.start, promoWindow.end),
-      listInsights(slug),
-      listSolutions(slug, "marketing").catch(() => []),
-      listSolutions(slug, "sales").catch(() => []),
-    ]);
+  // Prior week (Sun-Sat) for WoW comparison — Monday only fetches this.
+  const priorWeekStart = addDays(kpiStart, -7);
+  const priorWeekEnd = addDays(kpiEnd, -7);
+  const isMonday = reportType === "weekly_recap";
+
+  // Parallel fetch of every data source the dashboard needs. Monday adds
+  // the Tab 3 fetchers; Thursday skips them.
+  const [
+    kpiStrip,
+    sectionA,
+    sectionC,
+    webinars,
+    metaCampaigns,
+    insights,
+    mktSolutions,
+    salesSolutions,
+    priorWeekFunnel,
+    closerOverall,
+    setterOverall,
+    setterByMode,
+    bookingMode,
+  ] = await Promise.all([
+    fetchKpiStrip(kpiStart, kpiEnd),
+    fetchSectionA(kpiStart, kpiEnd),
+    fetchSectionC(kpiStart, kpiEnd),
+    fetchWebinarComparisonV2(compDates),
+    fetchMetaCampaigns(promoWindow.start, promoWindow.end),
+    listInsights(slug),
+    listSolutions(slug, "marketing").catch(() => []),
+    listSolutions(slug, "sales").catch(() => []),
+    isMonday ? fetchSectionC(priorWeekStart, priorWeekEnd) : Promise.resolve(null),
+    isMonday ? fetchCloserOverallExtended(kpiStart, kpiEnd) : Promise.resolve([]),
+    isMonday ? fetchSetterOverall(kpiStart, kpiEnd) : Promise.resolve([]),
+    isMonday ? fetchSetterByMode(kpiStart, kpiEnd) : Promise.resolve([]),
+    isMonday ? fetchBookingModeExtended(kpiStart, kpiEnd) : Promise.resolve([]),
+  ]);
 
   // Section B needs the KPI strip values (Cash/Booked, Show Rate, CPL) — compute after.
   const sectionB = await fetchSectionBData(kpiStart, kpiEnd, kpiStrip);
@@ -88,27 +117,28 @@ export default async function Page({
     body: snapshot.contextBody ?? "",
   };
 
-  // Tab definitions. Per user requirement, Marketing + Sales Solutions
-  // tabs are preserved on BOTH report types (not Monday-only as the
-  // raw spec would suggest). Monday's "Last Week's Sales" tab is a
-  // follow-up phase.
+  // Tab definitions. Monday's full layout per monday_report_build_guide.md §8:
+  // 6 tabs (Overview / Latest Webinar / Last Week's Sales / AI Insights /
+  // Marketing Solutions / Sales Solutions). Thursday: 5 tabs (no Last
+  // Week's Sales — sales for the Wed cycle aren't in yet). Solutions
+  // tabs preserved on both per user feedback memory.
   type TabDef = { id: string; label: string };
-  const tabs: TabDef[] =
-    reportType === "weekly_recap"
-      ? [
-          { id: "t1", label: "Overview" },
-          { id: "t2", label: "Latest Webinar" },
-          { id: "t3", label: "AI Strategic Insights" },
-          { id: "t5", label: "Marketing Solutions" },
-          { id: "t6", label: "Sales Solutions" },
-        ]
-      : [
-          { id: "t1", label: "Overview" },
-          { id: "t2", label: "Latest Webinar (Wed)" },
-          { id: "t3", label: "AI Strategic Insights" },
-          { id: "t5", label: "Marketing Solutions" },
-          { id: "t6", label: "Sales Solutions" },
-        ];
+  const tabs: TabDef[] = isMonday
+    ? [
+        { id: "t1", label: "Overview" },
+        { id: "t2", label: "Latest Webinar" },
+        { id: "t3sales", label: "Last Week's Sales" },
+        { id: "t4ai", label: "AI Strategic Insights" },
+        { id: "t5", label: "Marketing Solutions" },
+        { id: "t6", label: "Sales Solutions" },
+      ]
+    : [
+        { id: "t1", label: "Overview" },
+        { id: "t2", label: "Latest Webinar (Wed)" },
+        { id: "t4ai", label: "AI Strategic Insights" },
+        { id: "t5", label: "Marketing Solutions" },
+        { id: "t6", label: "Sales Solutions" },
+      ];
 
   const panels: Record<string, React.ReactNode> = {
     t1: <Tab1Overview weekLabel={weekLabel} sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} />,
@@ -122,7 +152,7 @@ export default async function Page({
         contextBanner={contextBanner}
       />
     ),
-    t3: (
+    t4ai: (
       <>
         <div className={styles.aiBadge}>
           🤖 Generated by AI · Claude · {snapshot.insightsGeneratedAt?.slice(0, 10) ?? "—"}
@@ -139,6 +169,23 @@ export default async function Page({
       </>
     ),
   };
+
+  // Monday-only Tab 3 — Last Week's Sales.
+  if (isMonday && priorWeekFunnel) {
+    panels.t3sales = (
+      <Tab3LastWeekSales
+        weekLabel={snapshot.weekLabel}
+        funnelData={sectionC}
+        thisWeek={sectionC}
+        priorWeek={priorWeekFunnel}
+        sectionA={sectionA}
+        closerOverall={closerOverall}
+        setterOverall={setterOverall}
+        setterByMode={setterByMode}
+        bookingMode={bookingMode}
+      />
+    );
+  }
   // Solutions tabs render on BOTH Monday + Thursday per user requirement
   // (preserved across the v2 refactor — see feedback memory).
   panels.t5 = (

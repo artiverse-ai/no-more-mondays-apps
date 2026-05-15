@@ -139,8 +139,8 @@ function SectionC({ data }: { data: SectionCData }) {
   const stages = [
     { label: "Prospects", value: data.prospects, color: "var(--blue)", bgColor: "rgba(59,130,246,.06)", borderColor: "rgba(59,130,246,.3)" },
     { label: "Prospects (SQ)", value: data.prospectsSq, color: "var(--blue)", bgColor: "rgba(59,130,246,.05)", borderColor: "rgba(59,130,246,.25)" },
-    { label: "Shows (SQ)", value: data.showsSq, color: "var(--green)", bgColor: "rgba(16,185,129,.06)", borderColor: "rgba(16,185,129,.3)" },
-    { label: "Shows (CQ)", value: data.showsCq, color: "var(--amber)", bgColor: "rgba(245,158,11,.06)", borderColor: "rgba(245,158,11,.3)" },
+    { label: "Shows", value: data.showsSq, color: "var(--green)", bgColor: "rgba(16,185,129,.06)", borderColor: "rgba(16,185,129,.3)" },
+    { label: "Qualified Shows", value: data.showsCq, color: "var(--amber)", bgColor: "rgba(245,158,11,.06)", borderColor: "rgba(245,158,11,.3)" },
     { label: "Deals", value: data.deals, color: "var(--purple)", bgColor: "rgba(139,92,246,.07)", borderColor: "rgba(139,92,246,.3)" },
   ];
   return (
@@ -177,10 +177,11 @@ function SectionC({ data }: { data: SectionCData }) {
 
       <div className={styles.sh} style={{ marginTop: 8 }}>Funnel Rates</div>
       <div className={styles.kpiGridMini}>
-        <MiniCard emoji="📊" label="Show Rate" value={fmtPct(data.showRate)} change="Shows (SQ) / Pros (SQ)" />
-        <MiniCard emoji="🎯" label="Close Rate (CQ)" value={fmtPct(data.closeRate)} change="Deals / Shows (CQ)" />
+        <MiniCard emoji="📈" label="Show Rate" value={fmtPct(data.showRate)} change="Shows / Pros (SQ)" />
+        <MiniCard emoji="🎯" label="Close Rate (Shows)" value={fmtPct(data.closeRateShows)} change="Deals / Shows" />
+        <MiniCard emoji="🎯" label="Close Rate (CQ)" value={fmtPct(data.closeRate)} change="Deals / Qualified Shows" />
         <MiniCard emoji="🚫" label="Setter DQ Rate" value={fmtPct(data.setterDqRate)} change="Setter DQ / Pros (D'd)" />
-        <MiniCard emoji="🚫" label="Closer DQ Rate" value={fmtPct(data.closerDqRate)} change="Closer DQ / Shows (SQ)" />
+        <MiniCard emoji="🚫" label="Closer DQ Rate" value={fmtPct(data.closerDqRate)} change="Closer DQ / Shows" />
       </div>
 
       <div className={styles.sh} style={{ marginTop: 8 }}>Prospect Efficiency (D'd → Downstream)</div>

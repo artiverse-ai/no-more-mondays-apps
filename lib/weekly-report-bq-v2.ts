@@ -305,29 +305,30 @@ export async function fetchSectionB(prevSun: string, prevSat: string, kpiStrip: 
 // ============================================================================
 
 export type SectionCData = {
-  // Funnel counts (§5.1)
+  // Funnel counts (§5.1 / Monday §6.1)
   prospects: number;
   prospectsDd: number;       // Pros (D'd)
   setterDq: number;
   closerDq: number;
   prospectsSq: number;       // Pros (SQ)
-  showsSq: number;
-  showsCq: number;
+  showsSq: number;           // Shows (renamed display label on Monday)
+  showsCq: number;           // Qualified Shows (renamed display label on Monday)
   deals: number;
   cashIntCalls: number;      // Cash from int_calls_enriched (NOT Fanbasis; used for $/X ratios only)
   revenue: number;
-  // Rates (§5.2–5.5) — derived
-  showRate: number | null;
-  closeRate: number | null;
-  setterDqRate: number | null;
-  closerDqRate: number | null;
-  // Efficiency (§5.6–5.11) — derived
-  ddToCq: number | null;       // §5.6 Shows (CQ) / Pros (D'd)
-  ddToClose: number | null;    // §5.7 Deals / Pros (D'd)
-  dollarsCcPerPdd: number | null; // §5.8 Cash / Pros (D'd)
-  dollarsCcPerShowsSq: number | null; // §5.9 Cash / Shows (SQ)
-  dollarsTcvPerPdd: number | null; // §5.10 TCV / Pros (D'd)
-  dollarsTcvPerShowsSq: number | null; // §5.11 TCV / Shows (SQ)
+  // Rates — derived
+  showRate: number | null;            // §5.2 / Monday §6.2
+  closeRate: number | null;           // Close Rate (CQ) = Deals / Qualified Shows — §5.3 / Monday §6.4
+  closeRateShows: number | null;      // NEW (Monday §6.3) — Deals / Shows (broader denominator)
+  setterDqRate: number | null;        // §5.4 / Monday §6.5
+  closerDqRate: number | null;        // §5.5 / Monday §6.6 — Closer DQ / Shows (NOT / Qualified Shows)
+  // Efficiency — derived
+  ddToCq: number | null;              // Qualified Shows / Pros (D'd) — Monday §6.7
+  ddToClose: number | null;           // Deals / Pros (D'd) — Monday §6.8
+  dollarsCcPerPdd: number | null;     // Cash / Pros (D'd) — Monday §6.9
+  dollarsCcPerShowsSq: number | null; // Cash / Shows — Monday §6.10
+  dollarsTcvPerPdd: number | null;    // TCV / Pros (D'd) — Monday §6.11
+  dollarsTcvPerShowsSq: number | null; // TCV / Shows — Monday §6.12
 };
 
 export async function fetchSectionC(prevSun: string, prevSat: string): Promise<SectionCData> {
@@ -363,25 +364,27 @@ export async function fetchSectionC(prevSun: string, prevSat: string): Promise<S
 
   return {
     prospects, prospectsDd, setterDq, closerDq, prospectsSq, showsSq, showsCq, deals, cashIntCalls, revenue,
-    // §5.2 Show Rate = Shows (SQ) / Pros (SQ)
+    // Show Rate = Shows / Pros (SQ)
     showRate: prospectsSq > 0 ? showsSq / prospectsSq : null,
-    // §5.3 Close Rate = Deals attended / Shows (CQ)
+    // Close Rate (CQ) = Deals / Qualified Shows
     closeRate: showsCq > 0 ? deals / showsCq : null,
-    // §5.4 Setter DQ Rate = Setter DQ / Pros (D'd)
+    // Close Rate (Shows) = Deals / Shows (broader denominator) — Monday §6.3
+    closeRateShows: showsSq > 0 ? deals / showsSq : null,
+    // Setter DQ Rate = Setter DQ / Pros (D'd)
     setterDqRate: prospectsDd > 0 ? setterDq / prospectsDd : null,
-    // §5.5 Closer DQ Rate = Closer DQ / Shows (SQ)
+    // Closer DQ Rate = Closer DQ / Shows (broader denominator per Monday §6.6)
     closerDqRate: showsSq > 0 ? closerDq / showsSq : null,
-    // §5.6 D'd → CQ
+    // D'd → Qualified Shows
     ddToCq: prospectsDd > 0 ? showsCq / prospectsDd : null,
-    // §5.7 D'd → Close
+    // D'd → Close
     ddToClose: prospectsDd > 0 ? deals / prospectsDd : null,
-    // §5.8 Dollars (CC) / Pros (D'd)
+    // Dollars (CC) / Pros (D'd)
     dollarsCcPerPdd: prospectsDd > 0 ? cashIntCalls / prospectsDd : null,
-    // §5.9 Dollars (CC) / Shows (SQ)
+    // Dollars (CC) / Shows
     dollarsCcPerShowsSq: showsSq > 0 ? cashIntCalls / showsSq : null,
-    // §5.10 Dollars (TCV) / Pros (D'd)
+    // Dollars (TCV) / Pros (D'd)
     dollarsTcvPerPdd: prospectsDd > 0 ? revenue / prospectsDd : null,
-    // §5.11 Dollars (TCV) / Shows (SQ)
+    // Dollars (TCV) / Shows
     dollarsTcvPerShowsSq: showsSq > 0 ? revenue / showsSq : null,
   };
 }
@@ -774,3 +777,298 @@ export function metaPromoWindow(latest: string, mode: "weekly_recap" | "midweek_
     ? { start: addDays(latest, -3), end: latest }   // Thu→Sun
     : { start: addDays(latest, -3), end: latest };  // Sun→Wed (also 4 days)
 }
+
+// ============================================================================
+// SECTION 9 — MONDAY TAB 3: Last Week's Sales (per monday spec §9)
+// ============================================================================
+
+/**
+ * Extended Closer Performance — 15-col output including all rate columns.
+ * Per Monday §9.5. Same SQL as fetchCloserOverallV2 but with all rates.
+ */
+export type CloserOverallExtended = {
+  closerOwner: string;
+  prospects: number;
+  prospectsDd: number;
+  setterDq: number;
+  setterDqRate: number | null;
+  closerDq: number;
+  closerDqRate: number | null;
+  prospectsSq: number;
+  shows: number;             // renamed from showsSq
+  showRate: number | null;
+  qualifiedShows: number;     // renamed from showsCq
+  closeRateShows: number | null;
+  closeRateCq: number | null;
+  deals: number;
+  cash: number;
+};
+
+export async function fetchCloserOverallExtended(prevSun: string, prevSat: string): Promise<CloserOverallExtended[]> {
+  const [rows] = await bq().query({
+    query: `SELECT
+        closer_owner,
+        COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
+        COUNT(DISTINCT IF(is_dispositioned,         prospect_email_lc, NULL))          AS prospects_dd,
+        COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
+        COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
+        COUNT(DISTINCT IF(is_show_rate_eligible,    prospect_email_lc, NULL))          AS prospects_sq,
+        COUNT(DISTINCT IF(is_show_up,               prospect_email_lc, NULL))          AS shows,
+        COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS qualified_shows,
+        COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
+        SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
+      FROM ${ENRICHED}
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+        AND ${EMAIL_EXCLUSION}
+        AND closer_owner IS NOT NULL
+      GROUP BY 1
+      ORDER BY cash DESC`,
+    params: { start: prevSun, end: prevSat },
+    types: { start: "STRING", end: "STRING" },
+  });
+  return (rows as Record<string, unknown>[]).map((r) => ({
+    closerOwner: String(r.closer_owner ?? ""),
+    prospects: num(r.prospects),
+    prospectsDd: num(r.prospects_dd),
+    setterDq: num(r.setter_dq),
+    setterDqRate: nNull(r.setter_dq_rate),
+    closerDq: num(r.closer_dq),
+    closerDqRate: nNull(r.closer_dq_rate),
+    prospectsSq: num(r.prospects_sq),
+    shows: num(r.shows),
+    showRate: nNull(r.show_rate),
+    qualifiedShows: num(r.qualified_shows),
+    closeRateShows: nNull(r.close_rate_shows),
+    closeRateCq: nNull(r.close_rate_cq),
+    deals: num(r.deals),
+    cash: num(r.cash),
+  }));
+}
+
+/**
+ * Setter Performance — Overall (NEW per Monday §9.6). Same 15-col shape as
+ * Closer Overall but grouped by setter_owner.
+ */
+export type SetterOverallRow = CloserOverallExtended & { setterOwner: string };
+
+export async function fetchSetterOverall(prevSun: string, prevSat: string): Promise<SetterOverallRow[]> {
+  const [rows] = await bq().query({
+    query: `SELECT
+        setter_owner,
+        COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
+        COUNT(DISTINCT IF(is_dispositioned,         prospect_email_lc, NULL))          AS prospects_dd,
+        COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
+        COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
+        COUNT(DISTINCT IF(is_show_rate_eligible,    prospect_email_lc, NULL))          AS prospects_sq,
+        COUNT(DISTINCT IF(is_show_up,               prospect_email_lc, NULL))          AS shows,
+        COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS qualified_shows,
+        COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
+        SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
+      FROM ${ENRICHED}
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+        AND ${EMAIL_EXCLUSION}
+        AND setter_owner IS NOT NULL
+      GROUP BY 1
+      ORDER BY cash DESC`,
+    params: { start: prevSun, end: prevSat },
+    types: { start: "STRING", end: "STRING" },
+  });
+  return (rows as Record<string, unknown>[]).map((r) => ({
+    setterOwner: String(r.setter_owner ?? ""),
+    closerOwner: String(r.setter_owner ?? ""), // dummy to satisfy type extension
+    prospects: num(r.prospects),
+    prospectsDd: num(r.prospects_dd),
+    setterDq: num(r.setter_dq),
+    setterDqRate: nNull(r.setter_dq_rate),
+    closerDq: num(r.closer_dq),
+    closerDqRate: nNull(r.closer_dq_rate),
+    prospectsSq: num(r.prospects_sq),
+    shows: num(r.shows),
+    showRate: nNull(r.show_rate),
+    qualifiedShows: num(r.qualified_shows),
+    closeRateShows: nNull(r.close_rate_shows),
+    closeRateCq: nNull(r.close_rate_cq),
+    deals: num(r.deals),
+    cash: num(r.cash),
+  }));
+}
+
+/**
+ * Setter Performance — by Booking Mode (per Monday §9.7). Adds Mode column,
+ * median time-to-book days (joined to GHL lead-created date), and combined
+ * bonus status. Each setter has TWO rows (Setter + Webinar) plus a combined
+ * `.div-row` summary line.
+ */
+export type SetterByModeRow = {
+  setterOwner: string;
+  mode: "Setter" | "Webinar" | "Other";
+  prospects: number;
+  prospectsDd: number;
+  setterDq: number;
+  setterDqRate: number | null;
+  closerDq: number;
+  closerDqRate: number | null;
+  prospectsSq: number;
+  shows: number;
+  showRate: number | null;
+  qualifiedShows: number;
+  closeRateShows: number | null;
+  closeRateCq: number | null;
+  deals: number;
+  cash: number;
+  medianTimeToBookDays: number | null;
+};
+
+export async function fetchSetterByMode(prevSun: string, prevSat: string): Promise<SetterByModeRow[]> {
+  // Note: spec §9.7 joins to raw_ghl.contacts but that's outside dbt_tuddin.
+  // We use stg_ghl_weekly_webinar_regs (already in dbt_tuddin) which carries email + created_date.
+  const [rows] = await bq().query({
+    query: `WITH ghl_lead AS (
+        SELECT
+          LOWER(email)      AS prospect_email_lc,
+          MIN(created_date) AS lead_created_date
+        FROM ${GHL_REGS}
+        WHERE email IS NOT NULL
+        GROUP BY 1
+      )
+      SELECT
+        c.setter_owner,
+        IF(c.is_setter_flow, 'Setter', IF(c.is_webinar_flow, 'Webinar', 'Other'))      AS mode,
+        COUNT(DISTINCT c.prospect_email_lc)                                            AS prospects,
+        COUNT(DISTINCT IF(c.is_dispositioned, c.prospect_email_lc, NULL))              AS prospects_dd,
+        COUNT(DISTINCT IF(c.call_outcome='Setter DQ', c.prospect_email_lc, NULL))      AS setter_dq,
+        COUNT(DISTINCT IF(c.call_outcome='Closer DQ', c.prospect_email_lc, NULL))      AS closer_dq,
+        COUNT(DISTINCT IF(c.is_show_rate_eligible, c.prospect_email_lc, NULL))         AS prospects_sq,
+        COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL))                    AS shows,
+        COUNT(DISTINCT IF(c.is_close_rate_eligible, c.prospect_email_lc, NULL))        AS qualified_shows,
+        COUNT(DISTINCT IF(c.is_deal, c.prospect_email_lc, NULL))                       AS deals,
+        SUM(IF(c.is_deal, c.cash_collected, 0))                                         AS cash,
+        APPROX_QUANTILES(
+          DATE_DIFF(DATE(c.calendly_created_ts, 'America/New_York'),
+                    l.lead_created_date, DAY), 2
+        )[OFFSET(1)] AS median_time_to_book_days,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(c.call_outcome='Setter DQ', c.prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(c.is_dispositioned, c.prospect_email_lc, NULL)))      AS setter_dq_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(c.call_outcome='Closer DQ', c.prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)))            AS closer_dq_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(c.is_show_rate_eligible, c.prospect_email_lc, NULL))) AS show_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_close_rate_eligible AND c.is_deal, c.prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(c.is_show_up, c.prospect_email_lc, NULL)))            AS close_rate_shows,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(c.is_close_rate_eligible AND c.is_deal, c.prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(c.is_close_rate_eligible, c.prospect_email_lc, NULL))) AS close_rate_cq
+      FROM ${ENRICHED} c
+      LEFT JOIN ghl_lead l USING (prospect_email_lc)
+      WHERE DATE(c.appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+        AND c.setter_owner IS NOT NULL
+        AND c.prospect_email_lc NOT LIKE '%@nomoremondays.io%'
+        AND c.prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
+      GROUP BY 1, 2
+      ORDER BY setter_owner, mode`,
+    params: { start: prevSun, end: prevSat },
+    types: { start: "STRING", end: "STRING" },
+  });
+  return (rows as Record<string, unknown>[]).map((r) => ({
+    setterOwner: String(r.setter_owner ?? ""),
+    mode: String(r.mode ?? "Other") as SetterByModeRow["mode"],
+    prospects: num(r.prospects),
+    prospectsDd: num(r.prospects_dd),
+    setterDq: num(r.setter_dq),
+    setterDqRate: nNull(r.setter_dq_rate),
+    closerDq: num(r.closer_dq),
+    closerDqRate: nNull(r.closer_dq_rate),
+    prospectsSq: num(r.prospects_sq),
+    shows: num(r.shows),
+    showRate: nNull(r.show_rate),
+    qualifiedShows: num(r.qualified_shows),
+    closeRateShows: nNull(r.close_rate_shows),
+    closeRateCq: nNull(r.close_rate_cq),
+    deals: num(r.deals),
+    cash: num(r.cash),
+    medianTimeToBookDays: nNull(r.median_time_to_book_days),
+  }));
+}
+
+/**
+ * Booking Mode Split — 15-col output per Monday §9.8 (extended over §11.4).
+ * 3 rows: Webinar Booked / Setter Booked / Other.
+ */
+export type BookingModeExtended = CloserOverallExtended & { bookingMode: "Webinar Booked" | "Setter Booked" | "Other" };
+
+export async function fetchBookingModeExtended(prevSun: string, prevSat: string): Promise<BookingModeExtended[]> {
+  const [rows] = await bq().query({
+    query: `SELECT
+        CASE
+          WHEN is_webinar_flow THEN 'Webinar Booked'
+          WHEN is_setter_flow  THEN 'Setter Booked'
+          ELSE 'Other'
+        END                                                                            AS booking_mode,
+        COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
+        COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL))                  AS prospects_dd,
+        COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
+        COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
+        COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))             AS prospects_sq,
+        COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL))                        AS shows,
+        COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))            AS qualified_shows,
+        COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL))                           AS deals,
+        SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS closer_dq_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_rate_eligible, prospect_email_lc, NULL))) AS show_rate,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_show_up, prospect_email_lc, NULL)))            AS close_rate_shows,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_close_rate_eligible AND is_deal, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))) AS close_rate_cq
+      FROM ${ENRICHED}
+      WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+        AND ${EMAIL_EXCLUSION}
+      GROUP BY 1
+      ORDER BY cash DESC`,
+    params: { start: prevSun, end: prevSat },
+    types: { start: "STRING", end: "STRING" },
+  });
+  return (rows as Record<string, unknown>[]).map((r) => ({
+    bookingMode: String(r.booking_mode ?? "Other") as BookingModeExtended["bookingMode"],
+    closerOwner: String(r.booking_mode ?? ""),
+    prospects: num(r.prospects),
+    prospectsDd: num(r.prospects_dd),
+    setterDq: num(r.setter_dq),
+    setterDqRate: nNull(r.setter_dq_rate),
+    closerDq: num(r.closer_dq),
+    closerDqRate: nNull(r.closer_dq_rate),
+    prospectsSq: num(r.prospects_sq),
+    shows: num(r.shows),
+    showRate: nNull(r.show_rate),
+    qualifiedShows: num(r.qualified_shows),
+    closeRateShows: nNull(r.close_rate_shows),
+    closeRateCq: nNull(r.close_rate_cq),
+    deals: num(r.deals),
+    cash: num(r.cash),
+  }));
+}
+
+// Note: Tab 3 money cards reuse `fetchSectionA` directly — same data,
+// different rendering. No new fetcher needed.

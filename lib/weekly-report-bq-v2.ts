@@ -23,7 +23,7 @@ const MART_HL_DAILY = `\`${PROJECT}.dbt_tuddin.mart_high_level_daily\``;
 const ENRICHED = `\`${PROJECT}.dbt_tuddin.int_calls_enriched\``;
 const FANBASIS = `\`${PROJECT}.dbt_tuddin.stg_fanbasis_sales\``;
 const META_CAMPAIGNS = `\`${PROJECT}.dbt_tuddin.stg_meta_campaigns\``;
-const GHL_REGS = `\`${PROJECT}.dbt_tuddin.stg_ghl_weekly_webinar_regs\``;
+const GHL_FORM_SUB = `\`${PROJECT}.dbt_tuddin.stg_ghl_form_submissions_flat\``;
 
 // Internal email exclusion fragment used in every int_calls_enriched / stg_calendly query.
 const EMAIL_EXCLUSION = `prospect_email_lc NOT LIKE '%@nomoremondays.io%' AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')`;
@@ -689,9 +689,10 @@ export async function fetchSetterPerformanceV2(prevSun: string, prevSat: string)
   const [rows] = await bq().query({
     query: `WITH ghl_lead AS (
         SELECT
-          LOWER(email)      AS prospect_email_lc,
-          MIN(created_date) AS lead_created_date
-        FROM ${GHL_REGS}
+          LOWER(email)              AS prospect_email_lc,
+          DATE(MIN(created_at))     AS lead_created_date
+        FROM ${GHL_FORM_SUB}
+        WHERE email IS NOT NULL
         GROUP BY 1
       ),
       per_setter_mode AS (
@@ -805,6 +806,7 @@ export type CloserOverallExtended = {
 };
 
 export async function fetchCloserOverallExtended(prevSun: string, prevSat: string): Promise<CloserOverallExtended[]> {
+  try {
   const [rows] = await bq().query({
     query: `SELECT
         closer_owner,
@@ -853,6 +855,10 @@ export async function fetchCloserOverallExtended(prevSun: string, prevSat: strin
     deals: num(r.deals),
     cash: num(r.cash),
   }));
+  } catch (err) {
+    console.error("[weekly-report-bq-v2] fetchCloserOverallExtended failed:", err);
+    return [];
+  }
 }
 
 /**
@@ -862,6 +868,7 @@ export async function fetchCloserOverallExtended(prevSun: string, prevSat: strin
 export type SetterOverallRow = CloserOverallExtended & { setterOwner: string };
 
 export async function fetchSetterOverall(prevSun: string, prevSat: string): Promise<SetterOverallRow[]> {
+  try {
   const [rows] = await bq().query({
     query: `SELECT
         setter_owner,
@@ -911,6 +918,10 @@ export async function fetchSetterOverall(prevSun: string, prevSat: string): Prom
     deals: num(r.deals),
     cash: num(r.cash),
   }));
+  } catch (err) {
+    console.error("[weekly-report-bq-v2] fetchSetterOverall failed:", err);
+    return [];
+  }
 }
 
 /**
@@ -941,13 +952,15 @@ export type SetterByModeRow = {
 
 export async function fetchSetterByMode(prevSun: string, prevSat: string): Promise<SetterByModeRow[]> {
   // Note: spec §9.7 joins to raw_ghl.contacts but that's outside dbt_tuddin.
-  // We use stg_ghl_weekly_webinar_regs (already in dbt_tuddin) which carries email + created_date.
+  // We use stg_ghl_form_submissions_flat (already in dbt_tuddin) which
+  // carries `email` + `created_at` (raw_ghl.contacts has no analogue here).
+  try {
   const [rows] = await bq().query({
     query: `WITH ghl_lead AS (
         SELECT
-          LOWER(email)      AS prospect_email_lc,
-          MIN(created_date) AS lead_created_date
-        FROM ${GHL_REGS}
+          LOWER(email)              AS prospect_email_lc,
+          DATE(MIN(created_at))     AS lead_created_date
+        FROM ${GHL_FORM_SUB}
         WHERE email IS NOT NULL
         GROUP BY 1
       )
@@ -1007,6 +1020,10 @@ export async function fetchSetterByMode(prevSun: string, prevSat: string): Promi
     cash: num(r.cash),
     medianTimeToBookDays: nNull(r.median_time_to_book_days),
   }));
+  } catch (err) {
+    console.error("[weekly-report-bq-v2] fetchSetterByMode failed:", err);
+    return [];
+  }
 }
 
 /**
@@ -1016,6 +1033,7 @@ export async function fetchSetterByMode(prevSun: string, prevSat: string): Promi
 export type BookingModeExtended = CloserOverallExtended & { bookingMode: "Webinar Booked" | "Setter Booked" | "Other" };
 
 export async function fetchBookingModeExtended(prevSun: string, prevSat: string): Promise<BookingModeExtended[]> {
+  try {
   const [rows] = await bq().query({
     query: `SELECT
         CASE
@@ -1068,6 +1086,10 @@ export async function fetchBookingModeExtended(prevSun: string, prevSat: string)
     deals: num(r.deals),
     cash: num(r.cash),
   }));
+  } catch (err) {
+    console.error("[weekly-report-bq-v2] fetchBookingModeExtended failed:", err);
+    return [];
+  }
 }
 
 // Note: Tab 3 money cards reuse `fetchSectionA` directly — same data,

@@ -8,38 +8,98 @@ type SopEntry = {
   description: string;
 };
 
-const SOPS: SopEntry[] = [
+type SopGroup = { title: string; sops: SopEntry[] };
+
+const SOP_GROUPS: SopGroup[] = [
   {
-    href: "/sops/how-to-read-capacity-dashboard",
-    external: false,
-    title: "How to read the capacity dashboard",
-    audience: "Ops · Sales managers",
-    description:
-      "What each chart and number on the team-availability dashboard means, how to filter, and what to do when something looks off.",
+    title: "Reporting dashboards",
+    sops: [
+      {
+        href: "/sops/weekly-report",
+        external: false,
+        title: "Weekly Report — Monday recap & Thursday midweek",
+        audience: "Leadership · Marketing · Sales",
+        description:
+          "How the two report formats differ, how to create a snapshot, what each tab covers, the AI insights pipeline, and Dev Mode for surfacing the exact SQL.",
+      },
+      {
+        href: "/sops/high-level-dashboard",
+        external: false,
+        title: "High-Level (CEO) dashboard",
+        audience: "CEO · Leadership",
+        description:
+          "Daily marketing + sales + sales-cycle rollup. The pre-standup scan: cash, TCV, ad spend, ROAS, OCC/FUC cycle times.",
+      },
+      {
+        href: "/sops/sales-performance-dashboard",
+        external: false,
+        title: "Sales (Closer) Performance dashboard",
+        audience: "Sales managers · CEO",
+        description:
+          "Every call rolled up by closer with cross-filters for source / setter / outcome / OCC·FUC. Δ-vs-prior pills on every KPI.",
+      },
+      {
+        href: "/sops/setter-performance-dashboard",
+        external: false,
+        title: "Setter Performance dashboard",
+        audience: "Sales managers · Setters",
+        description:
+          "Same call data, setter perspective. Show rate, Setter DQ rate, cash per booking, and the $300/week bonus eligibility view.",
+      },
+      {
+        href: "/sops/webinar-performance-dashboard",
+        external: false,
+        title: "Webinar Performance dashboard",
+        audience: "Marketing · CEO",
+        description:
+          "Per-webinar breakdown of every Sun + Wed event since launch. Spend, registration, attendance, bookings, cash, ROAS — plus the drill-down to a single webinar.",
+      },
+    ],
   },
   {
-    href: "/sops/closer-calendar-management",
-    external: false,
-    title: "Calendar management for closers",
-    audience: "Closers",
-    description:
-      "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week.",
-  },
-  {
-    href: "/sops/new-closer-joins",
-    external: false,
-    title: "When a new closer joins",
-    audience: "Ops",
-    description:
-      "The walkthrough for adding a new closer: get their calendar shared, add them to the active list, verify they appear in the dashboard.",
-  },
-  {
-    href: "/sops/closer-removed",
-    external: false,
-    title: "When a closer is removed",
-    audience: "Ops",
-    description:
-      "How to cleanly remove a closer from the booking system without breaking attribution, and what to do with their in-flight calls.",
+    title: "Sales ops tooling",
+    sops: [
+      {
+        href: "/sops/how-to-read-capacity-dashboard",
+        external: false,
+        title: "How to read the capacity dashboard",
+        audience: "Ops · Sales managers",
+        description:
+          "What each chart and number on the team-availability dashboard means, how to filter, and what to do when something looks off.",
+      },
+      {
+        href: "/sops/funnel-search",
+        external: false,
+        title: "Funnel Search",
+        audience: "Sales ops · Marketing",
+        description:
+          "Find Calendly bookings by funnel tag, then narrow by closer / host / status. The fast way to trace one deal end-to-end.",
+      },
+      {
+        href: "/sops/closer-calendar-management",
+        external: false,
+        title: "Calendar management for closers",
+        audience: "Closers",
+        description:
+          "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week.",
+      },
+      {
+        href: "/sops/new-closer-joins",
+        external: false,
+        title: "When a new closer joins",
+        audience: "Ops",
+        description:
+          "The walkthrough for adding a new closer: get their calendar shared, add them to the active list, verify they appear in the dashboard.",
+      },
+      {
+        href: "/sops/closer-removed",
+        external: false,
+        title: "When a closer is removed",
+        audience: "Ops",
+        description:
+          "How to cleanly remove a closer from the booking system without breaking attribution, and what to do with their in-flight calls.",
+      },
+    ],
   },
 ];
 
@@ -111,9 +171,18 @@ export default function SopsIndexPage() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 gap-3">
-        {SOPS.map((sop) => (
-          <Card key={sop.href} sop={sop} />
+      <div className="space-y-8">
+        {SOP_GROUPS.map((group) => (
+          <section key={group.title}>
+            <h2 className="sop-h2" style={{ marginBottom: 12, fontSize: 18 }}>
+              {group.title}
+            </h2>
+            <div className="grid grid-cols-1 gap-3">
+              {group.sops.map((sop) => (
+                <Card key={sop.href} sop={sop} />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
 

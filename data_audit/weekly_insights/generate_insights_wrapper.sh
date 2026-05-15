@@ -2,11 +2,13 @@
 # Wrapper for the weekly-insights generator. Sources secrets, uses the
 # venv python, logs to ~/data_audit/logs/weekly_insights.log.
 #
-# Cron entry (every minute):
-#   * * * * * /home/$USER/no-more-mondays-apps/data_audit/weekly_insights/generate_insights_wrapper.sh
+# Cron-launched every minute (* * * * *). Inside each minute, the wrapper
+# polls BQ every 10 seconds for up to ~55 seconds so a snapshot created at
+# t=03s is picked up by t≤13s instead of waiting up to 60s for the next
+# cron tick. flock guards against parallel runs across cron ticks.
 #
-# Or call directly to test:
-#   bash generate_insights_wrapper.sh
+# Cron entry:
+#   * * * * * /home/$USER/nmm-insights/data_audit/weekly_insights/generate_insights_wrapper.sh
 
 set -euo pipefail
 
@@ -14,9 +16,7 @@ USER_HOME="/home/${USER:-$(whoami)}"
 LOG="$USER_HOME/data_audit/logs/weekly_insights.log"
 SECRETS="$USER_HOME/.slack_secrets"
 
-# Repo layout: this script lives at <repo>/data_audit/weekly_insights/.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SCRIPT="$SCRIPT_DIR/generate_insights.py"
 
 VENV_PYTHON="$USER_HOME/data_audit/venv/bin/python3"
@@ -27,7 +27,8 @@ fi
 
 mkdir -p "$(dirname "$LOG")"
 
-# Use a lock so two cron ticks don't overlap (each generation can take 30-120s).
+# Lock: one wrapper instance per VM. Subsequent cron ticks during a long
+# Claude call will see the lock and exit immediately with "SKIP".
 LOCK="$USER_HOME/data_audit/.weekly_insights.lock"
 exec 9>"$LOCK"
 if ! flock -n 9; then
@@ -35,7 +36,6 @@ if ! flock -n 9; then
   exit 0
 fi
 
-# Secrets file holds CLAUDE_CODE_OAUTH_TOKEN, BQ_PROJECT, etc.
 # shellcheck disable=SC1090
 [ -f "$SECRETS" ] && source "$SECRETS"
 
@@ -44,10 +44,20 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
   exit 3
 fi
 
-echo "$(date -u +%FT%TZ) START weekly_insights" >> "$LOG"
-set +e
-"$VENV_PYTHON" "$SCRIPT" >> "$LOG" 2>&1
-RC=$?
-set -e
-echo "$(date -u +%FT%TZ) END   weekly_insights rc=$RC" >> "$LOG"
-exit "$RC"
+# Poll for the rest of this cron minute. Each iteration calls the
+# Python script which itself returns within seconds when nothing is
+# pending. If Claude is invoked, the iteration can take 30-180s; in that
+# case the loop naturally exits at the next bound check.
+END=$((SECONDS + 55))
+while [ "$SECONDS" -lt "$END" ]; do
+  echo "$(date -u +%FT%TZ) START weekly_insights" >> "$LOG"
+  set +e
+  "$VENV_PYTHON" "$SCRIPT" >> "$LOG" 2>&1
+  RC=$?
+  set -e
+  echo "$(date -u +%FT%TZ) END   weekly_insights rc=$RC" >> "$LOG"
+  # Sleep 10s between checks unless we're past the budget.
+  if [ "$SECONDS" -lt "$END" ]; then
+    sleep 10
+  fi
+done

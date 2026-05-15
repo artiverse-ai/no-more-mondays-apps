@@ -4,7 +4,7 @@
 // via CREATE TABLE IF NOT EXISTS — no manual migration needed.
 
 import crypto from "node:crypto";
-import { bq, table } from "./bq";
+import { BQ_DATASET, BQ_PROJECT, bq, table } from "./bq";
 
 export type ReportType = "weekly_recap" | "midweek_check";
 export type InsightsGenStatus = "pending" | "generating" | "succeeded" | "failed";
@@ -51,6 +51,34 @@ const INSIGHTS = table("weekly_report_insights");
 let _ready = false;
 async function ensure(): Promise<void> {
   if (_ready) return;
+
+  // BigQuery counts CREATE/ALTER TABLE statements against the per-table
+  // "table modification operations" daily quota (~1,500/day) — even when
+  // they're no-ops (IF NOT EXISTS already satisfied). With many serverless
+  // cold starts per day, blindly re-running the schema migration burned
+  // that quota and broke the dashboard.
+  //
+  // Free guard: INFORMATION_SCHEMA.TABLES is a metadata read that does
+  // not count against the modification quota. If both tables already
+  // exist, we set _ready and skip everything else.
+  try {
+    const [existing] = await bq().query({
+      query: `SELECT table_name
+              FROM \`${BQ_PROJECT}.${BQ_DATASET}.INFORMATION_SCHEMA.TABLES\`
+              WHERE table_name IN ('weekly_report_snapshots', 'weekly_report_insights')`,
+    });
+    const names = new Set((existing as { table_name: string }[]).map((r) => r.table_name));
+    if (names.has("weekly_report_snapshots") && names.has("weekly_report_insights")) {
+      _ready = true;
+      return;
+    }
+  } catch {
+    // Fall through to full migration on any metadata read failure.
+  }
+
+  // Full migration path — only runs on a genuinely fresh environment.
+  // Adding new columns later requires a one-off ALTER from an admin
+  // script (data_audit/weekly_insights/* has examples), not this runtime path.
   await bq().query({
     query: `CREATE TABLE IF NOT EXISTS ${SNAPSHOTS} (
       slug STRING NOT NULL,
@@ -64,6 +92,9 @@ async function ensure(): Promise<void> {
       context_tag STRING,
       context_title STRING,
       context_body STRING,
+      tab2_narrative_tag STRING,
+      tab2_narrative_title STRING,
+      tab2_narrative_body STRING,
       insights_generation_status STRING,
       insights_generated_at TIMESTAMP,
       insights_generation_error STRING,
@@ -71,16 +102,6 @@ async function ensure(): Promise<void> {
       updated_at TIMESTAMP,
       deleted_at TIMESTAMP
     )`,
-  });
-  // For tables created before these columns existed, add them idempotently.
-  await bq().query({
-    query: `ALTER TABLE ${SNAPSHOTS}
-      ADD COLUMN IF NOT EXISTS insights_generation_status STRING,
-      ADD COLUMN IF NOT EXISTS insights_generated_at TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS insights_generation_error STRING,
-      ADD COLUMN IF NOT EXISTS tab2_narrative_tag STRING,
-      ADD COLUMN IF NOT EXISTS tab2_narrative_title STRING,
-      ADD COLUMN IF NOT EXISTS tab2_narrative_body STRING`,
   });
   await bq().query({
     query: `CREATE TABLE IF NOT EXISTS ${INSIGHTS} (
@@ -96,10 +117,7 @@ async function ensure(): Promise<void> {
       deleted_at TIMESTAMP
     )`,
   });
-  // BigQuery enforces ~1,500 table-update operations per table per day.
-  // We previously seeded on every cold start which burned that quota fast
-  // (14 MERGE statements x N cold starts). Now we only seed when the
-  // snapshots table is genuinely empty — typical case is a fresh dev env.
+  // Seed on a truly empty snapshots table only.
   const [seedCheck] = await bq().query({
     query: `SELECT COUNT(*) AS n FROM ${SNAPSHOTS} WHERE deleted_at IS NULL`,
   });

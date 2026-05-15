@@ -27,7 +27,7 @@ const COLUMNS: Array<{
   { key: "prospects_sq", label: "SQ", align: "right" },
   { key: "shows_sq", label: "Shows", align: "right" },
   { key: "show_rate", label: "Show %", align: "right" },
-  { key: "shows_cq", label: "CQ Shows", align: "right" },
+  { key: "shows_cq", label: "Qualified Shows", align: "right" },
   { key: "closer_dq", label: "Closer DQ", align: "right" },
   { key: "deals", label: "Deals", align: "right" },
   { key: "cash", label: "Cash", align: "right" },

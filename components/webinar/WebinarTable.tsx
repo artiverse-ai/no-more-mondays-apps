@@ -49,7 +49,7 @@ const COLUMNS: Column[] = [
   { key: "pitched_attendees", label: "Pitched", align: "right", metric: "pitched_attendees", format: "int" },
   { key: "calls_booked", label: "Booked", align: "right", metric: "calls_booked", format: "int" },
   { key: "shows", label: "Shows", align: "right", metric: "shows", format: "int" },
-  { key: "qualified_shows", label: "CQ Shows", align: "right", metric: "qualified_shows", format: "int" },
+  { key: "qualified_shows", label: "Qualified Shows", align: "right", metric: "qualified_shows", format: "int" },
   { key: "deals_closed", label: "Deals", align: "right", metric: "deals_closed", format: "int" },
   { key: "webinar_deposits", label: "Deposits", align: "right", metric: "webinar_deposits", format: "int" },
 
@@ -231,7 +231,18 @@ function renderCell(c: Column, v: unknown, row: WebinarEvent): React.ReactNode {
     );
   }
 
-  if (v == null) return <span className="text-muted-foreground/60">—</span>;
+  if (v == null) {
+    // Explain WHY this cell is empty instead of leaving a mute dash.
+    const reason = nullReason(c.key as string, row);
+    return (
+      <span
+        className="text-muted-foreground/60"
+        title={reason}
+      >
+        —
+      </span>
+    );
+  }
 
   switch (c.format) {
     case "money":
@@ -246,10 +257,35 @@ function renderCell(c: Column, v: unknown, row: WebinarEvent): React.ReactNode {
       return fmt.pct(v as number);
     case "ratio": {
       const n = v as number;
-      const cls = n >= 1 ? "font-semibold text-accent" : "";
+      const cls =
+        n >= 1
+          ? "font-semibold text-accent"
+          : "font-medium text-alert-orange"; // <1× is underperforming, not "grayed" — call it out.
       return <span className={cls}>{fmt.ratio(n)}</span>;
     }
     default:
       return String(v);
   }
+}
+
+// Human-readable explanation of why a cell is empty. The big offenders
+// are ROAS / CAC / cost-per-* on legacy webinars (Fanbasis didn't exist)
+// and the in-progress latest Sunday (booking window still open).
+function nullReason(columnKey: string, row: WebinarEvent): string {
+  const roasLike =
+    columnKey === "roas_cash" ||
+    columnKey === "roas_revenue" ||
+    columnKey === "roas_cash_running" ||
+    columnKey === "cac" ||
+    columnKey === "blended_cost_per_qualified_show" ||
+    columnKey === "blended_cost_per_show" ||
+    columnKey === "blended_cpbc_active";
+
+  if (row.is_legacy && roasLike) {
+    return "Not available — legacy webinar (Fanbasis coverage starts mid-2025, so Live ROAS / CAC can't be computed for pre-2025 events).";
+  }
+  if (roasLike) {
+    return "Not yet available — webinar is in progress (booking window still open) or upstream mart hasn't computed this column yet.";
+  }
+  return "No value available for this webinar.";
 }

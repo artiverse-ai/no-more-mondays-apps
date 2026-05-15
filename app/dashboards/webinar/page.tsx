@@ -25,9 +25,11 @@ import { ViewTabs } from "@/components/ui/view-tabs";
 import { parseViewTab } from "@/lib/view-tabs";
 import { GRANS_WEBINAR, parseGranularity } from "@/lib/granularity";
 
+// Per-webinar table first (default) — Overview is secondary. The team
+// reads the table most often when they open the dashboard cold.
 const VIEW_OPTIONS = [
-  { key: "overview", label: "Overview" },
   { key: "table", label: "Per-webinar table" },
+  { key: "overview", label: "Overview" },
 ];
 
 export const dynamic = "force-dynamic";
@@ -50,7 +52,7 @@ export default async function WebinarDashboardPage(
   const sort = pickStr(sp.sort, "webinar_date");
   const dir: "asc" | "desc" = pickStr(sp.dir, "desc") === "asc" ? "asc" : "desc";
   const gran = parseGranularity(sp.gran, GRANS_WEBINAR, "webinar");
-  const view = parseViewTab(sp.view, VIEW_OPTIONS, "overview");
+  const view = parseViewTab(sp.view, VIEW_OPTIONS, "table");
 
   const [all, user, devMode] = await Promise.all([
     getWebinars(),
@@ -91,7 +93,7 @@ export default async function WebinarDashboardPage(
       .at(-1) ?? null;
 
   return (
-    <main className="mx-auto max-w-7xl space-y-8 p-4 md:p-8 lg:p-10">
+    <main className="mx-auto max-w-7xl space-y-6 p-3 sm:p-4 md:p-8 lg:p-10">
       {/* Hero */}
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-8">
         <div className="flex flex-col gap-1">
@@ -130,18 +132,20 @@ export default async function WebinarDashboardPage(
         </div>
       </header>
 
-      {/* Setter-DQ note on the new `shows` column (PR #43) — HIG callout */}
-      <p className="rounded-xl border border-alert-orange/30 bg-alert-orange/5 px-4 py-2.5 text-[12px] leading-relaxed text-foreground">
-        <strong className="font-semibold text-alert-orange">Heads-up:</strong>{" "}
-        <code className="rounded bg-alert-orange/10 px-1 py-0.5 font-mono">
-          shows
-        </code>{" "}
-        now excludes Setter DQs (PR #43 fix). Historical values may be smaller
-        than the pre-2026-04-19 &ldquo;Calls Held&rdquo; you remember — this is
-        a bug fix, not a regression. Click the{" "}
-        <code className="rounded bg-muted/60 px-1 py-0.5 font-mono">i</code>{" "}
-        next to any metric for the formula.
-      </p>
+      {/* Executive view hides developer-facing methodology notes; flip
+          devMode in the breadcrumb to see them. */}
+      {devMode ? (
+        <p className="rounded-xl border border-alert-orange/30 bg-alert-orange/5 px-4 py-2.5 text-[12px] leading-relaxed text-foreground">
+          <strong className="font-semibold text-alert-orange">Dev note:</strong>{" "}
+          <code className="rounded bg-alert-orange/10 px-1 py-0.5 font-mono">
+            shows
+          </code>{" "}
+          excludes Setter DQs (PR #43 fix). Historical values may be smaller
+          than pre-2026-04-19 &ldquo;Calls Held&rdquo;. Hover any{" "}
+          <code className="rounded bg-muted/60 px-1 py-0.5 font-mono">i</code>{" "}
+          for the formula.
+        </p>
+      ) : null}
 
       {/* View tabs — sit above filters so users see what they're toggling */}
       <ViewTabs

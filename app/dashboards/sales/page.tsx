@@ -131,7 +131,7 @@ export default async function SalesDashboardPage(
   }
 
   return (
-    <main className="mx-auto max-w-7xl space-y-6 p-4 md:p-8 lg:p-10">
+    <main className="mx-auto max-w-7xl space-y-6 p-3 sm:p-4 md:p-8 lg:p-10">
       {/* Hero */}
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
         <div className="flex flex-col gap-1">
@@ -364,7 +364,7 @@ function OverviewTab({
           <FunnelCell label="Canceled" value={funnel.canceled} delta={delta(funnel.canceled, funnelPrior.canceled)} tone="red" />
           <FunnelCell label="Shows (SQ)" value={funnel.shows_sq} delta={delta(funnel.shows_sq, funnelPrior.shows_sq)} />
           <FunnelCell label="Closer DQ" value={funnel.closer_dq} delta={delta(funnel.closer_dq, funnelPrior.closer_dq)} tone="yellow" />
-          <FunnelCell label="CQ Shows" value={funnel.shows_cq} delta={delta(funnel.shows_cq, funnelPrior.shows_cq)} />
+          <FunnelCell label="Qualified Shows" value={funnel.shows_cq} delta={delta(funnel.shows_cq, funnelPrior.shows_cq)} />
           <FunnelCell label="Deposits" value={funnel.deposits} delta={delta(funnel.deposits, funnelPrior.deposits)} tone="blue" />
           <FunnelCell label="Deals" value={funnel.deals} delta={delta(funnel.deals, funnelPrior.deals)} tone="green" />
         </div>

@@ -25,7 +25,7 @@ const COLUMNS: Array<{
   { key: "dispositioned", label: "Disposed", align: "right" },
   { key: "prospects_sq", label: "SQ", align: "right" },
   { key: "shows_sq", label: "Shows", align: "right" },
-  { key: "shows_cq", label: "CQ Shows", align: "right" },
+  { key: "shows_cq", label: "Qualified Shows", align: "right" },
   { key: "deposits", label: "Deposits", align: "right" },
   { key: "deals", label: "Deals", align: "right" },
   { key: "close_rate", label: "Close %", align: "right" },

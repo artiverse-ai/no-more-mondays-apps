@@ -34,6 +34,13 @@ VALID_TONES = {"ctx", "win", "watch", "flag", "fix", "fwd"}
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 CLAUDE_TIMEOUT_SEC = int(os.environ.get("CLAUDE_TIMEOUT_SEC", "300"))
 
+# Model selection. Haiku is ~3x faster than Sonnet for structured-JSON
+# output like ours and the quality is sufficient for "produce 12 insight
+# cards citing specific numbers". Fallback to Sonnet on overload so we
+# never come back empty-handed during heavy load.
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "haiku")
+CLAUDE_FALLBACK_MODEL = os.environ.get("CLAUDE_FALLBACK_MODEL", "sonnet")
+
 
 def _log(msg: str) -> None:
     print(msg, flush=True)
@@ -71,8 +78,16 @@ def run_claude(prompt: str) -> str:
         raise RuntimeError(
             "CLAUDE_CODE_OAUTH_TOKEN env var is not set — claude -p will fail."
         )
-    cmd = [CLAUDE_BIN, "-p", prompt, "--output-format", "text"]
-    _log(f"Calling: {CLAUDE_BIN} -p <…{len(prompt)} chars…> --output-format text")
+    cmd = [
+        CLAUDE_BIN, "-p", prompt,
+        "--output-format", "text",
+        "--model", CLAUDE_MODEL,
+        "--fallback-model", CLAUDE_FALLBACK_MODEL,
+    ]
+    _log(
+        f"Calling: {CLAUDE_BIN} -p <…{len(prompt)} chars…> "
+        f"--model {CLAUDE_MODEL} (fallback {CLAUDE_FALLBACK_MODEL})"
+    )
     proc = subprocess.run(
         cmd,
         capture_output=True,

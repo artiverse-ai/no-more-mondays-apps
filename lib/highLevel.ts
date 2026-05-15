@@ -74,6 +74,7 @@ export type CeoKpis = {
   aov: number | null;
   acv: number | null;
   pifRate: number | null;
+  cashCollectionRate: number | null; // totalCashCollected / totalRevenueContracted
 };
 
 export type ResolvedPeriod = {
@@ -252,6 +253,7 @@ export function computeCeoKpis(rows: HighLevelDay[]): CeoKpis {
     aov: div(totalCashCollected, totalDealsClosed),
     acv: div(totalRevenueContracted, totalDealsClosed),
     pifRate: div(countPifDeals, totalDealsClosed),
+    cashCollectionRate: div(totalCashCollected, totalRevenueContracted),
   };
 }
 
@@ -391,6 +393,35 @@ export function medianFirstCallToClose(
     }
   }
   return { value: median(vals), n: vals.length };
+}
+
+function average(vals: number[]): number | null {
+  if (vals.length === 0) return null;
+  return vals.reduce((acc, v) => acc + v, 0) / vals.length;
+}
+
+export function averageBookingToClose(
+  rows: SalesCycleRow[],
+): { value: number | null; n: number } {
+  const vals: number[] = [];
+  for (const r of rows) {
+    if (r.close_type === "OCC" && r.booking_to_close_days != null) {
+      vals.push(r.booking_to_close_days);
+    }
+  }
+  return { value: average(vals), n: vals.length };
+}
+
+export function averageFirstCallToClose(
+  rows: SalesCycleRow[],
+): { value: number | null; n: number } {
+  const vals: number[] = [];
+  for (const r of rows) {
+    if (r.close_type === "FUC" && r.first_call_to_close_days != null) {
+      vals.push(r.first_call_to_close_days);
+    }
+  }
+  return { value: average(vals), n: vals.length };
 }
 
 // =====================================================================

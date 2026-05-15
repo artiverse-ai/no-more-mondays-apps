@@ -14,6 +14,10 @@ import type { CloserRollup } from "@/lib/calls";
 
 type Align = "left" | "right";
 
+// Column order mirrors Monday Report §9.5 Closer Performance Overall:
+// Closer · Prospects · D'd · S.DQ · S.DQ% · C.DQ · C.DQ% · SQ · Shows ·
+// Show% · Q.Shows · Close% (Shows) · Close% (CQ) · Deals · Cash · TCV ·
+// AOV · ACV.
 const COLUMNS: Array<{
   key: keyof CloserRollup | "rank";
   label: string;
@@ -23,12 +27,18 @@ const COLUMNS: Array<{
   { key: "closer", label: "Closer", align: "left" },
   { key: "prospects", label: "Prospects", align: "right" },
   { key: "dispositioned", label: "Disposed", align: "right" },
+  { key: "setter_dq", label: "S.DQ", align: "right" },
+  { key: "setter_dq_rate", label: "S.DQ %", align: "right" },
+  { key: "closer_dq", label: "C.DQ", align: "right" },
+  { key: "closer_dq_rate", label: "C.DQ %", align: "right" },
   { key: "prospects_sq", label: "SQ", align: "right" },
   { key: "shows_sq", label: "Shows", align: "right" },
+  { key: "show_rate", label: "Show %", align: "right" },
   { key: "shows_cq", label: "Qualified Shows", align: "right" },
+  { key: "close_rate_shows", label: "Close % (Shows)", align: "right" },
+  { key: "close_rate_cq", label: "Close % (CQ)", align: "right" },
   { key: "deposits", label: "Deposits", align: "right" },
   { key: "deals", label: "Deals", align: "right" },
-  { key: "close_rate", label: "Close %", align: "right" },
   { key: "cash", label: "Cash", align: "right" },
   { key: "tcv", label: "TCV", align: "right" },
   { key: "aov", label: "AOV", align: "right" },
@@ -153,19 +163,32 @@ export function CloserLeaderboard({
                   </td>
                   <Num value={fmt.int(r.prospects)} />
                   <Num value={fmt.int(r.dispositioned)} />
+                  <Num value={fmt.int(r.setter_dq)} />
+                  <Num value={fmt.pct(r.setter_dq_rate)} />
+                  <Num value={fmt.int(r.closer_dq)} />
+                  <Num value={fmt.pct(r.closer_dq_rate)} />
                   <Num value={fmt.int(r.prospects_sq)} />
                   <Num value={fmt.int(r.shows_sq)} />
+                  <Num value={fmt.pct(r.show_rate)} />
                   <Num value={fmt.int(r.shows_cq)} />
-                  <Num value={fmt.int(r.deposits)} />
-                  <Num value={fmt.int(r.deals)} />
                   <td
                     className={cn(
                       "whitespace-nowrap px-3 py-2 text-right tabular-nums",
-                      closeRateClass(r.close_rate),
+                      closeRateClass(r.close_rate_shows),
                     )}
                   >
-                    {fmt.pct(r.close_rate)}
+                    {fmt.pct(r.close_rate_shows)}
                   </td>
+                  <td
+                    className={cn(
+                      "whitespace-nowrap px-3 py-2 text-right tabular-nums",
+                      closeRateClass(r.close_rate_cq),
+                    )}
+                  >
+                    {fmt.pct(r.close_rate_cq)}
+                  </td>
+                  <Num value={fmt.int(r.deposits)} />
+                  <Num value={fmt.int(r.deals)} />
                   <Num value={fmt.money(r.cash)} />
                   <Num value={fmt.money(r.tcv)} />
                   <Num value={fmt.money(r.aov)} />

@@ -130,6 +130,14 @@ export default async function HighLevelDashboardPage(
       {/* Quick-button rail — same nine windows as Sales/Setter for parity. */}
       <DateRangeQuickButtons currentKey={periodKey} pathname={PATHNAME} />
 
+      {periodKey === "this-week" ? (
+        <p className="rounded-xl border border-alert-blue/30 bg-alert-blue/5 px-3 py-2 text-[12px] leading-relaxed text-foreground">
+          <span className="font-medium text-alert-blue">Ongoing week</span> ·
+          {" "}numbers may still update through Saturday as calls, deposits, and
+          payments come in.
+        </p>
+      ) : null}
+
       {/* Hero KPIs — 4 primary metrics */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi

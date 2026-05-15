@@ -179,6 +179,13 @@ export default async function SalesDashboardPage(
         <DateRangeQuickButtons currentKey={periodKey} pathname={PATHNAME} />
       </div>
 
+      {periodKey === "this-week" ? (
+        <p className="rounded-xl border border-alert-blue/30 bg-alert-blue/5 px-3 py-2 text-[12px] leading-relaxed text-foreground">
+          <span className="font-medium text-alert-blue">Ongoing week</span> ·
+          {" "}numbers may still update through Saturday.
+        </p>
+      ) : null}
+
       {/* Cross-filter row — always visible so users can refine no matter
           which tab they're on. */}
       <CallsFilterRow

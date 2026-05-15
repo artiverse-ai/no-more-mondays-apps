@@ -7,7 +7,7 @@ import {
   computeKpis,
   deriveFilterOptions,
   getCalls,
-  latestDbtUpdatedAt,
+  getCallsTableFreshness,
   rollupBySetter,
   type CallRow,
   type OccFuc,
@@ -79,9 +79,10 @@ export default async function SetterDashboardPage(
   const dir: "asc" | "desc" = pickStr(sp.dir, "desc") === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(pickStr(sp.page, "1"), 10) || 1);
 
-  const [allCurrent, allPrior, user, devMode] = await Promise.all([
+  const [allCurrent, allPrior, updatedAt, user, devMode] = await Promise.all([
     getCalls({ from: resolved.from, to: resolved.to }),
     getCalls({ from: prior.from, to: prior.to }),
+    getCallsTableFreshness(),
     getCurrentUser(),
     getDevMode(),
   ]);
@@ -99,7 +100,6 @@ export default async function SetterDashboardPage(
   const funnel = computeFunnelCounts(filtered);
   const funnelPrior = computeFunnelCounts(filteredPrior);
   const setterRollup = rollupBySetter(filtered);
-  const updatedAt = latestDbtUpdatedAt(allCurrent);
 
   const sharedSp = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) {

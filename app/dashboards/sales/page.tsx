@@ -7,7 +7,7 @@ import {
   computeKpis,
   deriveFilterOptions,
   getCalls,
-  latestDbtUpdatedAt,
+  getCallsTableFreshness,
   rollupByCloser,
   type CallRow,
   type OccFuc,
@@ -88,9 +88,10 @@ export default async function SalesDashboardPage(
   // Single canonical query per page-load (current + prior periods in
   // parallel for Δ-vs-prior computation).
   // -----------------------------------------------------------------
-  const [allCurrent, allPrior, user, devMode] = await Promise.all([
+  const [allCurrent, allPrior, updatedAt, user, devMode] = await Promise.all([
     getCalls({ from: resolved.from, to: resolved.to }),
     getCalls({ from: prior.from, to: prior.to }),
+    getCallsTableFreshness(),
     getCurrentUser(),
     getDevMode(),
   ]);
@@ -123,7 +124,6 @@ export default async function SalesDashboardPage(
   const funnel = computeFunnelCounts(filtered);
   const funnelPrior = computeFunnelCounts(filteredPrior);
   const closerRollup = rollupByCloser(filtered);
-  const updatedAt = latestDbtUpdatedAt(allCurrent);
 
   const sharedSp = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) {

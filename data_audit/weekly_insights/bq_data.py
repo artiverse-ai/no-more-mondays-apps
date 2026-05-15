@@ -423,4 +423,4 @@ def insert_insights(slug: str, items: list[dict[str, Any]]) -> int:
         + ", ".join(placeholders)
     )
     cli.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=params)).result()
-    return len(rows)
+    return len(items)

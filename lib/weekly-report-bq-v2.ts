@@ -29,6 +29,105 @@ const GHL_FORM_SUB = `\`${PROJECT}.dbt_tuddin.stg_ghl_form_submissions_flat\``;
 const EMAIL_EXCLUSION = `prospect_email_lc NOT LIKE '%@nomoremondays.io%' AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')`;
 
 // ============================================================================
+// EXPORTED SQL TEMPLATES — used by the Dev-Mode info modal so the user can
+// see (and copy) the exact query that produced any KPI strip or Tab 1 card.
+// These are the SAME strings the fetchers run; both point at the constants
+// below so the two cannot drift.
+// ============================================================================
+
+export const SQL_AVG_WEBINAR_SHOW_RATE = `SELECT
+  SAFE_DIVIDE(SUM(unique_attendees), NULLIF(SUM(total_registrants), 0)) AS avg_webinar_show_rate
+FROM ${MART_WEBINAR}
+WHERE webinar_date BETWEEN DATE(@start) AND DATE(@end)
+  AND webinar_day IN ('Sunday', 'Wednesday')`;
+
+export const SQL_PCT_TIER_ONE_LEADS = `SELECT
+  SAFE_DIVIDE(SUM(tier_one_submissions), NULLIF(SUM(form_submissions), 0)) AS pct_tier_one_leads
+FROM ${MART_WEBINAR}
+WHERE webinar_date BETWEEN DATE(@start) AND DATE(@end)`;
+
+export const SQL_BLENDED_CASH_ROAS = `WITH cash AS (
+  SELECT SUM(amount_usd) AS cash_fanbasis
+  FROM ${FANBASIS}
+  WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
+    AND status = 'succeeded'
+),
+spend AS (
+  SELECT SUM(total_ad_spend) AS total_ad_spend
+  FROM ${MART_HL_DAILY}
+  WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)
+)
+SELECT SAFE_DIVIDE(cash.cash_fanbasis, spend.total_ad_spend) AS blended_cash_roas
+FROM cash, spend`;
+
+export const SQL_CASH_PER_BOOKED_CALL = `WITH cash AS (
+  SELECT SUM(amount_usd) AS cash_fanbasis
+  FROM ${FANBASIS}
+  WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
+    AND status = 'succeeded'
+),
+calls AS (
+  SELECT SUM(total_calls_booked) AS total_calls_booked
+  FROM ${MART_HL_DAILY}
+  WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)
+)
+SELECT SAFE_DIVIDE(cash.cash_fanbasis, calls.total_calls_booked) AS cash_per_booked_call
+FROM cash, calls`;
+
+export const SQL_SECTION_A_CASH = `SELECT SUM(amount_usd) AS cash_fanbasis
+FROM ${FANBASIS}
+WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
+  AND status = 'succeeded'`;
+
+export const SQL_SECTION_A_HL = `SELECT
+  SUM(total_revenue_contracted) AS tcv,
+  SUM(total_ad_spend)           AS ad_spend,
+  SUM(total_deals_closed)       AS deals,
+  SUM(count_pif_deals)          AS pif_deals
+FROM ${MART_HL_DAILY}
+WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)`;
+
+export const SQL_OCC_CYCLE = `SELECT
+  APPROX_QUANTILES(IF(close_type='OCC', booking_to_close_days, NULL), 2)[OFFSET(1)] AS median_book_to_close_occ,
+  AVG(IF(close_type='OCC', booking_to_close_days, NULL))                            AS avg_book_to_close_occ,
+  COUNT(IF(close_type='OCC', 1, NULL))                                              AS n_occ
+FROM ${ENRICHED}
+WHERE is_deal
+  AND date_closed BETWEEN DATE(@start) AND DATE(@end)
+  AND ${EMAIL_EXCLUSION}`;
+
+export const SQL_FUC_CYCLE = `SELECT
+  APPROX_QUANTILES(IF(close_type='FUC', first_call_to_close_days, NULL), 2)[OFFSET(1)] AS median_first_call_to_close_fuc,
+  AVG(IF(close_type='FUC', first_call_to_close_days, NULL))                            AS avg_first_call_to_close_fuc,
+  COUNT(IF(close_type='FUC', 1, NULL))                                                 AS n_fuc
+FROM ${ENRICHED}
+WHERE is_deal
+  AND date_closed BETWEEN DATE(@start) AND DATE(@end)
+  AND ${EMAIL_EXCLUSION}`;
+
+export const SQL_SECTION_B = `SELECT
+  SUM(total_calls_booked)        AS total_calls_booked,
+  SUM(total_calls_booked_active) AS total_calls_booked_active,
+  SUM(total_ad_spend)            AS ad_spend
+FROM ${MART_HL_DAILY}
+WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)`;
+
+export const SQL_SECTION_C = `SELECT
+  COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
+  COUNT(DISTINCT IF(is_dispositioned,         prospect_email_lc, NULL))          AS prospects_dd,
+  COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
+  COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
+  COUNT(DISTINCT IF(is_show_rate_eligible,    prospect_email_lc, NULL))          AS prospects_sq,
+  COUNT(DISTINCT IF(is_show_up,               prospect_email_lc, NULL))          AS shows_sq,
+  COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS shows_cq,
+  COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
+  SUM(IF(is_deal, cash_collected,    0))                                          AS cash_int_calls,
+  SUM(IF(is_deal, revenue_generated, 0))                                          AS revenue
+FROM ${ENRICHED}
+WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+  AND ${EMAIL_EXCLUSION}`;
+
+// ============================================================================
 // SECTION 1 — PERSISTENT KPI STRIP (§2)
 // ============================================================================
 
@@ -43,11 +142,7 @@ export type KpiStripData = {
 /** §2.1 Avg Webinar Show Rate — weighted Zoom-attend rate across the week */
 export async function fetchAvgWebinarShowRate(prevSun: string, prevSat: string): Promise<number | null> {
   const [rows] = await bq().query({
-    query: `SELECT
-      SAFE_DIVIDE(SUM(unique_attendees), NULLIF(SUM(total_registrants), 0)) AS avg_webinar_show_rate
-    FROM ${MART_WEBINAR}
-    WHERE webinar_date BETWEEN DATE(@start) AND DATE(@end)
-      AND webinar_day IN ('Sunday', 'Wednesday')`,
+    query: SQL_AVG_WEBINAR_SHOW_RATE,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -59,10 +154,7 @@ export async function fetchAvgWebinarShowRate(prevSun: string, prevSat: string):
 export async function fetchPctTierOneLeads(prevSun: string, prevSat: string): Promise<number | null> {
   try {
     const [rows] = await bq().query({
-      query: `SELECT
-        SAFE_DIVIDE(SUM(tier_one_submissions), NULLIF(SUM(form_submissions), 0)) AS pct_tier_one_leads
-      FROM ${MART_WEBINAR}
-      WHERE webinar_date BETWEEN DATE(@start) AND DATE(@end)`,
+      query: SQL_PCT_TIER_ONE_LEADS,
       params: { start: prevSun, end: prevSat },
       types: { start: "STRING", end: "STRING" },
     });
@@ -77,19 +169,7 @@ export async function fetchPctTierOneLeads(prevSun: string, prevSat: string): Pr
 /** §2.3 Blended Cash ROAS — Fanbasis cash / total Meta spend */
 export async function fetchBlendedCashRoas(prevSun: string, prevSat: string): Promise<number | null> {
   const [rows] = await bq().query({
-    query: `WITH cash AS (
-      SELECT SUM(amount_usd) AS cash_fanbasis
-      FROM ${FANBASIS}
-      WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
-        AND status = 'succeeded'
-    ),
-    spend AS (
-      SELECT SUM(total_ad_spend) AS total_ad_spend
-      FROM ${MART_HL_DAILY}
-      WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)
-    )
-    SELECT SAFE_DIVIDE(cash.cash_fanbasis, spend.total_ad_spend) AS blended_cash_roas
-    FROM cash, spend`,
+    query: SQL_BLENDED_CASH_ROAS,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -106,19 +186,7 @@ export async function fetchCplBlended(_prevSun: string, _prevSat: string): Promi
 /** §2.5 Cash / Booked Call — Fanbasis cash / total booked calls */
 export async function fetchCashPerBookedCall(prevSun: string, prevSat: string): Promise<number | null> {
   const [rows] = await bq().query({
-    query: `WITH cash AS (
-      SELECT SUM(amount_usd) AS cash_fanbasis
-      FROM ${FANBASIS}
-      WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
-        AND status = 'succeeded'
-    ),
-    calls AS (
-      SELECT SUM(total_calls_booked) AS total_calls_booked
-      FROM ${MART_HL_DAILY}
-      WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)
-    )
-    SELECT SAFE_DIVIDE(cash.cash_fanbasis, calls.total_calls_booked) AS cash_per_booked_call
-    FROM cash, calls`,
+    query: SQL_CASH_PER_BOOKED_CALL,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -168,21 +236,12 @@ export async function fetchSectionAMoney(prevSun: string, prevSat: string): Prom
   // Two parallel queries: Fanbasis cash + mart_high_level_daily aggregates.
   const [cashRows, hlRows] = await Promise.all([
     bq().query({
-      query: `SELECT SUM(amount_usd) AS cash_fanbasis
-        FROM ${FANBASIS}
-        WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
-          AND status = 'succeeded'`,
+      query: SQL_SECTION_A_CASH,
       params: { start: prevSun, end: prevSat },
       types: { start: "STRING", end: "STRING" },
     }),
     bq().query({
-      query: `SELECT
-        SUM(total_revenue_contracted) AS tcv,
-        SUM(total_ad_spend)           AS ad_spend,
-        SUM(total_deals_closed)       AS deals,
-        SUM(count_pif_deals)          AS pif_deals
-      FROM ${MART_HL_DAILY}
-      WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)`,
+      query: SQL_SECTION_A_HL,
       params: { start: prevSun, end: prevSat },
       types: { start: "STRING", end: "STRING" },
     }),
@@ -210,14 +269,7 @@ export async function fetchSectionAMoney(prevSun: string, prevSat: string): Prom
 /** §3.11 OCC cycle — median + avg + count for Book→Close, filter close_type='OCC' */
 export async function fetchOccCycle(prevSun: string, prevSat: string): Promise<{ median: number | null; avg: number | null; n: number }> {
   const [rows] = await bq().query({
-    query: `SELECT
-      APPROX_QUANTILES(IF(close_type='OCC', booking_to_close_days, NULL), 2)[OFFSET(1)] AS median_book_to_close_occ,
-      AVG(IF(close_type='OCC', booking_to_close_days, NULL))                            AS avg_book_to_close_occ,
-      COUNT(IF(close_type='OCC', 1, NULL))                                              AS n_occ
-    FROM ${ENRICHED}
-    WHERE is_deal
-      AND date_closed BETWEEN DATE(@start) AND DATE(@end)
-      AND ${EMAIL_EXCLUSION}`,
+    query: SQL_OCC_CYCLE,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -228,14 +280,7 @@ export async function fetchOccCycle(prevSun: string, prevSat: string): Promise<{
 /** §3.12 FUC cycle — median + avg + count for 1st-Call→Close, filter close_type='FUC' */
 export async function fetchFucCycle(prevSun: string, prevSat: string): Promise<{ median: number | null; avg: number | null; n: number }> {
   const [rows] = await bq().query({
-    query: `SELECT
-      APPROX_QUANTILES(IF(close_type='FUC', first_call_to_close_days, NULL), 2)[OFFSET(1)] AS median_first_call_to_close_fuc,
-      AVG(IF(close_type='FUC', first_call_to_close_days, NULL))                            AS avg_first_call_to_close_fuc,
-      COUNT(IF(close_type='FUC', 1, NULL))                                                 AS n_fuc
-    FROM ${ENRICHED}
-    WHERE is_deal
-      AND date_closed BETWEEN DATE(@start) AND DATE(@end)
-      AND ${EMAIL_EXCLUSION}`,
+    query: SQL_FUC_CYCLE,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -277,12 +322,7 @@ export type SectionBData = {
 /** §4.1, §4.2 — total calls booked + cost per booked. KPI strip values reused for §4.3-4.5. */
 export async function fetchSectionB(prevSun: string, prevSat: string, kpiStrip: KpiStripData): Promise<SectionBData> {
   const [rows] = await bq().query({
-    query: `SELECT
-      SUM(total_calls_booked)        AS total_calls_booked,
-      SUM(total_calls_booked_active) AS total_calls_booked_active,
-      SUM(total_ad_spend)            AS ad_spend
-    FROM ${MART_HL_DAILY}
-    WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)`,
+    query: SQL_SECTION_B,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });
@@ -333,20 +373,7 @@ export type SectionCData = {
 
 export async function fetchSectionC(prevSun: string, prevSat: string): Promise<SectionCData> {
   const [rows] = await bq().query({
-    query: `SELECT
-      COUNT(DISTINCT prospect_email_lc)                                              AS prospects,
-      COUNT(DISTINCT IF(is_dispositioned,         prospect_email_lc, NULL))          AS prospects_dd,
-      COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL))          AS setter_dq,
-      COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL))          AS closer_dq,
-      COUNT(DISTINCT IF(is_show_rate_eligible,    prospect_email_lc, NULL))          AS prospects_sq,
-      COUNT(DISTINCT IF(is_show_up,               prospect_email_lc, NULL))          AS shows_sq,
-      COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS shows_cq,
-      COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
-      SUM(IF(is_deal, cash_collected,    0))                                          AS cash_int_calls,
-      SUM(IF(is_deal, revenue_generated, 0))                                          AS revenue
-    FROM ${ENRICHED}
-    WHERE DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
-      AND ${EMAIL_EXCLUSION}`,
+    query: SQL_SECTION_C,
     params: { start: prevSun, end: prevSat },
     types: { start: "STRING", end: "STRING" },
   });

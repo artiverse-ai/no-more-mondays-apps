@@ -1,5 +1,7 @@
 import type { KpiStripData } from "@/lib/weekly-report-bq-v2";
+import { getResolvedSql, type MetricKey, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
+import { SqlInfoButton } from "./SqlInfoButton";
 import styles from "./report.module.css";
 
 const fmtPct = (frac: number | null, digits = 1) =>
@@ -11,54 +13,47 @@ const fmtUsd = (n: number | null) =>
     ? "N/A"
     : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
-export function PersistentKpiStrip({ data }: { data: KpiStripData }) {
+export function PersistentKpiStrip({
+  data,
+  devMode = false,
+  sqlCtx,
+}: {
+  data: KpiStripData;
+  devMode?: boolean;
+  sqlCtx?: SqlCtx;
+}) {
   // Each card: value renders as the canonical metric formatting; N/A
   // values fall back to .kpiValueNa per spec §22.
+  const card = (
+    kind: "webinar" | "company",
+    label: string,
+    value: string,
+    isNa: boolean,
+    meta: string,
+    tooltip: string,
+    metricKey: MetricKey,
+  ) => (
+    <Card
+      kind={kind}
+      label={label}
+      value={value}
+      isNa={isNa}
+      meta={meta}
+      tooltip={tooltip}
+      sqlInfo={devMode && sqlCtx ? getResolvedSql(metricKey, sqlCtx) : null}
+    />
+  );
+
   return (
     <div className={styles.kpiStrip}>
-      <Card
-        kind="webinar"
-        label="Avg Webinar Show Rate"
-        value={fmtPct(data.avgWebinarShowRate)}
-        isNa={data.avgWebinarShowRate == null}
-        meta="Target 24%"
-        tooltip={TIP.avgWebinarShowRate}
-      />
-      <Card
-        kind="webinar"
-        label="% Tier 1 Leads"
-        value={fmtPct(data.pctTierOneLeads)}
-        isNa={data.pctTierOneLeads == null}
-        meta="Awaiting mart fields"
-        tooltip={TIP.pctTierOneLeads}
-      />
+      {card("webinar", "Avg Webinar Show Rate", fmtPct(data.avgWebinarShowRate), data.avgWebinarShowRate == null, "Target 24%", TIP.avgWebinarShowRate, "avgWebinarShowRate")}
+      {card("webinar", "% Tier 1 Leads", fmtPct(data.pctTierOneLeads), data.pctTierOneLeads == null, "Awaiting mart fields", TIP.pctTierOneLeads, "pctTierOneLeads")}
 
       <div className={styles.kpiDivider} aria-hidden="true" />
 
-      <Card
-        kind="company"
-        label="Blended Cash ROAS"
-        value={fmtX(data.blendedCashRoas)}
-        isNa={data.blendedCashRoas == null}
-        meta="Target 4×"
-        tooltip={TIP.blendedCashRoas}
-      />
-      <Card
-        kind="company"
-        label="CPL Blended"
-        value={fmtUsd(data.cplBlended)}
-        isNa={data.cplBlended == null}
-        meta="Target <$7"
-        tooltip={TIP.cplBlended}
-      />
-      <Card
-        kind="company"
-        label="Cash / Booked Call (DPC)"
-        value={fmtUsd(data.cashPerBookedCall)}
-        isNa={data.cashPerBookedCall == null}
-        meta="Sergio's KPI"
-        tooltip={TIP.cashPerBookedCall}
-      />
+      {card("company", "Blended Cash ROAS", fmtX(data.blendedCashRoas), data.blendedCashRoas == null, "Target 4×", TIP.blendedCashRoas, "blendedCashRoas")}
+      {card("company", "CPL Blended", fmtUsd(data.cplBlended), data.cplBlended == null, "Target <$7", TIP.cplBlended, "cplBlended")}
+      {card("company", "Cash / Booked Call (DPC)", fmtUsd(data.cashPerBookedCall), data.cashPerBookedCall == null, "Sergio's KPI", TIP.cashPerBookedCall, "cashPerBookedCall")}
     </div>
   );
 }
@@ -70,6 +65,7 @@ function Card({
   isNa,
   meta,
   tooltip,
+  sqlInfo,
 }: {
   kind: "webinar" | "company";
   label: string;
@@ -77,6 +73,7 @@ function Card({
   isNa: boolean;
   meta: string;
   tooltip: string;
+  sqlInfo?: import("@/lib/dev-sql").ResolvedMetricSql | null;
 }) {
   const kindCls = kind === "webinar" ? styles.kpiWebinar : styles.kpiCompany;
   return (
@@ -85,6 +82,7 @@ function Card({
         <span className={styles.tip} data-tip={tooltip} style={{ cursor: "help" }}>
           {label}
         </span>
+        {sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}
       </div>
       <div className={`${styles.kpiValue} ${isNa ? styles.kpiValueNa : ""}`}>{value}</div>
       <div className={styles.kpiMeta}>{meta}</div>

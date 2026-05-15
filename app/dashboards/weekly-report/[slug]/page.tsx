@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
+import { DevModeToggle } from "@/components/DevModeToggle";
 import { getCurrentUser } from "@/lib/auth";
+import { getDevMode } from "@/lib/dev-mode";
+import { getAllResolvedSql } from "@/lib/dev-sql";
+import { DownloadAllSqlButton } from "../_components/DownloadAllSqlButton";
 import {
   MARKETING_EDITOR,
   SALES_EDITOR,
@@ -50,6 +54,7 @@ export default async function Page({
 
   const reportType = snapshot.reportType;
   const isAdmin = Boolean(me?.isAdmin);
+  const devMode = await getDevMode();
 
   // The KPI window for both Monday and Thursday is the prev Sun-Sat. Per
   // spec §1: for Thursday, this is the same week Monday's report covered
@@ -140,8 +145,12 @@ export default async function Page({
         { id: "t6", label: "Sales Solutions" },
       ];
 
+  const sqlCtx = { kpiStart, kpiEnd };
+  const sqlBundle = devMode && isAdmin ? getAllResolvedSql(sqlCtx) : "";
+  const sqlFilename = `nmm-weekly-${slug}-${kpiStart}_${kpiEnd}.sql`;
+
   const panels: Record<string, React.ReactNode> = {
-    t1: <Tab1Overview weekLabel={weekLabel} sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} />,
+    t1: <Tab1Overview weekLabel={weekLabel} sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} devMode={devMode && isAdmin} sqlCtx={sqlCtx} />,
     t2: (
       <Tab2LatestWebinar
         webinars={webinars}
@@ -218,8 +227,14 @@ export default async function Page({
           Latest Webinar: {snapshot.latestWebinar ?? "—"} · KPI window {fmtKpiWindow(kpiStart, kpiEnd)}
         </span>
         <span className={styles.badge}>{snapshot.badge}</span>
+        {isAdmin ? (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, marginLeft: 12 }}>
+            <DevModeToggle current={devMode} />
+            {devMode ? <DownloadAllSqlButton sqlBundle={sqlBundle} filename={sqlFilename} /> : null}
+          </span>
+        ) : null}
       </div>
-      <PersistentKpiStrip data={kpiStrip} />
+      <PersistentKpiStrip data={kpiStrip} devMode={devMode && isAdmin} sqlCtx={sqlCtx} />
       <Tabs tabs={tabs} defaultActive="t1" panels={panels} />
     </div>
   );

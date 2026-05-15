@@ -194,6 +194,53 @@ export function enumerateMonThuRange(now: Date = new Date(), weeksBack = 12): Pr
 }
 
 /**
+ * Single BQ job that returns webinar + call counts for every (start,end)
+ * window passed in. Used by the snapshot-picker preload so we don't fire
+ * 24 separate jobs at page load.
+ */
+export async function bulkCheckAvailability(
+  windows: { weekStart: string; weekEnd: string }[],
+): Promise<Map<string, Availability>> {
+  if (windows.length === 0) return new Map();
+
+  // Build a STRUCT array literal — simpler than wiring an ARRAY<STRUCT>
+  // through the @google-cloud/bigquery params API.
+  const structs = windows
+    .map((w) => `STRUCT(DATE('${w.weekStart}') AS s, DATE('${w.weekEnd}') AS e)`)
+    .join(", ");
+
+  const [rows] = await bq().query({
+    query: `WITH windows AS (
+        SELECT * FROM UNNEST([${structs}])
+      )
+      SELECT
+        FORMAT_DATE('%F', w.s) AS week_start,
+        FORMAT_DATE('%F', w.e) AS week_end,
+        (SELECT COUNT(*) FROM ${MART}
+           WHERE webinar_date BETWEEN w.s AND w.e) AS webinars,
+        (SELECT COUNT(*) FROM ${ENRICHED}
+           WHERE DATE(appointment_date_time) BETWEEN w.s AND w.e) AS calls
+      FROM windows w`,
+  });
+
+  const map = new Map<string, Availability>();
+  for (const r of rows as Array<{
+    week_start: string;
+    week_end: string;
+    webinars: number | string;
+    calls: number | string;
+  }>) {
+    const webinars = Number(r.webinars ?? 0);
+    const calls = Number(r.calls ?? 0);
+    const missing: Availability["missing"] = [];
+    if (webinars === 0) missing.push("webinars");
+    if (calls === 0) missing.push("calls");
+    map.set(`${r.week_start}|${r.week_end}`, { webinars, calls, missing });
+  }
+  return map;
+}
+
+/**
  * One-shot helper used by the API route.
  */
 export async function determineNext(now: Date = new Date()): Promise<NextSnapshotResult> {

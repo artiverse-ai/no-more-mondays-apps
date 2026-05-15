@@ -17,6 +17,10 @@ type Proposal = {
   availability: { webinars: number; calls: number; missing: string[] };
 };
 
+// Server-component-facing shape (matches what the index page builds in
+// its SSR preload). Re-exported so the parent can type its prop.
+export type InitialProposal = Proposal;
+
 const REPORT_LABEL: Record<Proposal["reportType"], string> = {
   weekly_recap: "Weekly recap",
   midweek_check: "Midweek check",
@@ -37,16 +41,20 @@ function fmtRange(start: string, end: string): string {
   return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", { ...opts, year: "numeric" })}`;
 }
 
-export function CreateNextSnapshotButton() {
+export function CreateNextSnapshotButton({ initialProposals = [] }: { initialProposals?: InitialProposal[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [proposals, setProposals] = useState<Proposal[] | null>(null);
-  const [selectedRunOn, setSelectedRunOn] = useState<string | null>(null);
+  const [proposals, setProposals] = useState<Proposal[] | null>(
+    initialProposals.length > 0 ? initialProposals : null,
+  );
+  const [selectedRunOn, setSelectedRunOn] = useState<string | null>(
+    initialProposals[0]?.runOn ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch the picker list when the user opens it.
+  // Fall back to a client-side fetch only if SSR preload didn't ship.
   useEffect(() => {
     if (!open || proposals) return;
     let cancelled = false;
@@ -59,7 +67,6 @@ export function CreateNextSnapshotButton() {
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
         if (cancelled) return;
         setProposals(data.proposals ?? []);
-        // Default-select the newest entry.
         setSelectedRunOn(data.proposals?.[0]?.runOn ?? null);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);

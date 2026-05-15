@@ -6,12 +6,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  bulkCheckAvailability,
   checkAvailability,
   enumerateMonThuRange,
   proposeFromRunDate,
   type ProposedSnapshot,
 } from "@/lib/next-snapshot";
-import { createSnapshot, getSnapshot } from "@/lib/weekly-report-snapshots";
+import { createSnapshot, getSnapshot, listSnapshots } from "@/lib/weekly-report-snapshots";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -28,20 +29,24 @@ export async function GET() {
 
   try {
     const proposed = enumerateMonThuRange(new Date(), 12);
-    const enriched: Proposal[] = await Promise.all(
-      proposed.map(async (p) => {
-        const [existing, availability] = await Promise.all([
-          getSnapshot(p.slug),
-          checkAvailability(p.weekStart, p.weekEnd),
-        ]);
-        return {
-          ...p,
-          existing: Boolean(existing),
-          dataReady: availability.missing.length === 0,
-          availability,
-        };
-      }),
-    );
+    const [existingSnapshots, availMap] = await Promise.all([
+      listSnapshots(),
+      bulkCheckAvailability(proposed.map((p) => ({ weekStart: p.weekStart, weekEnd: p.weekEnd }))),
+    ]);
+    const existingSlugs = new Set(existingSnapshots.map((s) => s.slug));
+    const enriched: Proposal[] = proposed.map((p) => {
+      const availability = availMap.get(`${p.weekStart}|${p.weekEnd}`) ?? {
+        webinars: 0,
+        calls: 0,
+        missing: ["webinars", "calls"] as ("webinars" | "calls")[],
+      };
+      return {
+        ...p,
+        existing: existingSlugs.has(p.slug),
+        dataReady: availability.missing.length === 0,
+        availability,
+      };
+    });
     return NextResponse.json({ proposals: enriched });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

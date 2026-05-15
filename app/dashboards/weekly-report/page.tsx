@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import { bulkCheckAvailability, enumerateMonThuRange } from "@/lib/next-snapshot";
 import { listSnapshots, type Snapshot } from "@/lib/weekly-report-snapshots";
-import { CreateNextSnapshotButton } from "./_components/CreateNextSnapshotButton";
+import { CreateNextSnapshotButton, type InitialProposal } from "./_components/CreateNextSnapshotButton";
 import { SnapshotRow } from "./_components/SnapshotRow";
 
 export const metadata = {
@@ -41,6 +42,43 @@ export default async function WeeklyReportsIndex() {
 
   const isAdmin = Boolean(user?.isAdmin);
 
+  // Preload the snapshot-picker payload server-side so the dropdown is
+  // ready the moment the admin clicks "+ Create snapshot". Bulk-check all
+  // 24 availability windows in one BQ job.
+  let initialProposals: InitialProposal[] = [];
+  if (isAdmin) {
+    try {
+      const proposed = enumerateMonThuRange(new Date(), 12);
+      const existingSlugs = new Set(snapshots.map((s) => s.slug));
+      const availMap = await bulkCheckAvailability(
+        proposed.map((p) => ({ weekStart: p.weekStart, weekEnd: p.weekEnd })),
+      );
+      initialProposals = proposed.map((p) => {
+        const avail = availMap.get(`${p.weekStart}|${p.weekEnd}`) ?? {
+          webinars: 0,
+          calls: 0,
+          missing: ["webinars", "calls"] as ("webinars" | "calls")[],
+        };
+        return {
+          slug: p.slug,
+          runOn: p.runOn,
+          weekStart: p.weekStart,
+          weekEnd: p.weekEnd,
+          reportType: p.reportType,
+          weekLabel: p.weekLabel,
+          badge: p.badge,
+          latestWebinar: p.latestWebinar,
+          existing: existingSlugs.has(p.slug),
+          dataReady: avail.missing.length === 0,
+          availability: avail,
+        };
+      });
+    } catch {
+      // Fall back to client-side fetch if preload fails.
+      initialProposals = [];
+    }
+  }
+
   return (
     <main className="mx-auto w-full max-w-4xl space-y-8 p-6 md:p-10">
       <header className="space-y-2 border-b border-border pb-6">
@@ -58,7 +96,7 @@ export default async function WeeklyReportsIndex() {
               of the current week.
             </p>
           </div>
-          {isAdmin ? <CreateNextSnapshotButton /> : null}
+          {isAdmin ? <CreateNextSnapshotButton initialProposals={initialProposals} /> : null}
         </div>
       </header>
 

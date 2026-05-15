@@ -119,6 +119,14 @@ def verify_active_for_write(slug: str, expected_status: str = "generating") -> b
 
 
 def mark_succeeded(slug: str) -> None:
+    """Marks ONLY the active row (deleted_at IS NULL) as succeeded.
+
+    Without the deleted_at filter, this UPDATE would touch every historical
+    row with the same slug — including a freshly-created 'pending' row from
+    a delete-then-recreate workflow. That blanket-update was incorrectly
+    flipping new pending rows to 'succeeded', hiding them from the polling
+    wrapper and breaking auto-generation on recreate.
+    """
     cli = _client()
     sql = f"""
       UPDATE {SNAPSHOTS}
@@ -127,6 +135,8 @@ def mark_succeeded(slug: str) -> None:
           insights_generated_at = CURRENT_TIMESTAMP(),
           updated_at = CURRENT_TIMESTAMP()
       WHERE slug = @slug
+        AND deleted_at IS NULL
+        AND insights_generation_status = 'generating'
     """
     cli.query(sql, job_config=bigquery.QueryJobConfig(
         query_parameters=[bigquery.ScalarQueryParameter("slug", "STRING", slug)]
@@ -176,6 +186,10 @@ def update_snapshot_narratives(
 
 
 def mark_failed(slug: str, message: str) -> None:
+    """Marks ONLY the active row (deleted_at IS NULL) as failed.
+    Same scoping concern as mark_succeeded — must not blanket-update
+    historical rows with this slug.
+    """
     cli = _client()
     sql = f"""
       UPDATE {SNAPSHOTS}
@@ -183,6 +197,8 @@ def mark_failed(slug: str, message: str) -> None:
           insights_generation_error = @msg,
           updated_at = CURRENT_TIMESTAMP()
       WHERE slug = @slug
+        AND deleted_at IS NULL
+        AND insights_generation_status = 'generating'
     """
     cli.query(sql, job_config=bigquery.QueryJobConfig(query_parameters=[
         bigquery.ScalarQueryParameter("slug", "STRING", slug),

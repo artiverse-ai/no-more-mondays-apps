@@ -88,11 +88,10 @@ export default async function Page({
     body: snapshot.contextBody ?? "",
   };
 
-  // Tab definitions — Monday has 5 (Overview, Latest Webinar, AI Insights,
-  // Marketing Solutions, Sales Solutions), Thursday has 3 (Overview,
-  // Latest Webinar, AI Insights). The Last Week's Sales tab from spec §20
-  // is a follow-up phase — for now, Monday skips it. Solutions tabs preserved
-  // per user requirement.
+  // Tab definitions. Per user requirement, Marketing + Sales Solutions
+  // tabs are preserved on BOTH report types (not Monday-only as the
+  // raw spec would suggest). Monday's "Last Week's Sales" tab is a
+  // follow-up phase.
   type TabDef = { id: string; label: string };
   const tabs: TabDef[] =
     reportType === "weekly_recap"
@@ -107,6 +106,8 @@ export default async function Page({
           { id: "t1", label: "Overview" },
           { id: "t2", label: "Latest Webinar (Wed)" },
           { id: "t3", label: "AI Strategic Insights" },
+          { id: "t5", label: "Marketing Solutions" },
+          { id: "t6", label: "Sales Solutions" },
         ];
 
   const panels: Record<string, React.ReactNode> = {
@@ -138,28 +139,28 @@ export default async function Page({
       </>
     ),
   };
-  if (reportType === "weekly_recap") {
-    panels.t5 = (
-      <SolutionsTab
-        reportWeek={slug}
-        tab="marketing"
-        editorEmail={MARKETING_EDITOR}
-        initial={mktSolutions}
-        currentUserEmail={me?.email ?? ""}
-        currentUserIsAdmin={Boolean(me?.isAdmin)}
-      />
-    );
-    panels.t6 = (
-      <SolutionsTab
-        reportWeek={slug}
-        tab="sales"
-        editorEmail={SALES_EDITOR}
-        initial={salesSolutions}
-        currentUserEmail={me?.email ?? ""}
-        currentUserIsAdmin={Boolean(me?.isAdmin)}
-      />
-    );
-  }
+  // Solutions tabs render on BOTH Monday + Thursday per user requirement
+  // (preserved across the v2 refactor — see feedback memory).
+  panels.t5 = (
+    <SolutionsTab
+      reportWeek={slug}
+      tab="marketing"
+      editorEmail={MARKETING_EDITOR}
+      initial={mktSolutions}
+      currentUserEmail={me?.email ?? ""}
+      currentUserIsAdmin={Boolean(me?.isAdmin)}
+    />
+  );
+  panels.t6 = (
+    <SolutionsTab
+      reportWeek={slug}
+      tab="sales"
+      editorEmail={SALES_EDITOR}
+      initial={salesSolutions}
+      currentUserEmail={me?.email ?? ""}
+      currentUserIsAdmin={Boolean(me?.isAdmin)}
+    />
+  );
 
   return (
     <div className={styles.bg}>

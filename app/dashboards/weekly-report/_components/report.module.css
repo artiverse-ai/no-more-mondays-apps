@@ -180,7 +180,7 @@
 .tbActive { color: var(--text-primary); border-bottom-color: var(--text-primary); }
 
 .pane {
-  display: none;
+  display: block;
   padding: 28px 32px;
   max-width: 1400px;
   margin: 0 auto;

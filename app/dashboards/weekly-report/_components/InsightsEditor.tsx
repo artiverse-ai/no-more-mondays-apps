@@ -170,7 +170,11 @@ export function InsightsEditor({
               style={btnGhost}
               title="Mark for re-generation — VM cron will pick it up within ~1 min"
             >
-              {isGenerating ? "Queued…" : "Regenerate with AI"}
+              {genStatus === "pending"
+                ? "Queued…"
+                : genStatus === "generating"
+                ? "Generating…"
+                : "Regenerate with AI"}
             </button>
           </div>
         ) : null}

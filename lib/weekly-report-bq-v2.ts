@@ -453,7 +453,7 @@ export async function fetchWebinarComparisonV2(dates: string[]): Promise<Webinar
         reactivation_pool_size, reactivations_attended, reactivations_booked,
         is_reactivation_data_available
       FROM ${MART_WEBINAR}
-      WHERE webinar_date IN UNNEST(@dates)
+      WHERE webinar_date IN (SELECT DATE(d) FROM UNNEST(@dates) AS d)
       ORDER BY webinar_date DESC`,
     params: { dates: dates.map((d) => d) },
     types: { dates: ["STRING"] },

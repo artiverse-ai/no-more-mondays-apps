@@ -1,52 +1,69 @@
-/* Lifted near-verbatim from the original HTML report so the look matches
-   exactly. Scoped via CSS modules so it can't leak into the rest of the
-   app's light theme. */
+/*
+ * NMM Weekly Report — Light theme per weekly_report_build_guide.md §2
+ *
+ * This file scopes ALL report styles via CSS modules so the light theme
+ * doesn't leak into the rest of the (light) admin chrome around it.
+ * Class names match the build-guide naming so HTML→TSX porting is 1:1.
+ */
 
+/* ============================================================================
+ * §2 Design tokens — light theme
+ * ============================================================================ */
 .bg {
-  --bg: #0a0a0a;
-  --surface: #121212;
-  --surface-2: #191919;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-light: rgba(255, 255, 255, 0.04);
-  --text-primary: #f0f0f0;
-  --text-secondary: #9a9a9a;
-  --text-muted: #555;
-  --green: #4ade80;
-  --amber: #fbbf24;
-  --red: #f87171;
-  --blue: #60a5fa;
-  --purple: #a78bfa;
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --surface-2: #f5f5f7;
+  --border: #e5e7eb;
+  --border-light: #f0f0f3;
+
+  --text-primary: #0a0a0a;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+
+  /* Spec specifies SF Pro / SF Mono; system fallbacks below work natively
+     on macOS/iOS and gracefully degrade elsewhere. */
+  --font-display: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+  --font-body: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', monospace;
 
   background: var(--bg);
   color: var(--text-primary);
-  font-family: var(--font-outfit), sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
-.bg :global(h1),
-.bg :global(h2),
-.bg :global(h3),
-.bg :global(h4) {
-  font-family: var(--font-syne), sans-serif;
-}
-.bg :global(*) {
-  box-sizing: border-box;
+
+.numeric, .num, .kpiValue {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
+/* ============================================================================
+ * §3 Header
+ * ============================================================================ */
 .hdr {
-  background: var(--surface);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
-  padding: 18px 32px;
+  padding: 12px 32px;
   display: flex;
   align-items: baseline;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
 }
-.hdr :global(h1) {
-  font-size: 17px;
+.hdr h1 {
+  font-family: var(--font-display);
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.01em;
+  margin: 0;
 }
 .sub {
   color: var(--text-secondary);
@@ -54,24 +71,97 @@
 }
 .badge {
   margin-left: auto;
-  background: rgba(167, 139, 250, 0.1);
-  border: 1px solid rgba(167, 139, 250, 0.3);
-  color: var(--purple);
+  background: #f3f4f6;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   font-size: 10px;
-  font-family: var(--font-jetbrains-mono), monospace;
-  padding: 3px 10px;
+  font-family: var(--font-mono);
+  padding: 2px 8px;
   border-radius: 4px;
   letter-spacing: 0.5px;
 }
 
-.tabNav {
+/* ============================================================================
+ * §4 Persistent KPI strip
+ * ============================================================================ */
+.kpiStrip {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--surface);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1px 1fr 1fr 1fr;
+  gap: 14px;
+  align-items: center;
+  min-height: 56px;
+}
+.kpiDivider {
+  width: 1px;
+  background: var(--border);
+  align-self: stretch;
+  margin: 4px 0;
+}
+.kpiCard {
+  padding: 2px 6px 2px 12px;
+  position: relative;
+}
+.kpiCard::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  border-radius: 1px;
+}
+.kpiWebinar::before { background: var(--purple); }
+.kpiCompany::before { background: var(--blue); }
+.kpiLabel {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  line-height: 1.2;
+}
+.kpiValue {
+  font: 600 17px/1.1 var(--font-display);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.kpiValueNa {
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+.kpiMeta {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deltaUp { color: var(--green); font-weight: 500; }
+.deltaDn { color: var(--red); font-weight: 500; }
+.deltaNt { color: var(--text-muted); }
+
+/* ============================================================================
+ * §5 Tab navigation
+ * ============================================================================ */
+.tabNav {
+  position: sticky;
+  top: 56px;
+  z-index: 99;
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
   display: flex;
   padding: 0 32px;
+  gap: 4px;
 }
 .tb {
   background: none;
@@ -79,28 +169,30 @@
   border-bottom: 2px solid transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  font-family: var(--font-outfit), sans-serif;
+  font-family: var(--font-body);
   font-size: 13px;
   font-weight: 500;
-  padding: 13px 18px;
+  padding: 11px 16px;
   transition: color 0.15s, border-color 0.15s;
+  min-height: 44px;
 }
-.tb:hover {
-  color: var(--text-primary);
-}
-.tbActive {
-  color: var(--purple);
-  border-bottom-color: var(--purple);
-}
+.tb:hover { color: var(--text-primary); }
+.tbActive { color: var(--text-primary); border-bottom-color: var(--text-primary); }
 
 .pane {
-  padding: 32px;
+  display: none;
+  padding: 28px 32px;
   max-width: 1400px;
   margin: 0 auto;
 }
+.paneActive { display: block; }
+
+/* ============================================================================
+ * §6 Section header
+ * ============================================================================ */
 .sh {
-  font-family: var(--font-syne), sans-serif;
-  font-size: 10px;
+  font-family: var(--font-display);
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 1.6px;
   text-transform: uppercase;
@@ -109,329 +201,251 @@
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-light);
 }
-.section {
-  margin-bottom: 40px;
-}
-
-.ctxBanner {
-  background: linear-gradient(135deg, rgba(96, 165, 250, 0.05), rgba(167, 139, 250, 0.05));
-  border: 1px solid rgba(96, 165, 250, 0.2);
-  border-left: 4px solid var(--blue);
-  border-radius: 10px;
-  padding: 20px 24px;
-  margin-bottom: 32px;
-}
-.ctxTag {
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 10px;
-  color: var(--blue);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
-}
-.ctxBanner :global(h3) {
-  font-family: var(--font-syne), sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-.ctxList {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin-bottom: 12px;
-  padding: 0;
-}
-.ctxList li {
+.section { margin-bottom: 36px; }
+.sectionIntro {
   font-size: 13px;
   color: var(--text-secondary);
-  padding-left: 16px;
-  position: relative;
-  line-height: 1.55;
-}
-.ctxList li::before {
-  content: "→";
-  position: absolute;
-  left: 0;
-  color: var(--blue);
-}
-.code {
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 11px;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 1px 5px;
-  border-radius: 3px;
-  color: var(--text-secondary);
-}
-.ctxNote {
-  font-size: 11px;
-  color: var(--text-muted);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding-top: 9px;
-  margin-top: 9px;
+  margin: -8px 0 16px;
+  line-height: 1.6;
 }
 
-.tw {
-  overflow-x: auto;
-}
-.ct,
-.dt {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.ct th,
-.dt th {
-  font-family: var(--font-syne), sans-serif;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  padding: 9px 14px;
-  text-align: right;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-.ct th:first-child,
-.dt th:first-child {
-  text-align: left;
-}
-.ct td,
-.dt td {
-  padding: 9px 14px;
-  text-align: right;
-  border-bottom: 1px solid var(--border-light);
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 12px;
-  color: var(--text-primary);
-  vertical-align: middle;
-  white-space: nowrap;
-}
-.ct td:first-child,
-.dt td:first-child {
-  text-align: left;
-  font-family: var(--font-outfit), sans-serif;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.ct tr:hover td,
-.dt tr:hover td {
-  background: rgba(255, 255, 255, 0.013);
-}
-.lh {
-  background: rgba(167, 139, 250, 0.07) !important;
-  color: var(--purple) !important;
-}
-.lhh {
-  background: rgba(167, 139, 250, 0.04) !important;
-  color: var(--purple) !important;
-}
-.divRow td {
-  background: var(--surface-2) !important;
-  font-family: var(--font-syne), sans-serif !important;
-  font-size: 10px !important;
-  font-weight: 600 !important;
-  letter-spacing: 1px !important;
-  text-transform: uppercase !important;
-  color: var(--text-muted) !important;
-  padding: 7px 14px !important;
-  text-align: left !important;
-}
-
-.up {
-  color: var(--green);
-}
-.dn {
-  color: var(--red);
-}
-.nt {
-  color: var(--text-secondary);
-}
-.amb {
-  color: var(--amber);
-}
-
-.tagP {
-  display: inline-block;
-  font-size: 10px;
-  font-family: var(--font-jetbrains-mono), monospace;
-  color: var(--amber);
-  background: rgba(251, 191, 36, 0.08);
-  border: 1px solid rgba(251, 191, 36, 0.2);
-  padding: 2px 7px;
-  border-radius: 4px;
-}
-.tagG {
-  display: inline-block;
-  font-size: 10px;
-  font-family: var(--font-jetbrains-mono), monospace;
-  color: var(--green);
-  background: rgba(74, 222, 128, 0.08);
-  border: 1px solid rgba(74, 222, 128, 0.2);
-  padding: 2px 7px;
-  border-radius: 4px;
-}
-
-.kpiGrid {
+/* ============================================================================
+ * §7 Mini KPI cards
+ * ============================================================================ */
+.kpiGridMini {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  gap: 12px;
-  margin-bottom: 32px;
+  gap: 10px;
+  margin-bottom: 24px;
 }
-.kpi {
+.kpiMini {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 16px 18px;
+  padding: 12px 14px;
 }
-.kpiLbl {
-  font-family: var(--font-syne), sans-serif;
+.kpiMiniLbl {
+  font-family: var(--font-display);
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
-.kpiVal {
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 21px;
+.kpiMiniVal {
+  font-family: var(--font-mono);
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
 }
-.kpiCh {
+.kpiMiniCh {
   font-size: 11px;
   margin-top: 4px;
   color: var(--text-muted);
 }
+.up { color: var(--green); }
+.dn { color: var(--red); }
+.amb { color: var(--amber); }
+.nt { color: var(--text-muted); }
 
+/* ============================================================================
+ * §9 Funnel diagram
+ * ============================================================================ */
 .funnel {
   display: flex;
   flex-direction: column;
   gap: 0;
-  margin: 0 auto 32px;
+  margin: 0 auto 24px;
   max-width: 680px;
 }
-.fRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
+.fRow { display: flex; align-items: center; gap: 12px; width: 100%; }
 .fBar {
   height: 46px;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  min-width: 120px;
+  padding: 0 18px;
+  min-width: 140px;
+  border: 1px solid var(--border);
 }
 .fLabel {
-  font-family: var(--font-syne), sans-serif;
+  font-family: var(--font-display);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 .fVal {
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 15px;
+  font-family: var(--font-mono);
+  font-size: 16px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .fConn {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 3px 0 3px 14px;
+  padding: 4px 0 4px 18px;
 }
 .fRate {
-  font-family: var(--font-jetbrains-mono), monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: var(--surface-2);
-  color: var(--text-muted);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
 }
-.fDrop {
-  font-size: 11px;
-  color: var(--text-muted);
-}
+.fDrop { font-size: 11px; color: var(--text-muted); }
 
-.chRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 9px;
-}
-.chName {
-  font-size: 12px;
-  color: var(--text-secondary);
-  width: 110px;
-  flex-shrink: 0;
-}
-.chBg {
-  flex: 1;
-  height: 18px;
-  background: var(--surface-2);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.chFill {
-  height: 100%;
-  border-radius: 3px;
-}
-.chN {
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 11px;
-  color: var(--text-secondary);
-  width: 44px;
-  text-align: right;
-  flex-shrink: 0;
-}
-.chP {
-  font-family: var(--font-jetbrains-mono), monospace;
+/* ============================================================================
+ * §10 Tables
+ * ============================================================================ */
+.tw { overflow-x: auto; }
+.ct, .dt { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ct th, .dt th {
+  font-family: var(--font-display);
   font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
   color: var(--text-muted);
-  width: 40px;
+  padding: 10px 14px;
   text-align: right;
-  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.ct th:first-child, .dt th:first-child { text-align: left; }
+.ct td, .dt td {
+  padding: 10px 14px;
+  text-align: right;
+  border-bottom: 1px solid var(--border-light);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  vertical-align: middle;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ct td:first-child, .dt td:first-child {
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.ct tbody tr:hover td, .dt tbody tr:hover td { background: var(--surface-2); }
+.lh {
+  background: var(--surface-2) !important;
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+.lhh { background: var(--surface-2) !important; color: var(--text-primary) !important; }
+.divRow td {
+  background: var(--surface) !important;
+  font-family: var(--font-display) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+  color: var(--text-muted) !important;
+  padding: 8px 14px !important;
+  text-align: left !important;
 }
 
-.insGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* ============================================================================
+ * §11 Tag pills + na-cell
+ * ============================================================================ */
+.tagP {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--amber);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 2px 7px;
+  border-radius: 4px;
 }
+.tagG {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--green);
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.tagR {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.tagB {
+  display: inline-block;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--blue);
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.naCell { color: var(--text-muted); font-style: italic; }
+
+/* ============================================================================
+ * §12 Channel mix bars
+ * ============================================================================ */
+.chRow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.chName { font-size: 12px; color: var(--text-secondary); width: 120px; flex-shrink: 0; }
+.chBg { flex: 1; height: 18px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.chFill { height: 100%; border-radius: 3px; }
+.chN { font-family: var(--font-mono); font-size: 11px; color: var(--text-primary); width: 50px; text-align: right; flex-shrink: 0; }
+.chP { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); width: 46px; text-align: right; flex-shrink: 0; }
+
+/* ============================================================================
+ * §14 AI insights — badge + cards
+ * ============================================================================ */
+.aiBadge {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+.insGrid { display: flex; flex-direction: column; gap: 12px; }
 .ins {
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 3px solid transparent;
   border-radius: 10px;
-  padding: 16px 20px;
+  padding: 18px 22px;
 }
-.insWin {
-  border-left-color: var(--green);
-}
-.insWatch {
-  border-left-color: var(--amber);
-}
-.insFlag {
-  border-left-color: var(--red);
-}
-.insFix {
-  border-left-color: var(--purple);
-}
-.insFwd {
-  border-left-color: var(--blue);
-}
-.insCtx {
-  border-left-color: rgba(96, 165, 250, 0.45);
-}
+.insWin { border-left-color: var(--green); }
+.insWatch { border-left-color: var(--amber); }
+.insFlag { border-left-color: var(--red); }
+.insFix { border-left-color: var(--purple); }
+.insFwd { border-left-color: var(--blue); }
+.insCtx { border-left-color: var(--blue); background: var(--surface-2); }
 .insTag {
-  font-family: var(--font-jetbrains-mono), monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 1px;
@@ -441,53 +455,99 @@
   display: inline-block;
   margin-bottom: 8px;
 }
-.insWinTag {
-  background: rgba(74, 222, 128, 0.1);
-  color: var(--green);
-}
-.insWatchTag {
-  background: rgba(251, 191, 36, 0.1);
-  color: var(--amber);
-}
-.insFlagTag {
-  background: rgba(248, 113, 113, 0.1);
-  color: var(--red);
-}
-.insFixTag {
-  background: rgba(167, 139, 250, 0.12);
-  color: var(--purple);
-}
-.insFwdTag {
-  background: rgba(96, 165, 250, 0.1);
-  color: var(--blue);
-}
-.insCtxTag {
-  background: rgba(96, 165, 250, 0.08);
-  color: var(--blue);
-}
-.ins :global(h4) {
-  font-family: var(--font-syne), sans-serif;
+.insWinTag { background: rgba(16, 185, 129, 0.12); color: var(--green); }
+.insWatchTag { background: rgba(245, 158, 11, 0.12); color: var(--amber); }
+.insFlagTag { background: rgba(239, 68, 68, 0.12); color: var(--red); }
+.insFixTag { background: rgba(139, 92, 246, 0.12); color: var(--purple); }
+.insFwdTag { background: rgba(59, 130, 246, 0.12); color: var(--blue); }
+.insCtxTag { background: rgba(59, 130, 246, 0.08); color: var(--blue); }
+.ins h4 {
+  font-family: var(--font-display);
   font-size: 14px;
   font-weight: 700;
   margin-bottom: 6px;
+  color: var(--text-primary);
 }
-.ins :global(p) {
+.ins p {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.65;
 }
 
-.twoCol {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+/* ============================================================================
+ * §16 Banners
+ * ============================================================================ */
+.bannerInfo {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 28px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
 }
-@media (max-width: 900px) {
-  .twoCol {
-    grid-template-columns: 1fr;
-  }
+.bIcon { font-size: 16px; color: var(--blue); }
+.bannerInfo p { font-size: 13px; color: #1e40af; line-height: 1.55; }
+.bannerWarn {
+  background: #fefbf3;
+  border: 1px solid #fde68a;
+  border-left: 4px solid var(--amber);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #78350f;
+  font-family: var(--font-mono);
+  line-height: 1.6;
+}
+.ctxBanner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--blue);
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-bottom: 32px;
+}
+.ctxTag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--blue);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.ctxBanner h3 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
 }
 
+/* ============================================================================
+ * §17 Placeholder cards
+ * ============================================================================ */
+.placeholder {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.placeholder h4 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.placeholder p { font-size: 12px; line-height: 1.6; }
+
+/* ============================================================================
+ * §18 Footnotes
+ * ============================================================================ */
 .fn {
   font-size: 11px;
   color: var(--text-muted);
@@ -496,18 +556,92 @@
   padding-top: 8px;
   line-height: 1.6;
 }
-.fnHi {
-  color: var(--amber);
+.hi { color: var(--amber); font-weight: 600; }
+
+/* Tooltip helper (used by tagged numbers) */
+.tip { border-bottom: 1px dotted var(--text-muted); cursor: help; }
+
+/* Layout helpers */
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: var(--text-primary);
 }
 
-.spendAdjNote {
-  background: rgba(251, 191, 36, 0.04);
-  border: 1px solid rgba(251, 191, 36, 0.18);
-  border-radius: 6px;
-  padding: 8px 14px;
-  font-size: 11px;
-  color: var(--amber);
-  margin-top: 8px;
-  font-family: var(--font-jetbrains-mono), monospace;
-  line-height: 1.6;
+/* Backwards-compat for any leftover references during the migration. */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 16px 0 24px;
+}
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.kpiLbl {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.kpiVal {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.kpiCh { font-size: 11px; margin-top: 4px; color: var(--text-muted); }
+
+/* ============================================================================
+ * §19 Mobile breakpoints
+ * ============================================================================ */
+@media (max-width: 900px) {
+  .twoCol { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .hdr { padding: 10px 14px; }
+  .hdr h1 { font-size: 14px; }
+  .sub { font-size: 11px; flex-basis: 100%; }
+  .badge { margin-left: 0; font-size: 9px; }
+
+  .kpiStrip {
+    grid-template-columns: repeat(5, minmax(115px, 1fr));
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 10px;
+    padding: 8px 14px;
+    min-height: 50px;
+    scroll-snap-type: x mandatory;
+  }
+  .kpiCard { scroll-snap-align: start; padding-left: 10px; }
+  .kpiDivider { display: none; }
+  .kpiLabel { font-size: 9px; }
+  .kpiValue { font-size: 15px; }
+  .kpiMeta { font-size: 8.5px; }
+
+  .tabNav { padding: 0 14px; overflow-x: auto; }
+  .tb { padding: 10px 12px; font-size: 12px; }
+  .pane { padding: 18px 14px; }
+
+  .funnel { max-width: 100%; }
+  .fBar { min-width: 100px; padding: 0 12px; }
+
+  .ct, .dt { font-size: 11px; }
+  .ct td, .ct th, .dt td, .dt th { padding: 8px 10px; }
+
+  .kpiGridMini { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .kpiMini { padding: 10px 12px; }
+  .kpiMiniVal { font-size: 17px; }
 }

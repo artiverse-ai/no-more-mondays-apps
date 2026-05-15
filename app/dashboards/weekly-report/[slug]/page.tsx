@@ -6,28 +6,23 @@ import {
   listSolutions,
 } from "@/lib/weekly-report-solutions";
 import {
-  buildBookingMode,
-  buildChannelMix,
-  buildChannelMixTrend,
-  buildCloserOverall,
-  buildCloserOverallTotal,
-  buildCloserPerWebinar,
-  buildCloserWoW,
-  buildFunnelConnectors,
-  buildFunnelStages,
-  buildKpiCards,
-  buildReactivationFunnel,
-  buildSetterPerformance,
-  buildTopOfFunnelRows,
-  buildWoWComparison,
-  fetchWeeklyReport,
-} from "@/lib/weekly-report-bq";
+  fetchKpiStrip,
+  fetchSectionA,
+  fetchSectionB,
+  fetchSectionC,
+  fetchWebinarComparisonV2,
+  fetchMetaCampaigns,
+  comparisonDatesForMode,
+  metaPromoWindow,
+} from "@/lib/weekly-report-bq-v2";
 import { getSnapshot, listInsights, type Insight } from "@/lib/weekly-report-snapshots";
-import { ContextBannerEditor } from "../_components/ContextBannerEditor";
 import { InsightsEditor, type EditableInsight } from "../_components/InsightsEditor";
+import { PersistentKpiStrip } from "../_components/PersistentKpiStrip";
 import { SolutionsTab } from "../_components/SolutionsTab";
+import { Tab1Overview } from "../_components/Tab1Overview";
+import { Tab2LatestWebinar } from "../_components/Tab2LatestWebinar";
 import { Tabs } from "../_components/Tabs";
-import { Tip, TooltipLayer } from "../_components/Tooltip";
+import { TooltipLayer } from "../_components/Tooltip";
 import styles from "../_components/report.module.css";
 
 export const metadata = {
@@ -36,14 +31,6 @@ export const metadata = {
 
 // Re-fetch on every request — BQ data moves as deals close.
 export const revalidate = 0;
-
-const COLORS = {
-  blue: "var(--blue)",
-  green: "var(--green)",
-  amber: "var(--amber)",
-  purple: "var(--purple)",
-} as const;
-
 
 export default async function Page({
   params,
@@ -56,621 +43,183 @@ export default async function Page({
   const snapshot = await getSnapshot(slug);
   if (!snapshot) notFound();
 
-  const [reportData, insights, mktInitial, salesInitial] = await Promise.all([
-    fetchWeeklyReport(snapshot.weekStart, snapshot.weekEnd, snapshot.reportType),
-    listInsights(slug),
-    listSolutions(slug, "marketing").catch(() => []),
-    listSolutions(slug, "sales").catch(() => []),
-  ]);
+  const reportType = snapshot.reportType;
+  const isAdmin = Boolean(me?.isAdmin);
 
-  const REPORT_META = {
-    weekLabel: snapshot.weekLabel,
-    latestWebinar: snapshot.latestWebinar ?? "—",
-    badge: snapshot.badge,
-  };
-  const MAY_10_CONTEXT = {
+  // The KPI window for both Monday and Thursday is the prev Sun-Sat. Per
+  // spec §1: for Thursday, this is the same week Monday's report covered
+  // (the just-closed week ending the Saturday before latest_wed).
+  const { kpiStart, kpiEnd, latestWebinarDate } = computeWindows(snapshot.weekStart, snapshot.weekEnd, reportType);
+
+  // Comparison IN-list per spec §7 — depends on report type.
+  const compDates = comparisonDatesForMode(latestWebinarDate, reportType);
+
+  // Promo window for the Meta campaigns table — 4 days ending on latest.
+  const promoWindow = metaPromoWindow(latestWebinarDate, reportType);
+
+  // Parallel fetch of every data source the dashboard needs.
+  const [kpiStrip, sectionA, sectionC, webinars, metaCampaigns, insights, mktSolutions, salesSolutions] =
+    await Promise.all([
+      fetchKpiStrip(kpiStart, kpiEnd),
+      fetchSectionA(kpiStart, kpiEnd),
+      fetchSectionC(kpiStart, kpiEnd),
+      fetchWebinarComparisonV2(compDates),
+      fetchMetaCampaigns(promoWindow.start, promoWindow.end),
+      listInsights(slug),
+      listSolutions(slug, "marketing").catch(() => []),
+      listSolutions(slug, "sales").catch(() => []),
+    ]);
+
+  // Section B needs the KPI strip values (Cash/Booked, Show Rate, CPL) — compute after.
+  const sectionB = await fetchSectionBData(kpiStart, kpiEnd, kpiStrip);
+
+  // Determine if the latest column is in-progress. Today: yes only when the
+  // latest webinar date == snapshot.run_on date (Thursday → today's Wed
+  // hasn't fully booked out yet). For weekly_recap (Monday) the latest_sun
+  // is 1 day before run_on, so the cycle isn't in-progress in the same way,
+  // but we still treat it as partial if total cash collected is 0 (sales
+  // haven't landed yet).
+  const inProgress = reportType === "midweek_check";
+
+  const weekLabel = `${snapshot.weekLabel}`;
+  const contextBanner = {
     tag: snapshot.contextTag ?? "",
     title: snapshot.contextTitle ?? "",
     body: snapshot.contextBody ?? "",
   };
-  const INSIGHTS: Insight[] = insights;
-  const SNAPSHOT_SLUG = slug;
 
-  // Build the shapes the tab components consume.
-  const topOfFunnel = buildTopOfFunnelRows(reportData.webinars);
-  const channelMix = buildChannelMix(reportData.webinars[0]);
-  const channelMixTrend = buildChannelMixTrend(reportData.webinars);
-  const reactivation = buildReactivationFunnel(reportData.webinars);
+  // Tab definitions — Monday has 5 (Overview, Latest Webinar, AI Insights,
+  // Marketing Solutions, Sales Solutions), Thursday has 3 (Overview,
+  // Latest Webinar, AI Insights). The Last Week's Sales tab from spec §20
+  // is a follow-up phase — for now, Monday skips it. Solutions tabs preserved
+  // per user requirement.
+  type TabDef = { id: string; label: string };
+  const tabs: TabDef[] =
+    reportType === "weekly_recap"
+      ? [
+          { id: "t1", label: "Overview" },
+          { id: "t2", label: "Latest Webinar" },
+          { id: "t3", label: "AI Strategic Insights" },
+          { id: "t5", label: "Marketing Solutions" },
+          { id: "t6", label: "Sales Solutions" },
+        ]
+      : [
+          { id: "t1", label: "Overview" },
+          { id: "t2", label: "Latest Webinar (Wed)" },
+          { id: "t3", label: "AI Strategic Insights" },
+        ];
 
-  const funnelStages = buildFunnelStages(reportData.thisWeekFunnel);
-  const funnelConnectors = buildFunnelConnectors(reportData.thisWeekFunnel);
-  const kpiCards = buildKpiCards(reportData.thisWeekFunnel, reportData.priorWeekFunnel);
-  const wowRows = buildWoWComparison(reportData.thisWeekFunnel, reportData.priorWeekFunnel);
-  const closerOverall = buildCloserOverall(reportData.closerOverall);
-  const closerOverallTotal = buildCloserOverallTotal(reportData.thisWeekFunnel);
-  const closerWoW = buildCloserWoW(reportData.closerWoW);
-  const perWebinarMostRecent = buildCloserPerWebinar(reportData.perWebinarMostRecent);
-  const perWebinarSecond = buildCloserPerWebinar(reportData.perWebinarSecond);
-  const bookingMode = buildBookingMode(reportData.bookingMode);
-  const setterPerf = buildSetterPerformance(reportData.setterPerformance);
-
-  const isAdmin = Boolean(me?.isAdmin);
-  const t1Data = {
-    ctx: MAY_10_CONTEXT,
-    snapshotSlug: SNAPSHOT_SLUG,
-    canEdit: isAdmin,
-    topOfFunnel,
-    channelMix,
-    channelMixTrend,
-    reactivation,
-    webinarDates: reportData.window.webinarDates,
+  const panels: Record<string, React.ReactNode> = {
+    t1: <Tab1Overview weekLabel={weekLabel} sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} />,
+    t2: (
+      <Tab2LatestWebinar
+        webinars={webinars}
+        metaCampaigns={metaCampaigns}
+        inProgress={inProgress}
+        snapshotSlug={slug}
+        canEdit={isAdmin}
+        contextBanner={contextBanner}
+      />
+    ),
+    t3: (
+      <>
+        <div className={styles.aiBadge}>
+          🤖 Generated by AI · Claude · {snapshot.insightsGeneratedAt?.slice(0, 10) ?? "—"}
+        </div>
+        <InsightsEditor
+          snapshotSlug={slug}
+          weekLabel={snapshot.weekLabel}
+          latestWebinar={snapshot.latestWebinar}
+          canEdit={isAdmin}
+          initial={insights as EditableInsight[]}
+          initialStatus={snapshot.insightsGenerationStatus}
+          initialError={snapshot.insightsGenerationError}
+        />
+      </>
+    ),
   };
-  const TAB2_BANNER = {
-    tag: snapshot.tab2NarrativeTag ?? "",
-    title: snapshot.tab2NarrativeTitle ?? "",
-    body: snapshot.tab2NarrativeBody ?? "",
-  };
-  const t2Data = {
-    funnelStages,
-    funnelConnectors,
-    kpiCards,
-    wowRows,
-    closerOverall,
-    closerOverallTotal,
-    closerWoW,
-    perWebinarMostRecent,
-    perWebinarSecond,
-    bookingMode,
-    setterPerf,
-    webinarDates: reportData.window.webinarDates,
-    banner: TAB2_BANNER,
-    snapshotSlug: SNAPSHOT_SLUG,
-    canEdit: isAdmin,
-  };
+  if (reportType === "weekly_recap") {
+    panels.t5 = (
+      <SolutionsTab
+        reportWeek={slug}
+        tab="marketing"
+        editorEmail={MARKETING_EDITOR}
+        initial={mktSolutions}
+        currentUserEmail={me?.email ?? ""}
+        currentUserIsAdmin={Boolean(me?.isAdmin)}
+      />
+    );
+    panels.t6 = (
+      <SolutionsTab
+        reportWeek={slug}
+        tab="sales"
+        editorEmail={SALES_EDITOR}
+        initial={salesSolutions}
+        currentUserEmail={me?.email ?? ""}
+        currentUserIsAdmin={Boolean(me?.isAdmin)}
+      />
+    );
+  }
 
   return (
     <div className={styles.bg}>
       <TooltipLayer />
       <div className={styles.hdr}>
-        <h1>NMM Weekly Report</h1>
+        <h1>NMM {reportType === "weekly_recap" ? "Monday" : "Thursday"} Report</h1>
         <span className={styles.sub}>
-          {REPORT_META.weekLabel} &nbsp;·&nbsp; Latest Webinar: {REPORT_META.latestWebinar}
+          Latest Webinar: {snapshot.latestWebinar ?? "—"} · KPI window {kpiStart} → {kpiEnd}
         </span>
-        <span className={styles.badge}>{REPORT_META.badge}</span>
+        <span className={styles.badge}>{snapshot.badge}</span>
       </div>
-      <Tabs
-        tabs={[
-          { id: "t1", label: "Latest Webinar" },
-          { id: "t2", label: "Last Week's Sales" },
-          { id: "t3", label: "Strategic Insights" },
-          { id: "t4", label: "Marketing Solutions" },
-          { id: "t5", label: "Sales Solutions" },
-        ]}
-        defaultActive="t1"
-        panels={{
-          t1: <Tab1 {...t1Data} />,
-          t2: <Tab2 {...t2Data} />,
-          t3: (
-            <InsightsEditor
-              snapshotSlug={SNAPSHOT_SLUG}
-              weekLabel={snapshot.weekLabel}
-              latestWebinar={snapshot.latestWebinar}
-              canEdit={isAdmin}
-              initial={INSIGHTS as EditableInsight[]}
-              initialStatus={snapshot.insightsGenerationStatus}
-              initialError={snapshot.insightsGenerationError}
-            />
-          ),
-          t4: (
-            <SolutionsTab
-              reportWeek={SNAPSHOT_SLUG}
-              tab="marketing"
-              editorEmail={MARKETING_EDITOR}
-              initial={mktInitial}
-              currentUserEmail={me?.email ?? ""}
-              currentUserIsAdmin={Boolean(me?.isAdmin)}
-            />
-          ),
-          t5: (
-            <SolutionsTab
-              reportWeek={SNAPSHOT_SLUG}
-              tab="sales"
-              editorEmail={SALES_EDITOR}
-              initial={salesInitial}
-              currentUserEmail={me?.email ?? ""}
-              currentUserIsAdmin={Boolean(me?.isAdmin)}
-            />
-          ),
-        }}
-      />
+      <PersistentKpiStrip data={kpiStrip} />
+      <Tabs tabs={tabs} defaultActive="t1" panels={panels} />
     </div>
   );
 }
 
-// ════════════════════════════════════════════════════════════════════════
-//  TAB 1 — Latest Webinar (BQ-fed numbers; static commentary)
-// ════════════════════════════════════════════════════════════════════════
+// ============================================================================
+// Helpers
+// ============================================================================
 
-type Tab1Props = {
-  ctx: { tag: string; title: string; body: string };
-  snapshotSlug: string;
-  canEdit: boolean;
-  topOfFunnel: ReturnType<typeof buildTopOfFunnelRows>;
-  channelMix: ReturnType<typeof buildChannelMix>;
-  channelMixTrend: ReturnType<typeof buildChannelMixTrend>;
-  reactivation: ReturnType<typeof buildReactivationFunnel>;
-  webinarDates: string[];
-};
-
-function Tab1({ ctx, snapshotSlug, canEdit, topOfFunnel, channelMix, channelMixTrend, reactivation, webinarDates }: Tab1Props) {
-  const headers = webinarDates.length >= 3
-    ? webinarDates.slice(0, 3)
-    : [...webinarDates, "—", "—", "—"].slice(0, 3);
-  const totalReg = channelMix.reduce((s, c) => s + c.count, 0);
-
-  return (
-    <>
-      <ContextBannerEditor
-        snapshotSlug={snapshotSlug}
-        initialTag={ctx.tag}
-        initialTitle={ctx.title}
-        initialBody={ctx.body}
-        canEdit={canEdit}
-      />
-
-      {/* Top-of-Funnel comparison */}
-      <section className={styles.section}>
-        <div className={styles.sh}>Top-of-Funnel Comparison (live · BQ-fed)</div>
-        <div className={styles.tw}>
-          <table className={styles.ct}>
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th className={styles.lhh}>{headers[0]}</th>
-                <th>{headers[1]}</th>
-                <th>{headers[2]}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topOfFunnel.map((r, i) =>
-                r.kind === "divider" ? (
-                  <tr key={i} className={styles.divRow}>
-                    <td colSpan={4}>{r.label}</td>
-                  </tr>
-                ) : (
-                  <tr key={i}>
-                    <td>{r.tip ? <Tip tip={r.tip}>{r.label}</Tip> : r.label}</td>
-                    {r.values.map((v, j) => (
-                      <td key={j} className={j === 0 ? styles.lh : ""}>{v}</td>
-                    ))}
-                  </tr>
-                ),
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className={styles.fn}>
-          Live from <code className={styles.code}>mart_webinar_events</code>. Numbers will move as the day progresses — refresh to re-pull.
-        </div>
-      </section>
-
-      {/* Channel mix */}
-      <section className={styles.section}>
-        <div className={styles.sh}>Channel Mix — Latest Webinar ({totalReg} Registrants)</div>
-        <div className={styles.twoCol}>
-          <div>
-            {channelMix.map((c) => (
-              <div className={styles.chRow} key={c.name}>
-                <div className={styles.chName}>{c.name}</div>
-                <div className={styles.chBg}>
-                  <div className={styles.chFill} style={{ width: `${c.pct}%`, background: COLORS[c.color] }} />
-                </div>
-                <div className={styles.chN}>{c.count}</div>
-                <div className={styles.chP}>{c.pct.toFixed(1)}%</div>
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className={styles.sh} style={{ marginBottom: 12 }}>Channel Mix Trend</div>
-            <div className={styles.tw}>
-              <table className={styles.dt}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left" }}>Channel</th>
-                    <th className={styles.lhh}>{headers[0]}</th>
-                    <th>{headers[1]}</th>
-                    <th>{headers[2]}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {channelMixTrend.map((r) => (
-                    <tr key={r.name}>
-                      <td>{r.name}</td>
-                      <td className={`${styles.lh} ${r.dn ? styles.dn : ""}`}>{r.may10}</td>
-                      <td>{r.may6}</td>
-                      <td>{r.may3}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Reactivation */}
-      <section className={styles.section}>
-        <div className={styles.sh}>Reactivation Funnel (live)</div>
-        <div className={styles.tw}>
-          <table className={styles.dt}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>Webinar</th>
-                <th>Pool</th>
-                <th>Attended</th>
-                <th>Attend Rate</th>
-                <th>Booked</th>
-                <th>Book Rate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reactivation.map((r) => (
-                <tr key={r.webinar}>
-                  <td className={r.highlight ? styles.lh : ""}>{r.webinar}</td>
-                  <td className={r.highlight ? styles.lh : ""}>{r.pool}</td>
-                  <td className={r.highlight ? styles.lh : ""}>{r.attended}</td>
-                  <td className={r.highlight ? styles.lh : ""}>{r.attendRate}</td>
-                  <td className={r.highlight ? styles.lh : ""}>{r.booked}</td>
-                  <td className={r.highlight ? styles.lh : ""}>{r.bookRate}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </>
-  );
+function computeWindows(
+  weekStart: string,
+  weekEnd: string,
+  reportType: "weekly_recap" | "midweek_check",
+): { kpiStart: string; kpiEnd: string; latestWebinarDate: string } {
+  // For Monday recap: snapshot.weekStart..weekEnd IS the prev Sun-Sat (e.g.,
+  // May 3 → May 9 for the May 11 report). latest_sun = weekEnd - 1 (Sun
+  // ... wait actually weekEnd is Sat. The latest webinar was the Sunday
+  // BEFORE that, e.g., May 10 came after May 3-9. So we'd need run_on - 1.
+  // Simpler: take the snapshot's latest_webinar string — but that may be
+  // human-formatted. For the KPI window, weekStart and weekEnd ARE the
+  // Sun-Sat anchors.
+  //
+  // For Thursday midweek: snapshot.weekStart is the current Sun, weekEnd
+  // is current Wed (Sun..Wed). But spec §1 says the KPI window for Thursday
+  // is the PREVIOUS Sun-Sat, NOT the current Sun..Wed. So for a Thursday
+  // snapshot we need to shift back.
+  if (reportType === "midweek_check") {
+    // weekEnd = current Wed. Latest webinar = current Wed.
+    // Prev Sun-Sat = (current Wed - 11d) ... (current Wed - 4d)? No, the
+    // previous Sun is current Wed - 10d (going back to prior Sun before
+    // current week's Sun). Actually: previous Sun-Sat that ends before the
+    // current Sun. current Sun = weekStart. So prev Sat = weekStart - 1,
+    // prev Sun = weekStart - 7.
+    const prevSat = addDays(weekStart, -1);
+    const prevSun = addDays(weekStart, -7);
+    return { kpiStart: prevSun, kpiEnd: prevSat, latestWebinarDate: weekEnd };
+  }
+  // Monday recap: weekStart..weekEnd IS the prev Sun-Sat already. Latest
+  // webinar (Sun) is the Sunday AFTER weekEnd, i.e., weekEnd + 1.
+  return { kpiStart: weekStart, kpiEnd: weekEnd, latestWebinarDate: addDays(weekEnd, 1) };
 }
 
-// ════════════════════════════════════════════════════════════════════════
-//  TAB 2 — Last Week's Sales (BQ-fed)
-// ════════════════════════════════════════════════════════════════════════
-
-type Tab2Props = {
-  funnelStages: ReturnType<typeof buildFunnelStages>;
-  funnelConnectors: ReturnType<typeof buildFunnelConnectors>;
-  kpiCards: ReturnType<typeof buildKpiCards>;
-  wowRows: ReturnType<typeof buildWoWComparison>;
-  closerOverall: ReturnType<typeof buildCloserOverall>;
-  closerOverallTotal: ReturnType<typeof buildCloserOverallTotal>;
-  closerWoW: ReturnType<typeof buildCloserWoW>;
-  perWebinarMostRecent: ReturnType<typeof buildCloserPerWebinar>;
-  perWebinarSecond: ReturnType<typeof buildCloserPerWebinar>;
-  bookingMode: ReturnType<typeof buildBookingMode>;
-  setterPerf: ReturnType<typeof buildSetterPerformance>;
-  webinarDates: string[];
-  banner: { tag: string; title: string; body: string };
-  snapshotSlug: string;
-  canEdit: boolean;
-};
-
-function Tab2(p: Tab2Props) {
-  return (
-    <>
-      <ContextBannerEditor
-        snapshotSlug={p.snapshotSlug}
-        initialTag={p.banner.tag}
-        initialTitle={p.banner.title}
-        initialBody={p.banner.body}
-        canEdit={p.canEdit}
-        kind="tab2"
-      />
-      <section className={styles.section}>
-        <div className={styles.sh}>Sales Funnel — Week May 3–9, 2026 (live)</div>
-        <div className={styles.funnel}>
-          {p.funnelStages.map((s, i) => {
-            const conn = i < p.funnelConnectors.length ? p.funnelConnectors[i] : null;
-            const color = COLORS[s.color as keyof typeof COLORS];
-            const bgRgba = colorRgba(s.color, 0.09);
-            const borderRgba = colorRgba(s.color, 0.22);
-            return (
-              <div key={s.label}>
-                <div className={styles.fRow}>
-                  <div
-                    className={styles.fBar}
-                    style={{ background: bgRgba, border: `1px solid ${borderRgba}`, width: `${s.width}%` }}
-                  >
-                    <span className={styles.fLabel} style={{ color }}>
-                      <Tip tip={s.tip}>{s.label}</Tip>
-                    </span>
-                    <span className={styles.fVal} style={{ color }}>{s.value}</span>
-                  </div>
-                </div>
-                {conn ? (
-                  <div className={styles.fConn}>
-                    <span
-                      className={styles.fRate}
-                      style={conn.rateColor === "green" ? { background: "rgba(74,222,128,.08)", color: "var(--green)" } : undefined}
-                    >
-                      {conn.rate}
-                    </span>
-                    <span className={styles.fDrop}>{conn.drop}</span>
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-
-        <div className={styles.kpiGrid}>
-          {p.kpiCards.map((k) => (
-            <div className={styles.kpi} key={k.label}>
-              <div className={styles.kpiLbl}><Tip tip={k.tip}>{k.label}</Tip></div>
-              <div className={styles.kpiVal}>{k.value}</div>
-              <div className={`${styles.kpiCh} ${k.changeClass === "up" ? styles.up : k.changeClass === "dn" ? styles.dn : ""}`}>{k.change}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <div className={styles.sh}>Week-over-Week Comparison</div>
-        <div className={styles.tw}>
-          <table className={styles.ct}>
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th className={styles.lhh}>This Week</th>
-                <th>Prior</th>
-                <th>Change</th>
-              </tr>
-            </thead>
-            <tbody>
-              {p.wowRows.map((r, i) =>
-                r.kind === "divider" ? (
-                  <tr key={i} className={styles.divRow}><td colSpan={4}>{r.label}</td></tr>
-                ) : (
-                  <tr key={i}>
-                    <td>{r.tip ? <Tip tip={r.tip}>{r.label}</Tip> : r.label}</td>
-                    <td className={`${styles.lh} ${r.thisWeekClass ? styles[r.thisWeekClass as keyof typeof styles] : ""}`}>{r.thisWeek}</td>
-                    <td>{r.prior}</td>
-                    <td className={r.changeClass === "up" ? styles.up : r.changeClass === "dn" ? styles.dn : styles.nt}>{r.change}</td>
-                  </tr>
-                ),
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <div className={styles.sh}>Closer Performance — Per Webinar (booking_week_sun basis)</div>
-        <div className={styles.twoCol}>
-          <PerWebinarTable title={p.webinarDates[1] ?? "—"} rows={p.perWebinarMostRecent} />
-          <PerWebinarTable title={p.webinarDates[2] ?? "—"} rows={p.perWebinarSecond} />
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <div className={styles.sh}>Closer Performance — Overall (appointment_date_time, May 3–9)</div>
-        <div className={styles.tw}>
-          <table className={styles.dt}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>Closer</th>
-                <th>Prospects</th>
-                <th>Pros (D&apos;d)</th>
-                <th>S.DQ</th>
-                <th>C.DQ</th>
-                <th>Pros (SQ)</th>
-                <th>Shows (SQ)</th>
-                <th>Shows (CQ)</th>
-                <th>Deals</th>
-                <th>Cash</th>
-                <th>Show%</th>
-                <th>Close%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {p.closerOverall.map((r) => (
-                <tr key={r.closer}>
-                  <td>{r.closer}</td>
-                  <td>{r.prospects}</td>
-                  <td>{r.prosD}</td>
-                  <td>{r.sDQ}</td>
-                  <td>{r.cDQ}</td>
-                  <td>{r.prosSQ}</td>
-                  <td>{r.showsSQ}</td>
-                  <td>{r.showsCQ}</td>
-                  <td className={r.upDeals ? styles.up : r.dnDeals ? styles.dn : ""}>{r.deals}</td>
-                  <td className={r.upCash ? styles.up : r.dnCash ? styles.dn : ""}>{r.cash}</td>
-                  <td className={r.upShow ? styles.up : ""}>{r.show}</td>
-                  <td className={r.upClose ? styles.up : r.dnClose ? styles.dn : ""}>{r.close}</td>
-                </tr>
-              ))}
-              <tr className={styles.divRow}><td colSpan={12}>Week Total</td></tr>
-              <tr>
-                <td><strong>{p.closerOverallTotal.label}</strong></td>
-                <td>{p.closerOverallTotal.prospects}</td>
-                <td>{p.closerOverallTotal.prosD}</td>
-                <td>{p.closerOverallTotal.sDQ}</td>
-                <td>{p.closerOverallTotal.cDQ}</td>
-                <td>{p.closerOverallTotal.prosSQ}</td>
-                <td>{p.closerOverallTotal.showsSQ}</td>
-                <td>{p.closerOverallTotal.showsCQ}</td>
-                <td>{p.closerOverallTotal.deals}</td>
-                <td>{p.closerOverallTotal.cash}</td>
-                <td>{p.closerOverallTotal.show}</td>
-                <td>{p.closerOverallTotal.close}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <br />
-        <div className={styles.sh} style={{ marginBottom: 12 }}>WoW Closer Comparison</div>
-        <div className={styles.tw}>
-          <table className={styles.dt}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>Closer</th>
-                <th className={styles.lhh}>This wk Deals</th>
-                <th className={styles.lhh}>This wk Cash</th>
-                <th>Prior Deals</th>
-                <th>Prior Cash</th>
-              </tr>
-            </thead>
-            <tbody>
-              {p.closerWoW.map((r) => (
-                <tr key={r.closer}>
-                  <td>{r.closer}</td>
-                  <td className={`${styles.lh} ${r.upDeals ? styles.up : r.dnDeals ? styles.dn : ""}`}>{r.deals}</td>
-                  <td className={`${styles.lh} ${r.upCash ? styles.up : r.dnCash ? styles.dn : ""}`}>{r.cash}</td>
-                  <td>{r.priorDeals}</td>
-                  <td>{r.priorCash}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <div className={styles.sh}>Booking Mode &amp; Setter Performance — Week May 3–9</div>
-        <div className={styles.twoCol}>
-          <div>
-            <div className={styles.sh} style={{ marginBottom: 12 }}>Booking Mode Split</div>
-            <div className={styles.tw}>
-              <table className={styles.dt}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left" }}>Source</th>
-                    <th>Prospects</th>
-                    <th>Pros (SQ)</th>
-                    <th>Shows (SQ)</th>
-                    <th>Show%</th>
-                    <th>Shows (CQ)</th>
-                    <th>Deals</th>
-                    <th>Cash</th>
-                    <th>Close%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.bookingMode.map((r) => (
-                    <tr key={r.source}>
-                      <td>{r.source}</td>
-                      <td>{r.prospects}</td>
-                      <td>{r.prosSQ}</td>
-                      <td>{r.showsSQ}</td>
-                      <td className={r.upShow ? styles.up : ""}>{r.showRate}</td>
-                      <td>{r.showsCQ}</td>
-                      <td>{r.deals}</td>
-                      <td>{r.cash}</td>
-                      <td>{r.close}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div>
-            <div className={styles.sh} style={{ marginBottom: 12 }}>Setter Performance — by Booking Mode</div>
-            <div className={styles.tw}>
-              <table className={styles.dt} style={{ fontSize: 11 }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left" }}>Setter</th>
-                    <th>Mode</th>
-                    <th>Pros (SQ)</th>
-                    <th>Shows (SQ)</th>
-                    <th>Show%</th>
-                    <th>Deals</th>
-                    <th>Cash</th>
-                    <th><Tip tip="$300/week bonus: 80%+ overall show rate AND 20+ Prospects (SQ)">Bonus</Tip></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.setterPerf.map((s) => (
-                    <SetterBlock key={s.name} setter={s} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-    </>
-  );
+function addDays(iso: string, days: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
-function PerWebinarTable({ title, rows }: { title: string; rows: ReturnType<typeof buildCloserPerWebinar> }) {
-  return (
-    <div>
-      <div className={styles.sh} style={{ marginBottom: 12 }}>{title}</div>
-      <div className={styles.tw}>
-        <table className={styles.dt}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>Closer</th>
-              <th>Prospects</th>
-              <th>Pros (SQ)</th>
-              <th>Shows (SQ)</th>
-              <th>Shows (CQ)</th>
-              <th>Deals</th>
-              <th>Close%</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--text-muted)" }}>No data</td></tr>
-            ) : null}
-            {rows.map((r) => (
-              <tr key={r.closer}>
-                <td>{r.closer}</td>
-                <td>{r.prospects}</td>
-                <td>{r.prosSQ}</td>
-                <td>{r.showsSQ}</td>
-                <td>{r.showsCQ}</td>
-                <td className={r.upDeals ? styles.up : ""}>{r.deals}</td>
-                <td className={r.upClose ? styles.up : r.dnClose ? styles.dn : r.ntClose ? styles.nt : ""}>{r.close}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-function SetterBlock({ setter }: { setter: ReturnType<typeof buildSetterPerformance>[number] }) {
-  const toneClass = setter.bonus.tone === "dn" ? styles.dn : setter.bonus.tone === "amb" ? styles.amb : styles.up;
-  return (
-    <>
-      {setter.rows.map((row, idx) => (
-        <tr key={row.mode}>
-          {idx === 0 ? <td rowSpan={2} style={{ fontWeight: 600 }}>{setter.name}</td> : null}
-          <td>{row.mode}</td>
-          <td>{row.prosSQ}</td>
-          <td>{row.showsSQ}</td>
-          <td className={row.upShow ? styles.up : row.dnShow ? styles.dn : ""}>{row.show}</td>
-          <td>{row.deals}</td>
-          <td>{row.cash}</td>
-          {idx === 0 ? <td rowSpan={2} className={toneClass}><Tip tip={setter.bonus.tip}>{setter.bonus.label}</Tip></td> : null}
-        </tr>
-      ))}
-      <tr className={styles.divRow}><td colSpan={7}>{setter.combined}</td></tr>
-    </>
-  );
-}
-
-// ─── helpers ────────────────────────────────────────────────────────────
-
-function colorRgba(name: string, alpha: number): string {
-  const map: Record<string, [number, number, number]> = {
-    blue: [96, 165, 250],
-    green: [74, 222, 128],
-    amber: [251, 191, 36],
-    purple: [167, 139, 250],
-  };
-  const c = map[name] ?? map.blue;
-  return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${alpha})`;
+async function fetchSectionBData(start: string, end: string, kpiStrip: Awaited<ReturnType<typeof fetchKpiStrip>>) {
+  return (await import("@/lib/weekly-report-bq-v2")).fetchSectionB(start, end, kpiStrip);
 }

@@ -68,6 +68,42 @@ const dashboards: Tile[] = [
 
 const sops: SopRailEntry[] = [
   {
+    href: "/sops/weekly-report",
+    title: "Weekly Report — Mon recap & Thu midweek",
+    description:
+      "Snapshot creation, the 6 tabs, AI insights, Solutions tabs, and Dev Mode for the exact SQL.",
+  },
+  {
+    href: "/sops/high-level-dashboard",
+    title: "High-Level (CEO) dashboard",
+    description:
+      "Daily marketing + sales + sales-cycle rollup — the pre-standup scan.",
+  },
+  {
+    href: "/sops/sales-performance-dashboard",
+    title: "Sales (Closer) Performance",
+    description:
+      "Per-closer rollup with cross-filters and Δ-vs-prior on every KPI.",
+  },
+  {
+    href: "/sops/setter-performance-dashboard",
+    title: "Setter Performance",
+    description:
+      "Per-setter view including the $300/week bonus eligibility check.",
+  },
+  {
+    href: "/sops/webinar-performance-dashboard",
+    title: "Webinar Performance",
+    description:
+      "Per-webinar breakdown — spend, regs, attendance, bookings, cash, ROAS.",
+  },
+  {
+    href: "/sops/funnel-search",
+    title: "Funnel Search",
+    description:
+      "Trace one Calendly booking through the funnel by tag, closer, host, or status.",
+  },
+  {
     href: "/sops/how-to-read-capacity-dashboard",
     title: "How to read the capacity dashboard",
     description:

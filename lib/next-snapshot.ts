@@ -155,6 +155,45 @@ export async function checkAvailability(weekStart: string, weekEnd: string): Pro
 }
 
 /**
+ * Build a proposed snapshot from a specific Mon/Thu run date. Throws if the
+ * given date is not a Monday or Thursday, or if it is in the future.
+ */
+export function proposeFromRunDate(runDate: Date, now: Date = new Date()): ProposedSnapshot {
+  const day = runDate.getUTCDay();
+  if (day !== 1 && day !== 4) {
+    throw new Error(`Run date ${isoDate(runDate)} is not a Monday or Thursday`);
+  }
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  if (runDate > todayUtc) {
+    throw new Error(`Run date ${isoDate(runDate)} is in the future`);
+  }
+  return proposeFromDate(runDate);
+}
+
+/**
+ * Enumerate every Mon + Thu from `weeksBack` weeks ago up to and including
+ * the most-recent Mon/Thu on or before `now`. Newest-first.
+ */
+export function enumerateMonThuRange(now: Date = new Date(), weeksBack = 12): ProposedSnapshot[] {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const cutoff = addDays(today, -weeksBack * 7);
+
+  // Walk back from today to the most recent Mon/Thu.
+  let cursor = today;
+  while (cursor.getUTCDay() !== 1 && cursor.getUTCDay() !== 4) {
+    cursor = addDays(cursor, -1);
+  }
+  const out: ProposedSnapshot[] = [];
+  while (cursor >= cutoff) {
+    out.push(proposeFromDate(cursor));
+    // Step back to the previous Mon or Thu. Mon (1) → prev Thu = -4 days;
+    // Thu (4) → prev Mon = -3 days.
+    cursor = addDays(cursor, cursor.getUTCDay() === 1 ? -4 : -3);
+  }
+  return out;
+}
+
+/**
  * One-shot helper used by the API route.
  */
 export async function determineNext(now: Date = new Date()): Promise<NextSnapshotResult> {

@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type Proposed = {
+type Proposal = {
   slug: string;
   runOn: string;
   weekStart: string;
@@ -11,169 +11,224 @@ type Proposed = {
   reportType: "weekly_recap" | "midweek_check";
   weekLabel: string;
   badge: string;
+  latestWebinar: string;
+  existing: boolean;
+  dataReady: boolean;
+  availability: { webinars: number; calls: number; missing: string[] };
 };
 
-type GetResponse =
-  | { status: "exists"; proposed: Proposed; existingSlug: string }
-  | { status: "ready"; proposed: Proposed; availability: { webinars: number; calls: number; missing: string[] } }
-  | { status: "missing_data"; proposed: Proposed; availability: { webinars: number; calls: number; missing: string[] } };
+const REPORT_LABEL: Record<Proposal["reportType"], string> = {
+  weekly_recap: "Weekly recap",
+  midweek_check: "Midweek check",
+};
+
+function fmtDayDate(iso: string): string {
+  // "Thu May 14, 2026"
+  const d = new Date(iso + "T12:00:00Z");
+  return d.toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC",
+  });
+}
+
+function fmtRange(start: string, end: string): string {
+  const s = new Date(start + "T12:00:00Z");
+  const e = new Date(end + "T12:00:00Z");
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
+  return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", { ...opts, year: "numeric" })}`;
+}
 
 export function CreateNextSnapshotButton() {
   const router = useRouter();
-  const [status, setStatus] = useState<"idle" | "checking" | "creating">("idle");
-  const [result, setResult] = useState<GetResponse | null>(null);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [proposals, setProposals] = useState<Proposal[] | null>(null);
+  const [selectedRunOn, setSelectedRunOn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const reset = () => {
-    setStatus("idle");
-    setResult(null);
+  // Fetch the picker list when the user opens it.
+  useEffect(() => {
+    if (!open || proposals) return;
+    let cancelled = false;
+    setLoading(true);
     setError(null);
-  };
+    (async () => {
+      try {
+        const res = await fetch("/api/weekly-reports/proposals", { cache: "no-store" });
+        const data: { proposals?: Proposal[]; error?: string } = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        if (cancelled) return;
+        setProposals(data.proposals ?? []);
+        // Default-select the newest entry.
+        setSelectedRunOn(data.proposals?.[0]?.runOn ?? null);
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, proposals]);
 
-  const check = async () => {
-    setStatus("checking");
+  const selected = useMemo(
+    () => proposals?.find((p) => p.runOn === selectedRunOn) ?? null,
+    [proposals, selectedRunOn],
+  );
+
+  const reset = () => {
+    setOpen(false);
+    setProposals(null);
+    setSelectedRunOn(null);
     setError(null);
-    setResult(null);
-    try {
-      const res = await fetch("/api/weekly-reports/next", { cache: "no-store" });
-      const data: GetResponse & { error?: string } = await res.json();
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setResult(data);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setStatus("idle");
-    }
   };
 
   const create = async () => {
-    setStatus("creating");
+    if (!selected || selected.existing || !selected.dataReady) return;
+    setCreating(true);
     setError(null);
     try {
-      const res = await fetch("/api/weekly-reports/next", { method: "POST" });
+      const res = await fetch("/api/weekly-reports/proposals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runOn: selected.runOn }),
+      });
       const data: { slug?: string; error?: string } = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       router.push(`/dashboards/weekly-report/${data.slug}`);
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
-      setStatus("idle");
+      setCreating(false);
     }
   };
 
-  // Initial state — single button.
-  if (!result && !error) {
+  if (!open) {
     return (
       <button
         type="button"
-        onClick={() => void check()}
-        disabled={status !== "idle"}
-        className="shrink-0 rounded-lg border border-accent bg-accent/10 px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-accent transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-60"
+        onClick={() => setOpen(true)}
+        className="shrink-0 rounded-lg border border-accent bg-accent/10 px-4 py-2 text-xs font-medium uppercase tracking-[0.14em] text-accent transition hover:bg-accent/20"
       >
-        {status === "checking" ? "Checking…" : "+ Create next snapshot"}
+        + Create snapshot
       </button>
     );
   }
 
   return (
     <div className="w-full rounded-2xl border border-border bg-card p-5 text-sm shadow-sm">
-      {error ? (
+      {loading ? (
+        <div className="text-muted-foreground">Loading available dates…</div>
+      ) : error && !proposals ? (
         <div className="space-y-2">
           <div className="text-rose-700">Error: {error}</div>
           <button type="button" onClick={reset} className="text-xs uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
-            ← Try again
+            ← Cancel
           </button>
         </div>
-      ) : result?.status === "exists" ? (
-        <div className="space-y-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Already created</div>
-            <p className="mt-1 text-sm">
-              The next due snapshot (<code className="font-mono">{result.proposed.slug}</code> ·{" "}
-              {result.proposed.reportType === "weekly_recap" ? "Weekly recap" : "Midweek check"}) already exists.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <a
-              href={`/dashboards/weekly-report/${result.existingSlug}`}
-              className="rounded-md border border-accent bg-accent/10 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-accent hover:bg-accent/20"
+      ) : !proposals || proposals.length === 0 ? (
+        <div className="space-y-2">
+          <div className="text-muted-foreground">No Mon/Thu dates available in the last 12 weeks.</div>
+          <button type="button" onClick={reset} className="text-xs uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
+            ← Cancel
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label htmlFor="snapshot-date" className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              Pick a date (last 12 weeks)
+            </label>
+            <select
+              id="snapshot-date"
+              value={selectedRunOn ?? ""}
+              onChange={(e) => setSelectedRunOn(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-accent focus:outline-none"
             >
-              Open →
-            </a>
-            <button type="button" onClick={reset} className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
-              Close
-            </button>
+              {proposals.map((p) => {
+                const statusTag = p.existing
+                  ? "already exists"
+                  : p.dataReady
+                  ? "ready"
+                  : `missing ${p.availability.missing.join(" + ")}`;
+                return (
+                  <option key={p.runOn} value={p.runOn}>
+                    {fmtDayDate(p.runOn)} · {REPORT_LABEL[p.reportType]} — {statusTag}
+                  </option>
+                );
+              })}
+            </select>
           </div>
-        </div>
-      ) : result?.status === "missing_data" ? (
-        <div className="space-y-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-rose-700">Not ready yet</div>
-            <p className="mt-1 text-sm">
-              Proposed: <code className="font-mono">{result.proposed.slug}</code> ·{" "}
-              {result.proposed.weekLabel}
-            </p>
-            <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
-              <li>
-                Webinar rows in <code className="font-mono">mart_webinar_events</code>:{" "}
-                <span className={result.availability.webinars === 0 ? "text-rose-700" : ""}>
-                  {result.availability.webinars}
-                </span>
-              </li>
-              <li>
-                Call rows in <code className="font-mono">int_calls_enriched</code>:{" "}
-                <span className={result.availability.calls === 0 ? "text-rose-700" : ""}>
-                  {result.availability.calls}
-                </span>
-              </li>
-            </ul>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Missing: <strong>{result.availability.missing.join(", ")}</strong>. Wait for the dbt pipeline to finish, then try again.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => void check()} className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-accent hover:bg-accent/10">
-              Re-check
-            </button>
-            <button type="button" onClick={reset} className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : result?.status === "ready" ? (
-        <div className="space-y-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-[0.14em] text-emerald-700">Ready to create</div>
-            <div className="mt-1 space-y-1 text-sm">
-              <div>
-                <strong>{result.proposed.reportType === "weekly_recap" ? "Weekly recap" : "Midweek check"}</strong>{" "}
-                · <code className="font-mono">{result.proposed.slug}</code>
+
+          {selected ? (
+            <div className="space-y-1 rounded-lg border border-border bg-muted/20 p-3 text-xs">
+              <div className="font-mono text-sm">{selected.slug}</div>
+              <div className="text-muted-foreground">
+                {REPORT_LABEL[selected.reportType]} · Week {fmtRange(selected.weekStart, selected.weekEnd)}
               </div>
-              <div className="text-muted-foreground">{result.proposed.weekLabel}</div>
-              <div className="text-xs text-muted-foreground">
-                {result.availability.webinars} webinar row{result.availability.webinars === 1 ? "" : "s"} ·{" "}
-                {result.availability.calls.toLocaleString()} call row{result.availability.calls === 1 ? "" : "s"}
+              <div className="text-muted-foreground">Latest webinar: {selected.latestWebinar}</div>
+              <div className="text-muted-foreground">
+                BQ data:{" "}
+                <span className={selected.availability.webinars === 0 ? "text-rose-700" : ""}>
+                  {selected.availability.webinars} webinars
+                </span>{" "}
+                ·{" "}
+                <span className={selected.availability.calls === 0 ? "text-rose-700" : ""}>
+                  {selected.availability.calls.toLocaleString()} calls
+                </span>
               </div>
+              {selected.existing ? (
+                <div className="text-amber-700">Snapshot already exists.</div>
+              ) : !selected.dataReady ? (
+                <div className="text-rose-700">
+                  Cannot create — missing <strong>{selected.availability.missing.join(", ")}</strong> in BQ.
+                </div>
+              ) : (
+                <div className="text-emerald-700">Ready to create.</div>
+              )}
             </div>
-          </div>
-          <div className="flex gap-2">
+          ) : null}
+
+          {error ? <div className="text-xs text-rose-700">{error}</div> : null}
+
+          <div className="flex flex-wrap gap-2">
+            {selected?.existing ? (
+              <a
+                href={`/dashboards/weekly-report/${selected.slug}`}
+                className="rounded-md border border-accent bg-accent/10 px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-accent hover:bg-accent/20"
+              >
+                Open →
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void create()}
+                disabled={!selected || !selected.dataReady || creating}
+                title={
+                  !selected
+                    ? "Select a date first"
+                    : !selected.dataReady
+                    ? `BQ data not ready — missing ${selected.availability.missing.join(", ")} for ${fmtRange(selected.weekStart, selected.weekEnd)}. Wait for the dbt pipeline to finish.`
+                    : ""
+                }
+                className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {creating ? "Creating…" : "Create snapshot"}
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => void create()}
-              disabled={status === "creating"}
-              className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={reset}
+              disabled={creating}
+              className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground"
             >
-              {status === "creating" ? "Creating…" : "Create snapshot"}
-            </button>
-            <button type="button" onClick={reset} disabled={status === "creating"} className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
               Cancel
             </button>
           </div>
           <p className="text-[10px] text-muted-foreground">
-            The VM cron will pick it up within ~60 seconds and generate insights with Claude.
+            Only past Mon/Thu dates can be created. After creation, the VM cron picks it up within ~60s and generates AI insights.
           </p>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

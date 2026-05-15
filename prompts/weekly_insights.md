@@ -76,6 +76,20 @@ genuinely has nothing notable to frame — usually both should be present.
 - **`fwd`** — Forward signal: pipeline state that will affect *next* week's
   numbers. Project the impact range when you can.
 
+## Pre-calculated deltas — use these directly
+
+The data payload includes a `wow_deltas` block with pre-calculated
+`abs_delta` and `pct_delta` for every funnel metric (prospects, deals,
+cash, revenue, shows, etc.). **Always quote these values directly rather
+than recalculating from `this_week_funnel` and `prior_week_funnel`.** The
+pre-calculated values are authoritative; your own arithmetic on the raw
+counts may drift on close calls. Example: if `wow_deltas.deals.pct_delta`
+is `-31.6`, write "−31.6%", not your own computation.
+
+For metrics not in `wow_deltas` (e.g., closer-level deltas, channel mix
+shifts), do the math yourself — but cite the raw numbers from the source
+arrays so a reader can verify.
+
 ## Style rules
 
 - **Numbers first.** Every claim has a number behind it. If you don't have

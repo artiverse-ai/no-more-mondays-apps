@@ -54,11 +54,45 @@ def fetch_snapshot(slug: str) -> dict[str, Any] | None:
     return dict(rows[0].items())
 
 
+def reset_stuck_generating(stale_minutes: int = 10) -> int:
+    """Self-heal — if a row has been stuck in 'generating' for >stale_minutes
+    (typical signal of a VM crash mid-run or a Python exception that didn't
+    reach mark_failed), reset it to 'pending' so the next poll picks it up.
+
+    Called at the top of claim_pending so every cron tick self-heals.
+    Returns the number of rows reset.
+    """
+    cli = _client()
+    sql = f"""
+      UPDATE {SNAPSHOTS}
+      SET insights_generation_status = 'pending',
+          insights_generation_error = CONCAT('auto-reset after stuck >',
+            CAST(@minutes AS STRING), 'min in generating'),
+          updated_at = CURRENT_TIMESTAMP()
+      WHERE insights_generation_status = 'generating'
+        AND deleted_at IS NULL
+        AND updated_at < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @minutes MINUTE)
+    """
+    job = cli.query(
+        sql,
+        job_config=bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("minutes", "INT64", stale_minutes),
+        ]),
+    )
+    job.result()
+    return int(job.num_dml_affected_rows or 0)
+
+
 def claim_pending() -> dict[str, Any] | None:
     """
     Atomically pick one 'pending' snapshot, flip it to 'generating', and
     return it. Returns None if the queue is empty.
+
+    Calls reset_stuck_generating() first so rows abandoned in 'generating'
+    (e.g., from a VM crash or hard-killed Claude subprocess) get rescued
+    automatically.
     """
+    reset_stuck_generating()
     cli = _client()
     pick_sql = f"""
       SELECT slug FROM {SNAPSHOTS}
@@ -367,8 +401,45 @@ def fetch_setter_performance(start: str, end: str) -> list[dict[str, Any]]:
     ])
 
 
+def _safe_pct_delta(this_val: Any, prior_val: Any) -> dict[str, Any]:
+    """Pre-computes (this - prior) and (this - prior) / prior * 100 — the
+    two numbers Claude is most likely to cite (and most likely to compute
+    incorrectly on close calls). Returns None for ratio when prior is 0
+    to avoid divide-by-zero in downstream readers.
+    """
+    try:
+        t = float(this_val or 0)
+        p = float(prior_val or 0)
+    except (TypeError, ValueError):
+        return {"this": this_val, "prior": prior_val, "abs_delta": None, "pct_delta": None}
+    abs_delta = t - p
+    pct_delta = ((t - p) / p * 100) if p != 0 else None
+    return {
+        "this": t, "prior": p,
+        "abs_delta": round(abs_delta, 2),
+        "pct_delta": round(pct_delta, 2) if pct_delta is not None else None,
+    }
+
+
+def compute_funnel_wow(this_week: dict[str, Any], prior_week: dict[str, Any]) -> dict[str, Any]:
+    """Pre-calculates WoW deltas for every funnel metric. Claude can still
+    do math, but with these in hand it doesn't have to — fewer math errors,
+    faster output, more consistent insight quoting.
+    """
+    keys = [
+        "prospects", "pros_d", "setter_dq", "closer_dq",
+        "pros_sq", "shows_sq", "shows_cq", "deals", "cash", "revenue",
+    ]
+    return {k: _safe_pct_delta(this_week.get(k), prior_week.get(k)) for k in keys}
+
+
 def assemble_report_payload(slug: str) -> dict[str, Any]:
-    """Pulls every table needed for the prompt, keyed for JSON dump."""
+    """Pulls every table needed for the prompt, keyed for JSON dump.
+
+    Also pre-computes WoW deltas (absolute + percent) on funnel metrics
+    and surfaces them under `wow_deltas` so Claude doesn't have to redo
+    the math itself.
+    """
     snap = fetch_snapshot(slug)
     if snap is None:
         raise ValueError(f"Snapshot {slug!r} not found")
@@ -377,6 +448,9 @@ def assemble_report_payload(slug: str) -> dict[str, Any]:
     prior_start = _shift_days(start, -7)
     prior_end = _shift_days(end, -7)
     same_weekday = snap["report_type"] == "midweek_check"
+
+    this_week_funnel = fetch_week_funnel(start, end)
+    prior_week_funnel = fetch_week_funnel(prior_start, prior_end)
 
     return {
         "snapshot": {
@@ -397,8 +471,9 @@ def assemble_report_payload(slug: str) -> dict[str, Any]:
             },
         },
         "webinars_comparison": fetch_webinar_comparison(end, same_weekday),
-        "this_week_funnel": fetch_week_funnel(start, end),
-        "prior_week_funnel": fetch_week_funnel(prior_start, prior_end),
+        "this_week_funnel": this_week_funnel,
+        "prior_week_funnel": prior_week_funnel,
+        "wow_deltas": compute_funnel_wow(this_week_funnel, prior_week_funnel),
         "closer_overall": fetch_closer_overall(start, end),
         "booking_mode": fetch_booking_mode(start, end),
         "setter_performance": fetch_setter_performance(start, end),

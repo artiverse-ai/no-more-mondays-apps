@@ -34,12 +34,14 @@ VALID_TONES = {"ctx", "win", "watch", "flag", "fix", "fwd"}
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 CLAUDE_TIMEOUT_SEC = int(os.environ.get("CLAUDE_TIMEOUT_SEC", "300"))
 
-# Model selection. Haiku is ~3x faster than Sonnet for structured-JSON
-# output like ours and the quality is sufficient for "produce 12 insight
-# cards citing specific numbers". Fallback to Sonnet on overload so we
-# never come back empty-handed during heavy load.
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "haiku")
-CLAUDE_FALLBACK_MODEL = os.environ.get("CLAUDE_FALLBACK_MODEL", "sonnet")
+# Model selection. We default to Sonnet 4.6 — strong reasoning + reliable
+# math for our task (produce structured JSON with cited numbers from the
+# supplied data) while staying within the user's 3-5 min latency budget.
+# Haiku is faster but more error-prone on math; Opus is more capable but
+# typically exceeds the latency budget on a 14K-char prompt. Sonnet hits
+# the sweet spot.
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "sonnet")
+CLAUDE_FALLBACK_MODEL = os.environ.get("CLAUDE_FALLBACK_MODEL", "opus")
 
 
 def _log(msg: str) -> None:
@@ -72,8 +74,13 @@ def assemble_prompt(template: str, payload: dict[str, Any]) -> str:
     )
 
 
-def run_claude(prompt: str) -> str:
-    """Invoke Claude Code in headless mode, return its raw stdout."""
+CLAUDE_MAX_ATTEMPTS = int(os.environ.get("CLAUDE_MAX_ATTEMPTS", "3"))
+
+
+def _run_claude_once(prompt: str) -> str:
+    """Single subprocess invocation of `claude -p`. Raises on non-zero
+    exit or timeout. Caller layers retry on top.
+    """
     if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
         raise RuntimeError(
             "CLAUDE_CODE_OAUTH_TOKEN env var is not set — claude -p will fail."
@@ -84,10 +91,6 @@ def run_claude(prompt: str) -> str:
         "--model", CLAUDE_MODEL,
         "--fallback-model", CLAUDE_FALLBACK_MODEL,
     ]
-    _log(
-        f"Calling: {CLAUDE_BIN} -p <…{len(prompt)} chars…> "
-        f"--model {CLAUDE_MODEL} (fallback {CLAUDE_FALLBACK_MODEL})"
-    )
     proc = subprocess.run(
         cmd,
         capture_output=True,
@@ -100,6 +103,31 @@ def run_claude(prompt: str) -> str:
             f"claude exited {proc.returncode}.\nstderr: {proc.stderr[:500]}"
         )
     return proc.stdout
+
+
+def run_claude(prompt: str) -> str:
+    """Retry-wrapped Claude call. Transient failures (rate limit, network
+    blip, occasional malformed parse upstream) get a second + third
+    attempt with exponential backoff before bubbling the exception."""
+    _log(
+        f"Calling: {CLAUDE_BIN} -p <…{len(prompt)} chars…> "
+        f"--model {CLAUDE_MODEL} (fallback {CLAUDE_FALLBACK_MODEL})"
+    )
+    last_exc: Exception | None = None
+    import time
+    for attempt in range(1, CLAUDE_MAX_ATTEMPTS + 1):
+        try:
+            return _run_claude_once(prompt)
+        except Exception as e:  # noqa: BLE001
+            last_exc = e
+            if attempt < CLAUDE_MAX_ATTEMPTS:
+                backoff = 5 * attempt  # 5s, 10s
+                _log(f"  attempt {attempt} failed: {e}; retrying in {backoff}s")
+                time.sleep(backoff)
+            else:
+                _log(f"  attempt {attempt} failed (final): {e}")
+    assert last_exc is not None
+    raise last_exc
 
 
 def extract_json_object(raw: str) -> dict[str, Any]:
@@ -166,9 +194,22 @@ def _validate_banner(b: Any, name: str) -> dict[str, str] | None:
     return out
 
 
+MIN_INSIGHTS = int(os.environ.get("MIN_INSIGHTS", "8"))
+MAX_INSIGHTS = int(os.environ.get("MAX_INSIGHTS", "15"))
+MIN_BODY_CHARS = int(os.environ.get("MIN_BODY_CHARS", "80"))
+
+
 def validate_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    if not (4 <= len(items) <= 15):  # Soft bounds; prompt asks for 8-12.
-        raise ValueError(f"Expected 4-15 insight cards, got {len(items)}")
+    """Reject anything that looks degenerate so retry kicks in:
+    - Insight count outside [MIN_INSIGHTS..MAX_INSIGHTS]
+    - Missing/empty required fields
+    - Body shorter than MIN_BODY_CHARS (too terse to be useful)
+    - Invalid tone enum
+    """
+    if not (MIN_INSIGHTS <= len(items) <= MAX_INSIGHTS):
+        raise ValueError(
+            f"Expected {MIN_INSIGHTS}-{MAX_INSIGHTS} insight cards, got {len(items)}"
+        )
     cleaned = []
     for i, it in enumerate(items):
         if not isinstance(it, dict):
@@ -178,11 +219,16 @@ def validate_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 raise ValueError(f"Item {i} missing/empty field {k!r}")
         if it["tone"] not in VALID_TONES:
             raise ValueError(f"Item {i} has invalid tone {it['tone']!r}")
+        body = it["body"].strip()
+        if len(body) < MIN_BODY_CHARS:
+            raise ValueError(
+                f"Item {i} body too short ({len(body)} < {MIN_BODY_CHARS} chars): {body[:60]!r}"
+            )
         cleaned.append({
             "tone": it["tone"],
             "tag": it["tag"].strip(),
             "title": it["title"].strip(),
-            "body": it["body"].strip(),
+            "body": body,
             "position": int(it.get("position", i)),
         })
     return cleaned

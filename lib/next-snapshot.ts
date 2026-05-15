@@ -24,6 +24,7 @@ export type ProposedSnapshot = {
   reportType: ReportType;
   weekLabel: string;
   badge: string;
+  latestWebinar: string;
 };
 
 export type Availability = {
@@ -70,6 +71,13 @@ function fmtThuMidweekLabel(start: Date, end: Date): string {
   return `${s} – ${e} (week-to-date)`;
 }
 
+function fmtLatestWebinar(d: Date, mode: ReportType): string {
+  // "Sun May 10" for Monday (latest_sun); "Wed May 13" for Thursday (latest_wed).
+  const opts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" };
+  const formatted = d.toLocaleDateString("en-US", opts);
+  return formatted;
+}
+
 /**
  * For a given "today" (UTC date), find the most recent Mon or Thu (inclusive)
  * and build the proposed snapshot.
@@ -105,6 +113,12 @@ export function proposeFromDate(now: Date): ProposedSnapshot {
     badge = `${fmtBadgeDate(runDate)} · MIDWEEK`;
   }
 
+  // Monday recap: latest webinar is the Sunday the day before run (Sun).
+  // Thursday midweek: latest webinar is the Wednesday the day before run (Wed).
+  // Both are the day before runDate.
+  const latestWebinarDay = addDays(runDate, -1);
+  const latestWebinar = fmtLatestWebinar(latestWebinarDay, reportType);
+
   return {
     slug: isoDate(runDate),
     runOn: isoDate(runDate),
@@ -113,6 +127,7 @@ export function proposeFromDate(now: Date): ProposedSnapshot {
     reportType,
     weekLabel,
     badge,
+    latestWebinar,
   };
 }
 

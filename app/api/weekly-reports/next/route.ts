@@ -54,7 +54,7 @@ export async function POST() {
       reportType: p.reportType,
       weekLabel: p.weekLabel,
       badge: p.badge,
-      latestWebinar: null,
+      latestWebinar: p.latestWebinar,
       contextTag: null,
       contextTitle: null,
       contextBody: null,

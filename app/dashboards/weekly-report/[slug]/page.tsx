@@ -168,7 +168,7 @@ export default async function Page({
       <div className={styles.hdr}>
         <h1>NMM {reportType === "weekly_recap" ? "Monday" : "Thursday"} Report</h1>
         <span className={styles.sub}>
-          Latest Webinar: {snapshot.latestWebinar ?? "—"} · KPI window {kpiStart} → {kpiEnd}
+          Latest Webinar: {snapshot.latestWebinar ?? "—"} · KPI window {fmtKpiWindow(kpiStart, kpiEnd)}
         </span>
         <span className={styles.badge}>{snapshot.badge}</span>
       </div>
@@ -219,6 +219,16 @@ function addDays(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+function fmtKpiWindow(startIso: string, endIso: string): string {
+  // "May 3–9, 2026 (Sun–Sat)" — friendly format per spec §3.
+  const start = new Date(startIso + "T00:00:00Z");
+  const end = new Date(endIso + "T00:00:00Z");
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
+  const startLabel = start.toLocaleDateString("en-US", opts);
+  const endLabel = end.toLocaleDateString("en-US", { ...opts, year: "numeric" });
+  return `${startLabel}–${endLabel} (Sun–Sat)`;
 }
 
 async function fetchSectionBData(start: string, end: string, kpiStrip: Awaited<ReturnType<typeof fetchKpiStrip>>) {

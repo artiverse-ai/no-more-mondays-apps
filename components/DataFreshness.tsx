@@ -86,7 +86,8 @@ function useTick(): number {
 export type DataFreshnessProps = {
   /** ISO timestamp of the data being rendered (e.g. max `dbt_updated_at`). */
   asOf: string | null;
-  /** Override the refresh interval. Defaults to 5 minutes. */
+  /** Override the refresh interval. Defaults to 1 hour (matches the dbt
+   *  sync cadence — refreshing more often won't pull any new rows). */
   intervalMs?: number;
   /** Optional label override — defaults to "Data as of". */
   label?: string;
@@ -95,7 +96,7 @@ export type DataFreshnessProps = {
 
 export function DataFreshness({
   asOf,
-  intervalMs = 5 * 60 * 1000,
+  intervalMs = 60 * 60 * 1000,
   label = "Data as of",
   className,
 }: DataFreshnessProps) {
@@ -143,7 +144,7 @@ export function DataFreshness({
       )}
       title={
         validAsOf
-          ? `${label} ${validAsOf.toLocaleString()} — auto-refreshes every ${Math.round(intervalMs / 60_000)} min`
+          ? `${label} ${validAsOf.toLocaleString()} — dbt syncs hourly; this page re-fetches every ${Math.round(intervalMs / 60_000)} min to match.`
           : "Data freshness unavailable"
       }
     >
@@ -160,8 +161,11 @@ export function DataFreshness({
           {validAsOf ? <RelativeTime date={validAsOf} now={now} /> : "—"}
         </span>
       </span>
-      <span className="hidden text-muted-foreground/70 sm:inline">
-        · next in {formatCountdown(nextRefreshIn)}
+      <span
+        className="hidden text-muted-foreground/70 sm:inline"
+        title="dbt models sync hourly; next auto-refresh"
+      >
+        · next sync in {formatCountdown(nextRefreshIn)}
       </span>
       <button
         type="button"

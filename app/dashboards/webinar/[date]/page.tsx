@@ -336,8 +336,12 @@ export default async function WebinarDetailPage(
         </div>
       </section>
 
-      {/* Sales */}
+      {/* Sales — ordered top→bottom in funnel order: stage counts +
+          conversion rates → money → efficiency → ROAS. Pitch→Book Rate
+          sits first because it bridges the previous (Funnel) group
+          (`pitched_attendees`) with this group (`calls_booked`). */}
       <Group title="Sales">
+        <Kpi label="Pitch → Book Rate" metric="pitch_to_book_rate" devMode={devMode} value={fmt.pct(w.pitch_to_book_rate)} sub="booked / pitched" />
         <Kpi label="Calls Booked" metric="calls_booked" devMode={devMode} value={fmt.int(w.calls_booked)} />
         <Kpi label="Active (non-canceled)" metric="calls_booked_active" devMode={devMode} value={fmt.int(w.calls_booked_active)} />
         <Kpi
@@ -382,7 +386,6 @@ export default async function WebinarDetailPage(
           value={fmt.ratio(w.roas_cash_running)}
           sub="running cash / spend"
         />
-        <Kpi label="Pitch → Book Rate" metric="pitch_to_book_rate" devMode={devMode} value={fmt.pct(w.pitch_to_book_rate)} />
       </Group>
 
       </> : null}

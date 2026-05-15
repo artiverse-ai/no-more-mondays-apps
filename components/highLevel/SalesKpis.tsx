@@ -71,6 +71,13 @@ export function SalesKpis({
           value={fmt.pct(kpis.pifRate)}
           sub="paid-in-full / deals"
         />
+        <Kpi
+          label="Cash Collection Rate"
+          metric="cash_collection_rate"
+          devMode={devMode}
+          value={fmt.pct(kpis.cashCollectionRate)}
+          sub="cash / contracted (TCV)"
+        />
       </div>
     </section>
   );

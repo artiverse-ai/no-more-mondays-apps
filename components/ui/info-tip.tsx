@@ -77,13 +77,12 @@ export function InfoTip({
         <Tooltip.Positioner sideOffset={8} className="z-50">
           <Tooltip.Popup
             className={cn(
-              "w-[min(22rem,calc(100vw-2rem))] origin-[var(--transform-origin)] rounded-xl bg-popover p-3.5 text-[12.5px] leading-relaxed text-popover-foreground outline-none",
+              "w-[min(22rem,calc(100vw-2rem))] origin-[var(--transform-origin)] rounded-xl bg-popover p-3.5 text-[12.5px] leading-relaxed text-popover-foreground outline-none ease-out",
               "shadow-[var(--shadow-elevated)]",
               "data-[instant]:duration-0",
               "data-[open]:animate-in data-[open]:fade-in-0 data-[open]:zoom-in-95",
               "data-[closed]:animate-out data-[closed]:fade-out-0 data-[closed]:zoom-out-95",
             )}
-            style={{ transitionTimingFunction: "var(--ease-out)" }}
           >
             <div className="text-[13px] font-semibold tracking-[-0.005em] text-foreground">
               {def.label}

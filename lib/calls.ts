@@ -431,6 +431,8 @@ export type CloserRollup = {
   closer: string;
   prospects: number;
   dispositioned: number;
+  setter_dq: number;
+  closer_dq: number;
   prospects_sq: number;
   shows_sq: number;
   shows_cq: number;
@@ -441,13 +443,16 @@ export type CloserRollup = {
   deposit_collected: number;
   aov: number | null;
   acv: number | null;
-  show_rate: number | null;     // shows_sq / prospects_sq
-  close_rate: number | null;    // deals / shows_cq
+  show_rate: number | null;            // shows_sq / prospects_sq
+  close_rate_shows: number | null;     // deals / shows (Monday-spec "Close Rate (Shows)")
+  close_rate_cq: number | null;        // deals / qualified shows
+  setter_dq_rate: number | null;       // setter_dq / dispositioned
+  closer_dq_rate: number | null;       // closer_dq / shows (NOT qualified shows — per Monday spec)
 };
 
 export type SetterRollup = {
   setter: string;
-  bookings: number;             // every prospect they booked
+  bookings: number;                    // every prospect they booked
   dispositioned: number;
   setter_dq: number;
   prospects_sq: number;
@@ -456,8 +461,11 @@ export type SetterRollup = {
   closer_dq: number;
   deals: number;
   cash: number;
-  setter_dq_rate: number | null;     // setter_dq / dispositioned
+  setter_dq_rate: number | null;       // setter_dq / dispositioned
+  closer_dq_rate: number | null;       // closer_dq / shows
   show_rate: number | null;
+  close_rate_shows: number | null;     // deals / shows
+  close_rate_cq: number | null;        // deals / qualified shows
   cash_per_booking: number | null;
 };
 
@@ -494,6 +502,8 @@ export function rollupByCloser(rows: CallRow[]): CloserRollup[] {
       closer,
       prospects: f.prospects,
       dispositioned: f.dispositioned,
+      setter_dq: f.setter_dq,
+      closer_dq: f.closer_dq,
       prospects_sq: f.prospects_sq,
       shows_sq: f.shows_sq,
       shows_cq: f.shows_cq,
@@ -505,7 +515,10 @@ export function rollupByCloser(rows: CallRow[]): CloserRollup[] {
       aov: div(cash, f.deals),
       acv: div(tcv, f.deals),
       show_rate: div(f.shows_sq, f.prospects_sq),
-      close_rate: div(f.deals, f.shows_cq),
+      close_rate_shows: div(f.deals, f.shows_sq),
+      close_rate_cq: div(f.deals, f.shows_cq),
+      setter_dq_rate: div(f.setter_dq, f.dispositioned),
+      closer_dq_rate: div(f.closer_dq, f.shows_sq),
     });
   }
   return out.sort((a, b) => b.cash - a.cash);
@@ -547,7 +560,10 @@ export function rollupBySetter(rows: CallRow[]): SetterRollup[] {
       deals: f.deals,
       cash,
       setter_dq_rate: div(f.setter_dq, f.dispositioned),
+      closer_dq_rate: div(f.closer_dq, f.shows_sq),
       show_rate: div(f.shows_sq, f.prospects_sq),
+      close_rate_shows: div(f.deals, f.shows_sq),
+      close_rate_cq: div(f.deals, f.shows_cq),
       cash_per_booking: div(cash, bookings),
     });
   }

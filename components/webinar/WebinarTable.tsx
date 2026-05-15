@@ -59,10 +59,12 @@ const COLUMNS: Column[] = [
   { key: "cash_collected_per_attendee", label: "Cash/Att", align: "right", metric: "cash_collected_per_attendee", format: "money" },
   { key: "contract_value_per_attendee", label: "TCV/Att", align: "right", metric: "contract_value_per_attendee", format: "money" },
 
-  // Efficiency
-  { key: "blended_cost_per_show", label: "$/Show", align: "right", metric: "blended_cost_per_show", format: "money" },
-  { key: "blended_cost_per_qualified_show", label: "$/CQ Show", align: "right", metric: "blended_cost_per_qualified_show", format: "money" },
-  { key: "blended_cpbc_active", label: "$/Active Bk", align: "right", metric: "blended_cpbc_active", format: "money" },
+  // Efficiency (cost-per-stage; runs reg → booked → show → qual-show → deal)
+  { key: "paid_cpr", label: "$/Reg", align: "right", metric: "paid_cpr", format: "money2" },
+  { key: "blended_cpbc", label: "$/Booked", align: "right", metric: "blended_cpbc", format: "money2" },
+  { key: "blended_cpbc_active", label: "$/Active Bk", align: "right", metric: "blended_cpbc_active", format: "money2" },
+  { key: "blended_cost_per_show", label: "$/Show", align: "right", metric: "blended_cost_per_show", format: "money2" },
+  { key: "blended_cost_per_qualified_show", label: "$/Q.Show", align: "right", metric: "blended_cost_per_qualified_show", format: "money2" },
   { key: "cac", label: "CAC", align: "right", metric: "cac", format: "money" },
 
   // ROAS

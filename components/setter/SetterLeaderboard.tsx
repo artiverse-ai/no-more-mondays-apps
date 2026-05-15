@@ -13,6 +13,9 @@ import type { SetterRollup } from "@/lib/calls";
 
 type Align = "left" | "right";
 
+// Column order mirrors Monday Report §9.6 Setter Performance Overall:
+// Setter · Bookings · D'd · S.DQ · S.DQ% · C.DQ · C.DQ% · SQ · Shows ·
+// Show% · Q.Shows · Close% (Shows) · Close% (CQ) · Deals · Cash · Cash/Bk.
 const COLUMNS: Array<{
   key: keyof SetterRollup | "rank";
   label: string;
@@ -22,13 +25,16 @@ const COLUMNS: Array<{
   { key: "setter", label: "Setter", align: "left" },
   { key: "bookings", label: "Bookings", align: "right" },
   { key: "dispositioned", label: "Disposed", align: "right" },
-  { key: "setter_dq", label: "Setter DQ", align: "right" },
-  { key: "setter_dq_rate", label: "DQ %", align: "right" },
+  { key: "setter_dq", label: "S.DQ", align: "right" },
+  { key: "setter_dq_rate", label: "S.DQ %", align: "right" },
+  { key: "closer_dq", label: "C.DQ", align: "right" },
+  { key: "closer_dq_rate", label: "C.DQ %", align: "right" },
   { key: "prospects_sq", label: "SQ", align: "right" },
   { key: "shows_sq", label: "Shows", align: "right" },
   { key: "show_rate", label: "Show %", align: "right" },
   { key: "shows_cq", label: "Qualified Shows", align: "right" },
-  { key: "closer_dq", label: "Closer DQ", align: "right" },
+  { key: "close_rate_shows", label: "Close % (Shows)", align: "right" },
+  { key: "close_rate_cq", label: "Close % (CQ)", align: "right" },
   { key: "deals", label: "Deals", align: "right" },
   { key: "cash", label: "Cash", align: "right" },
   { key: "cash_per_booking", label: "Cash / Bk", align: "right" },
@@ -160,11 +166,21 @@ export function SetterLeaderboard({
                   >
                     {fmt.pct(r.setter_dq_rate)}
                   </td>
+                  <Num value={fmt.int(r.closer_dq)} />
+                  <td
+                    className={cn(
+                      "whitespace-nowrap px-3 py-2 text-right tabular-nums",
+                      dqClass(r.closer_dq_rate),
+                    )}
+                  >
+                    {fmt.pct(r.closer_dq_rate)}
+                  </td>
                   <Num value={fmt.int(r.prospects_sq)} />
                   <Num value={fmt.int(r.shows_sq)} />
                   <Num value={fmt.pct(r.show_rate)} />
                   <Num value={fmt.int(r.shows_cq)} />
-                  <Num value={fmt.int(r.closer_dq)} />
+                  <Num value={fmt.pct(r.close_rate_shows)} />
+                  <Num value={fmt.pct(r.close_rate_cq)} />
                   <Num value={fmt.int(r.deals)} />
                   <Num value={fmt.money(r.cash)} />
                   <Num value={fmt.money(r.cash_per_booking)} />

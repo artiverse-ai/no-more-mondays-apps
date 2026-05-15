@@ -259,6 +259,14 @@ export const METRIC_DEFS: Record<string, MetricDef> = {
     sql: "-- is_paid_in_full := is_deal AND cash_collected >= revenue_generated",
     source: "int_calls_enriched → mart_high_level_daily",
   },
+  cash_collection_rate: {
+    key: "cash_collection_rate",
+    label: "Cash Collection Rate",
+    description:
+      "Share of contracted revenue actually collected in cash within the period. <100% is normal when payment plans haven't paid out fully yet; trends toward 100% as installments complete.",
+    formula: "SUM(total_cash_collected) / SUM(total_revenue_contracted)",
+    source: "mart_high_level_daily",
+  },
 
   // ===== mart_webinar_events — remaining (covered by Phase B InfoTips) =====
 

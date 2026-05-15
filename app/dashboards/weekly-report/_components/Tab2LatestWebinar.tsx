@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { WebinarComparisonRowV2, MetaCampaignRow } from "@/lib/weekly-report-bq-v2";
+import { TIP } from "@/lib/metric-tips";
 import { ContextBannerEditor } from "./ContextBannerEditor";
 import styles from "./report.module.css";
 
@@ -74,40 +75,41 @@ export function Tab2LatestWebinar({
             </thead>
             <tbody>
               <DivRow>Registration</DivRow>
-              <DataRow label="Ad Spend" values={webinars.map((w) => fmtUsd(w.totalWebinarAdSpend))} />
-              <DataRow label="LP Page Views" values={webinars.map((w) => fmtInt(w.lpPageViews))} />
-              <DataRow label="LP Opt-Ins" values={webinars.map((w) => fmtInt(w.lpOptIns))} />
-              <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} />
-              <DataRow label="Total Registrants" values={webinars.map((w) => fmtInt(w.totalRegistrants))} />
+              <DataRow label="Ad Spend" values={webinars.map((w) => fmtUsd(w.totalWebinarAdSpend))} tip={TIP.adSpendMart} />
+              <DataRow label="LP Page Views" values={webinars.map((w) => fmtInt(w.lpPageViews))} tip={TIP.lpPageViews} />
+              <DataRow label="LP Opt-Ins" values={webinars.map((w) => fmtInt(w.lpOptIns))} tip={TIP.lpOptIns} />
+              <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} />
+              <DataRow label="Total Registrants" values={webinars.map((w) => fmtInt(w.totalRegistrants))} tip={TIP.totalRegistrantsGhl} />
               <DataRow label="↳ Meta" values={webinars.map((w) => fmtInt(w.metaRegistrants))} />
               <DataRow label="↳ ManyChat" values={webinars.map((w) => fmtInt(w.manychatRegistrants))} />
               <DataRow label="↳ Setter" values={webinars.map((w) => fmtInt(w.setterRegistrants))} />
               <DataRow label="↳ Other organic" values={webinars.map((w) => fmtInt(w.otherOrganicRegistrants))} />
 
               <DivRow>Attendance</DivRow>
-              <DataRow label="Unique Attendees" values={webinars.map((w) => fmtInt(w.uniqueAttendees))} />
-              <DataRow label="Pitched (>25 min)" values={webinars.map((w) => fmtInt(w.pitchedAttendees))} />
-              <DataRow label="Attend Rate (Zoom/Reg)" values={webinars.map((w) => fmtPct(w.regToAttendRate))} />
-              <DataRow label="Pitch Rate" values={webinars.map((w) => fmtPct(w.attendToPitchedRate))} />
+              <DataRow label="Unique Attendees" values={webinars.map((w) => fmtInt(w.uniqueAttendees))} tip={TIP.uniqueAttendees} />
+              <DataRow label="Pitched (>25 min)" values={webinars.map((w) => fmtInt(w.pitchedAttendees))} tip={TIP.pitchedAttendees} />
+              <DataRow label="Attend Rate (Zoom/Reg)" values={webinars.map((w) => fmtPct(w.regToAttendRate))} tip={TIP.attendRateRegToZoom} />
+              <DataRow label="Pitch Rate" values={webinars.map((w) => fmtPct(w.attendToPitchedRate))} tip={TIP.pitchRate} />
 
               <DivRow>Meta Funnel · Registration Campaigns Only</DivRow>
-              <DataRow label="Meta Impressions" values={webinars.map((w) => fmtInt(w.metaImpressions))} />
-              <DataRow label="Meta Link Clicks" values={webinars.map((w) => fmtInt(w.metaLinkClicks))} />
-              <DataRow label="Meta CTR (link)" values={webinars.map((w) => fmtPct(w.metaCtr))} />
-              <DataRow label="Meta Reported Conv." values={webinars.map((w) => fmtInt(w.metaReportedConversions))} />
-              <DataRow label="Meta CVR (link)" values={webinars.map((w) => fmtPct(w.metaCvr))} />
-              <DataRow label="Meta CPL" values={webinars.map((w) => fmtUsd2(w.metaCpl))} />
+              <DataRow label="Meta Impressions" values={webinars.map((w) => fmtInt(w.metaImpressions))} tip={TIP.metaImpressions} />
+              <DataRow label="Meta Link Clicks" values={webinars.map((w) => fmtInt(w.metaLinkClicks))} tip={TIP.metaLinkClicks} />
+              <DataRow label="Meta CTR (link)" values={webinars.map((w) => fmtPct(w.metaCtr))} tip={TIP.metaCtr} />
+              <DataRow label="Meta Reported Conv." values={webinars.map((w) => fmtInt(w.metaReportedConversions))} tip={TIP.metaReportedConv} />
+              <DataRow label="Meta CVR (link)" values={webinars.map((w) => fmtPct(w.metaCvr))} tip={TIP.metaCvr} />
+              <DataRow label="Meta CPL" values={webinars.map((w) => fmtUsd2(w.metaCpl))} tip={TIP.metaCpl} />
 
               <DivRow>Cost Efficiency</DivRow>
-              <DataRow label="Cost / Reg (Paid)" values={webinars.map((w) => fmtUsd2(w.paidCpr))} />
-              <DataRow label="Cost / Attendee" values={webinars.map((w) => fmtUsd2(w.blendedCpa))} />
-              <DataRow label="Cost / Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbc))} />
-              <DataRow label="Cost / Active Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbcActive))} />
+              <DataRow label="Cost / Reg (Paid)" values={webinars.map((w) => fmtUsd2(w.paidCpr))} tip={TIP.costPerRegPaid} />
+              <DataRow label="Cost / Attendee" values={webinars.map((w) => fmtUsd2(w.blendedCpa))} tip={TIP.costPerAttendee} />
+              <DataRow label="Cost / Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbc))} tip={TIP.costPerBookedCall} />
+              <DataRow label="Cost / Active Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbcActive))} tip={TIP.costPerActiveBookedCall} />
               <DataRow
                 label="Cost / Qualified Show"
                 values={webinars.map((w, i) =>
                   i === 0 && inProgress ? naCell() : fmtUsd2(w.blendedCostPerQualifiedShow),
                 )}
+                tip={TIP.costPerQualifiedShow}
               />
 
               <DivRow>Sales — Webinar-Attributed</DivRow>
@@ -116,29 +118,34 @@ export function Tab2LatestWebinar({
                 values={webinars.map((w, i) =>
                   i === 0 && inProgress ? partial(fmtInt(w.callsBooked)) : fmtInt(w.callsBooked),
                 )}
+                tip={TIP.callsBookedTotal}
               />
-              <DataRow label="Active Calls Booked" values={webinars.map((w) => fmtInt(w.callsBookedActive))} />
+              <DataRow label="Active Calls Booked" values={webinars.map((w) => fmtInt(w.callsBookedActive))} tip={TIP.callsBookedActive} />
               <DataRow
                 label="Shows"
                 values={webinars.map((w, i) => (i === 0 && inProgress ? partial(fmtInt(w.shows)) : fmtInt(w.shows)))}
+                tip={TIP.showsHeld}
               />
               <DataRow
                 label="Qualified Shows"
                 values={webinars.map((w, i) =>
                   i === 0 && inProgress ? partial(fmtInt(w.qualifiedShows)) : fmtInt(w.qualifiedShows),
                 )}
+                tip={TIP.funnelQualifiedShows}
               />
               <DataRow
                 label="Deals"
                 values={webinars.map((w, i) =>
                   i === 0 && inProgress ? partial(fmtInt(w.dealsClosed)) : fmtInt(w.dealsClosed),
                 )}
+                tip={TIP.dealsCycle}
               />
               <DataRow
                 label="Cash"
                 values={webinars.map((w, i) =>
                   i === 0 && inProgress ? partial(fmtUsd(w.cashCollected)) : fmtUsd(w.cashCollected),
                 )}
+                tip={TIP.cashCollected}
               />
               <DataRow
                 label="Cash Collected / Attendee"
@@ -147,6 +154,7 @@ export function Tab2LatestWebinar({
                     ? partial(fmtUsd2(w.cashCollectedPerAttendee))
                     : fmtUsd2(w.cashCollectedPerAttendee),
                 )}
+                tip={TIP.cashCollectedPerAttendee}
               />
               <DataRow
                 label="Contract Value / Attendee"
@@ -155,10 +163,12 @@ export function Tab2LatestWebinar({
                     ? partial(fmtUsd2(w.contractValuePerAttendee))
                     : fmtUsd2(w.contractValuePerAttendee),
                 )}
+                tip={TIP.contractValuePerAttendee}
               />
               <DataRow
                 label="ROAS (Cash)"
                 values={webinars.map((w, i) => (i === 0 && inProgress ? naCell() : fmtX(w.roasCash)))}
+                tip={TIP.roasCash}
               />
               <DataRow
                 label="ROAS (Revenue/TCV)"
@@ -203,10 +213,10 @@ export function Tab2LatestWebinar({
 
 // Helper components
 
-function DataRow({ label, values }: { label: string; values: (string | ReactNode)[] }) {
+function DataRow({ label, values, tip }: { label: string; values: (string | ReactNode)[]; tip?: string }) {
   return (
     <tr>
-      <td>{label}</td>
+      <td data-tip={tip} style={tip ? { cursor: "help" } : undefined}>{label}</td>
       {values.map((v, i) => (
         <td key={i} className={i === 0 ? styles.lh : ""}>
           {v}

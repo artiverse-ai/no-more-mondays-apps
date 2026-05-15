@@ -6,6 +6,7 @@ import type {
   SetterByModeRow,
   BookingModeExtended,
 } from "@/lib/weekly-report-bq-v2";
+import { TIP } from "@/lib/metric-tips";
 import styles from "./report.module.css";
 
 const fmtInt = (n: number | null) => (n == null ? "—" : Math.round(n).toLocaleString());
@@ -48,11 +49,11 @@ export function Tab3LastWeekSales(p: Tab3LastWeekSalesProps) {
 function FunnelPlusKpis({ weekLabel, funnel, money }: { weekLabel: string; funnel: SectionCData; money: SectionAData }) {
   const pros = funnel.prospects || 1;
   const stages = [
-    { label: "Prospects", value: funnel.prospects, color: "var(--blue)", bg: "rgba(59,130,246,.06)", border: "rgba(59,130,246,.3)" },
-    { label: "Prospects (SQ)", value: funnel.prospectsSq, color: "var(--blue)", bg: "rgba(59,130,246,.05)", border: "rgba(59,130,246,.25)" },
-    { label: "Shows", value: funnel.showsSq, color: "var(--green)", bg: "rgba(16,185,129,.06)", border: "rgba(16,185,129,.3)" },
-    { label: "Qualified Shows", value: funnel.showsCq, color: "var(--amber)", bg: "rgba(245,158,11,.06)", border: "rgba(245,158,11,.3)" },
-    { label: "Deals", value: funnel.deals, color: "var(--purple)", bg: "rgba(139,92,246,.07)", border: "rgba(139,92,246,.3)" },
+    { label: "Prospects", value: funnel.prospects, color: "var(--blue)", bg: "rgba(59,130,246,.06)", border: "rgba(59,130,246,.3)", tip: TIP.funnelProspects },
+    { label: "Prospects (SQ)", value: funnel.prospectsSq, color: "var(--blue)", bg: "rgba(59,130,246,.05)", border: "rgba(59,130,246,.25)", tip: TIP.funnelProspectsSq },
+    { label: "Shows", value: funnel.showsSq, color: "var(--green)", bg: "rgba(16,185,129,.06)", border: "rgba(16,185,129,.3)", tip: TIP.funnelShows },
+    { label: "Qualified Shows", value: funnel.showsCq, color: "var(--amber)", bg: "rgba(245,158,11,.06)", border: "rgba(245,158,11,.3)", tip: TIP.funnelQualifiedShows },
+    { label: "Deals", value: funnel.deals, color: "var(--purple)", bg: "rgba(139,92,246,.07)", border: "rgba(139,92,246,.3)", tip: TIP.funnelDeals },
   ];
   return (
     <section className={styles.section}>
@@ -62,7 +63,7 @@ function FunnelPlusKpis({ weekLabel, funnel, money }: { weekLabel: string; funne
           <div key={s.label}>
             <div className={styles.fRow}>
               <div className={styles.fBar} style={{ background: s.bg, borderColor: s.border, width: `${(s.value / pros) * 100}%` }}>
-                <span className={styles.fLabel} style={{ color: s.color }}>{s.label}</span>
+                <span className={styles.fLabel} style={{ color: s.color, cursor: "help" }} data-tip={s.tip}>{s.label}</span>
                 <span className={styles.fVal} style={{ color: s.color }}>{fmtInt(s.value)}</span>
               </div>
             </div>
@@ -72,29 +73,29 @@ function FunnelPlusKpis({ weekLabel, funnel, money }: { weekLabel: string; funne
 
       <div className={styles.sh} style={{ marginTop: 24 }}>Money</div>
       <div className={styles.kpiGridMini}>
-        <Mini emoji="💰" label="Cash" value={fmtUsd(money.cashCollected)} change="Fanbasis (deal-week)" />
-        <Mini emoji="💼" label="Revenue (TCV)" value={fmtUsd(money.revenueTcv)} change="" />
-        <Mini emoji="💵" label="AOV" value={fmtUsd(money.aov)} change="Cash / Deals" />
-        <Mini emoji="📦" label="ACV" value={fmtUsd(money.acv)} change="TCV / Deals" />
-        <Mini emoji="💸" label="PIF Rate" value={fmtPct(money.pifRate)} change="Paid-In-Full deals" />
-        <Mini emoji="📊" label="Cash Collection Rate" value={fmtPct(money.cashCollectionRate)} change="Cash / TCV" />
+        <Mini emoji="💰" label="Cash" value={fmtUsd(money.cashCollected)} change="Fanbasis (deal-week)" tip={TIP.cashCollected} />
+        <Mini emoji="💼" label="Revenue (TCV)" value={fmtUsd(money.revenueTcv)} change="" tip={TIP.revenueTcv} />
+        <Mini emoji="💵" label="AOV" value={fmtUsd(money.aov)} change="Cash / Deals" tip={TIP.aov} />
+        <Mini emoji="📦" label="ACV" value={fmtUsd(money.acv)} change="TCV / Deals" tip={TIP.acv} />
+        <Mini emoji="💸" label="PIF Rate" value={fmtPct(money.pifRate)} change="Paid-In-Full deals" tip={TIP.pifRate} />
+        <Mini emoji="📊" label="Cash Collection Rate" value={fmtPct(money.cashCollectionRate)} change="Cash / TCV" tip={TIP.cashCollectionRate} />
       </div>
 
       <div className={styles.sh} style={{ marginTop: 24 }}>Funnel Rates</div>
       <div className={styles.kpiGridMini}>
-        <Mini emoji="📈" label="Show Rate" value={fmtPct(funnel.showRate)} change="Shows / Pros (SQ)" />
-        <Mini emoji="🎯" label="Close Rate (Shows)" value={fmtPct(funnel.closeRateShows)} change="Deals / Shows" />
-        <Mini emoji="🎯" label="Close Rate (CQ)" value={fmtPct(funnel.closeRate)} change="Deals / Qualified Shows" />
-        <Mini emoji="🚫" label="Setter DQ Rate" value={fmtPct(funnel.setterDqRate)} change="Setter DQ / Pros (D'd)" />
-        <Mini emoji="🚫" label="Closer DQ Rate" value={fmtPct(funnel.closerDqRate)} change="Closer DQ / Shows" />
+        <Mini emoji="📈" label="Show Rate" value={fmtPct(funnel.showRate)} change="Shows / Pros (SQ)" tip={TIP.showRate} />
+        <Mini emoji="🎯" label="Close Rate (Shows)" value={fmtPct(funnel.closeRateShows)} change="Deals / Shows" tip={TIP.closeRateShows} />
+        <Mini emoji="🎯" label="Close Rate (CQ)" value={fmtPct(funnel.closeRate)} change="Deals / Qualified Shows" tip={TIP.closeRateCq} />
+        <Mini emoji="🚫" label="Setter DQ Rate" value={fmtPct(funnel.setterDqRate)} change="Setter DQ / Pros (D'd)" tip={TIP.setterDqRate} />
+        <Mini emoji="🚫" label="Closer DQ Rate" value={fmtPct(funnel.closerDqRate)} change="Closer DQ / Shows" tip={TIP.closerDqRate} />
       </div>
 
       <div className={styles.sh} style={{ marginTop: 24 }}>Dollar Yield Per Prospect</div>
       <div className={styles.kpiGridMini}>
-        <Mini emoji="📈" label="CC / Pros (D'd)" value={fmtUsd2(funnel.dollarsCcPerPdd)} change="" />
-        <Mini emoji="📈" label="CV (TCV) / Pros (D'd)" value={fmtUsd2(funnel.dollarsTcvPerPdd)} change="" />
-        <Mini emoji="📈" label="CC / Show" value={fmtUsd2(funnel.dollarsCcPerShowsSq)} change="" />
-        <Mini emoji="📈" label="CV (TCV) / Show" value={fmtUsd2(funnel.dollarsTcvPerShowsSq)} change="" />
+        <Mini emoji="📈" label="CC / Pros (D'd)" value={fmtUsd2(funnel.dollarsCcPerPdd)} change="" tip={TIP.dollarsCcPerPdd} />
+        <Mini emoji="📈" label="CV (TCV) / Pros (D'd)" value={fmtUsd2(funnel.dollarsTcvPerPdd)} change="" tip={TIP.dollarsTcvPerPdd} />
+        <Mini emoji="📈" label="CC / Show" value={fmtUsd2(funnel.dollarsCcPerShowsSq)} change="" tip={TIP.dollarsCcPerShowsSq} />
+        <Mini emoji="📈" label="CV (TCV) / Show" value={fmtUsd2(funnel.dollarsTcvPerShowsSq)} change="" tip={TIP.dollarsTcvPerShowsSq} />
       </div>
     </section>
   );
@@ -194,20 +195,20 @@ function CloserOverallTable({ rows }: { rows: CloserOverallExtended[] }) {
           <thead>
             <tr>
               <th>Closer</th>
-              <th>Prospects</th>
-              <th>D'd</th>
-              <th>S.DQ</th>
-              <th>S.DQ%</th>
-              <th>C.DQ</th>
-              <th>C.DQ%</th>
-              <th>SQ</th>
-              <th>Shows</th>
-              <th>Show%</th>
-              <th>Q.Shows</th>
-              <th>Close% Shows</th>
-              <th>Close% CQ</th>
-              <th>Deals</th>
-              <th>Cash</th>
+              <th data-tip={TIP.tbl_prospects}>Prospects</th>
+              <th data-tip={TIP.tbl_dd}>D'd</th>
+              <th data-tip={TIP.tbl_sDq}>S.DQ</th>
+              <th data-tip={TIP.tbl_sDqPct}>S.DQ%</th>
+              <th data-tip={TIP.tbl_cDq}>C.DQ</th>
+              <th data-tip={TIP.tbl_cDqPct}>C.DQ%</th>
+              <th data-tip={TIP.tbl_sq}>SQ</th>
+              <th data-tip={TIP.tbl_shows}>Shows</th>
+              <th data-tip={TIP.tbl_showPct}>Show%</th>
+              <th data-tip={TIP.tbl_qShows}>Q.Shows</th>
+              <th data-tip={TIP.tbl_closeShowsPct}>Close% Shows</th>
+              <th data-tip={TIP.tbl_closeCqPct}>Close% CQ</th>
+              <th data-tip={TIP.tbl_deals}>Deals</th>
+              <th data-tip={TIP.tbl_cash}>Cash</th>
             </tr>
           </thead>
           <tbody>
@@ -267,20 +268,20 @@ function SetterOverallTable({ rows }: { rows: SetterOverallRow[] }) {
           <thead>
             <tr>
               <th>Setter</th>
-              <th>Prospects</th>
-              <th>D'd</th>
-              <th>S.DQ</th>
-              <th>S.DQ%</th>
-              <th>C.DQ</th>
-              <th>C.DQ%</th>
-              <th>SQ</th>
-              <th>Shows</th>
-              <th>Show%</th>
-              <th>Q.Shows</th>
-              <th>Close% Shows</th>
-              <th>Close% CQ</th>
-              <th>Deals</th>
-              <th>Cash</th>
+              <th data-tip={TIP.tbl_prospects}>Prospects</th>
+              <th data-tip={TIP.tbl_dd}>D'd</th>
+              <th data-tip={TIP.tbl_sDq}>S.DQ</th>
+              <th data-tip={TIP.tbl_sDqPct}>S.DQ%</th>
+              <th data-tip={TIP.tbl_cDq}>C.DQ</th>
+              <th data-tip={TIP.tbl_cDqPct}>C.DQ%</th>
+              <th data-tip={TIP.tbl_sq}>SQ</th>
+              <th data-tip={TIP.tbl_shows}>Shows</th>
+              <th data-tip={TIP.tbl_showPct}>Show%</th>
+              <th data-tip={TIP.tbl_qShows}>Q.Shows</th>
+              <th data-tip={TIP.tbl_closeShowsPct}>Close% Shows</th>
+              <th data-tip={TIP.tbl_closeCqPct}>Close% CQ</th>
+              <th data-tip={TIP.tbl_deals}>Deals</th>
+              <th data-tip={TIP.tbl_cash}>Cash</th>
             </tr>
           </thead>
           <tbody>
@@ -330,19 +331,19 @@ function SetterByModeTable({ rows }: { rows: SetterByModeRow[] }) {
             <tr>
               <th>Setter</th>
               <th>Mode</th>
-              <th>D'd</th>
-              <th>S.DQ</th>
-              <th>S.DQ%</th>
-              <th>SQ</th>
-              <th>Shows</th>
-              <th>Show%</th>
-              <th>Q.Shows</th>
-              <th>Close% Shows</th>
-              <th>Close% CQ</th>
-              <th>TTB (d)</th>
-              <th>Deals</th>
-              <th>Cash</th>
-              <th>Bonus</th>
+              <th data-tip={TIP.tbl_dd}>D'd</th>
+              <th data-tip={TIP.tbl_sDq}>S.DQ</th>
+              <th data-tip={TIP.tbl_sDqPct}>S.DQ%</th>
+              <th data-tip={TIP.tbl_sq}>SQ</th>
+              <th data-tip={TIP.tbl_shows}>Shows</th>
+              <th data-tip={TIP.tbl_showPct}>Show%</th>
+              <th data-tip={TIP.tbl_qShows}>Q.Shows</th>
+              <th data-tip={TIP.tbl_closeShowsPct}>Close% Shows</th>
+              <th data-tip={TIP.tbl_closeCqPct}>Close% CQ</th>
+              <th data-tip={TIP.tbl_ttb}>TTB (d)</th>
+              <th data-tip={TIP.tbl_deals}>Deals</th>
+              <th data-tip={TIP.tbl_cash}>Cash</th>
+              <th data-tip={TIP.tbl_bonus}>Bonus</th>
             </tr>
           </thead>
           <tbody>
@@ -407,20 +408,20 @@ function BookingModeTable({ rows }: { rows: BookingModeExtended[] }) {
           <thead>
             <tr>
               <th>Mode</th>
-              <th>Prospects</th>
-              <th>D'd</th>
-              <th>S.DQ</th>
-              <th>S.DQ%</th>
-              <th>C.DQ</th>
-              <th>C.DQ%</th>
-              <th>SQ</th>
-              <th>Shows</th>
-              <th>Show%</th>
-              <th>Q.Shows</th>
-              <th>Close% Shows</th>
-              <th>Close% CQ</th>
-              <th>Deals</th>
-              <th>Cash</th>
+              <th data-tip={TIP.tbl_prospects}>Prospects</th>
+              <th data-tip={TIP.tbl_dd}>D'd</th>
+              <th data-tip={TIP.tbl_sDq}>S.DQ</th>
+              <th data-tip={TIP.tbl_sDqPct}>S.DQ%</th>
+              <th data-tip={TIP.tbl_cDq}>C.DQ</th>
+              <th data-tip={TIP.tbl_cDqPct}>C.DQ%</th>
+              <th data-tip={TIP.tbl_sq}>SQ</th>
+              <th data-tip={TIP.tbl_shows}>Shows</th>
+              <th data-tip={TIP.tbl_showPct}>Show%</th>
+              <th data-tip={TIP.tbl_qShows}>Q.Shows</th>
+              <th data-tip={TIP.tbl_closeShowsPct}>Close% Shows</th>
+              <th data-tip={TIP.tbl_closeCqPct}>Close% CQ</th>
+              <th data-tip={TIP.tbl_deals}>Deals</th>
+              <th data-tip={TIP.tbl_cash}>Cash</th>
             </tr>
           </thead>
           <tbody>
@@ -453,12 +454,12 @@ function BookingModeTable({ rows }: { rows: BookingModeExtended[] }) {
 // ----------------------------------------------------------------------------
 // Shared Mini KPI card
 // ----------------------------------------------------------------------------
-function Mini({ emoji, label, value, change }: { emoji: string; label: string; value: string; change: string }) {
+function Mini({ emoji, label, value, change, tip }: { emoji: string; label: string; value: string; change: string; tip?: string }) {
   return (
     <div className={styles.kpiMini}>
       <div className={styles.kpiMiniLbl}>
         <span>{emoji}</span>
-        <span>{label}</span>
+        <span data-tip={tip} style={tip ? { cursor: "help" } : undefined}>{label}</span>
       </div>
       <div className={styles.kpiMiniVal}>{value}</div>
       {change ? <div className={styles.kpiMiniCh}>{change}</div> : null}

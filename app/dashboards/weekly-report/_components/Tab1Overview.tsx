@@ -1,4 +1,5 @@
 import type { SectionAData, SectionBData, SectionCData } from "@/lib/weekly-report-bq-v2";
+import { TIP } from "@/lib/metric-tips";
 import styles from "./report.module.css";
 
 const fmtInt = (n: number | null) => (n == null ? "—" : Math.round(n).toLocaleString());
@@ -40,16 +41,16 @@ function SectionA({ data, weekLabel }: { data: SectionAData; weekLabel: string }
         Company-wide money, deals, and cycle times. {weekLabel}.
       </p>
       <div className={styles.kpiGridMini}>
-        <MiniCard emoji="💰" label="Cash Collected" value={fmtUsd(data.cashCollected)} change="Fanbasis + Whop" />
-        <MiniCard emoji="💼" label="Revenue (TCV)" value={fmtUsd(data.revenueTcv)} change="Total Contract Value" />
-        <MiniCard emoji="📈" label="ROAS (Cash)" value={fmtX(data.roasCash)} change={target("4×")} />
-        <MiniCard emoji="📈" label="ROAS (TCV)" value={fmtX(data.roasTcv)} change="TCV / Ad Spend" />
-        <MiniCard emoji="📣" label="Ad Spend (Blended)" value={fmtUsd(data.adSpendBlended)} change="All Meta campaigns" />
-        <MiniCard emoji="🤝" label="Deals Closed" value={fmtInt(data.dealsClosed)} change="" />
-        <MiniCard emoji="💵" label="AOV" value={fmtUsd(data.aov)} change="Fanbasis cash / deals" />
-        <MiniCard emoji="📦" label="ACV" value={fmtUsd(data.acv)} change="TCV / deals" />
-        <MiniCard emoji="💸" label="PIF Rate" value={fmtPct(data.pifRate)} change="Paid-In-Full deals" />
-        <MiniCard emoji="📊" label="Cash Collection Rate" value={fmtPct(data.cashCollectionRate)} change="Cash / TCV" />
+        <MiniCard emoji="💰" label="Cash Collected" value={fmtUsd(data.cashCollected)} change="Fanbasis + Whop" tip={TIP.cashCollected} />
+        <MiniCard emoji="💼" label="Revenue (TCV)" value={fmtUsd(data.revenueTcv)} change="Total Contract Value" tip={TIP.revenueTcv} />
+        <MiniCard emoji="📈" label="ROAS (Cash)" value={fmtX(data.roasCash)} change={target("4×")} tip={TIP.roasCash} />
+        <MiniCard emoji="📈" label="ROAS (TCV)" value={fmtX(data.roasTcv)} change="TCV / Ad Spend" tip={TIP.roasTcv} />
+        <MiniCard emoji="📣" label="Ad Spend (Blended)" value={fmtUsd(data.adSpendBlended)} change="All Meta campaigns" tip={TIP.adSpendBlended} />
+        <MiniCard emoji="🤝" label="Deals Closed" value={fmtInt(data.dealsClosed)} change="" tip={TIP.dealsClosed} />
+        <MiniCard emoji="💵" label="AOV" value={fmtUsd(data.aov)} change="Fanbasis cash / deals" tip={TIP.aov} />
+        <MiniCard emoji="📦" label="ACV" value={fmtUsd(data.acv)} change="TCV / deals" tip={TIP.acv} />
+        <MiniCard emoji="💸" label="PIF Rate" value={fmtPct(data.pifRate)} change="Paid-In-Full deals" tip={TIP.pifRate} />
+        <MiniCard emoji="📊" label="Cash Collection Rate" value={fmtPct(data.cashCollectionRate)} change="Cash / TCV" tip={TIP.cashCollectionRate} />
       </div>
 
       <div className={styles.sh} style={{ marginTop: 24 }}>
@@ -61,24 +62,28 @@ function SectionA({ data, weekLabel }: { data: SectionAData; weekLabel: string }
           label="OCC Median"
           value={fmtDays(data.medianBookToCloseOcc)}
           change={`n = ${data.nOcc} on-call closes`}
+          tip={TIP.medianBookToCloseOcc}
         />
         <MiniCard
           emoji="⏱"
           label="OCC Average"
           value={fmtDays(data.avgBookToCloseOcc)}
           change={`Book → Close on call`}
+          tip={TIP.avgBookToCloseOcc}
         />
         <MiniCard
           emoji="⏱"
           label="FUC Median"
           value={fmtDays(data.medianFirstCallToCloseFuc)}
           change={`n = ${data.nFuc} follow-up closes`}
+          tip={TIP.medianFirstCallToCloseFuc}
         />
         <MiniCard
           emoji="⏱"
           label="FUC Average"
           value={fmtDays(data.avgFirstCallToCloseFuc)}
           change={`1st Call → Close`}
+          tip={TIP.avgFirstCallToCloseFuc}
         />
       </div>
     </section>
@@ -101,30 +106,35 @@ function SectionB({ data }: { data: SectionBData }) {
           label="Total Calls Booked"
           value={fmtInt(data.totalCallsBooked)}
           change={data.totalCallsBookedActive != null ? `Active: ${fmtInt(data.totalCallsBookedActive)}` : ""}
+          tip={TIP.totalCallsBooked}
         />
         <MiniCard
           emoji="📞"
           label="Cost / Booked Call"
           value={fmtUsd2(data.costPerBookedCall)}
           change="Ad Spend / Calls Booked"
+          tip={TIP.costPerBookedCall}
         />
         <MiniCard
           emoji="💰"
           label="Cash / Booked Call (DPC)"
           value={fmtUsd2(data.cashPerBookedCall)}
           change="Sergio's KPI"
+          tip={TIP.cashPerBookedCall}
         />
         <MiniCard
           emoji="📊"
           label="Avg Webinar Show Rate"
           value={fmtPct(data.avgWebinarShowRate)}
           change={target("24%")}
+          tip={TIP.avgWebinarShowRate}
         />
         <MiniCard
           emoji="📈"
           label="CPL Blended"
           value={fmtUsd2(data.cplBlended)}
           change={target("<$7")}
+          tip={TIP.cplBlended}
         />
       </div>
     </section>
@@ -137,11 +147,11 @@ function SectionB({ data }: { data: SectionBData }) {
 function SectionC({ data }: { data: SectionCData }) {
   const pros = data.prospects || 1; // avoid divide-by-zero in bar widths
   const stages = [
-    { label: "Prospects", value: data.prospects, color: "var(--blue)", bgColor: "rgba(59,130,246,.06)", borderColor: "rgba(59,130,246,.3)" },
-    { label: "Prospects (SQ)", value: data.prospectsSq, color: "var(--blue)", bgColor: "rgba(59,130,246,.05)", borderColor: "rgba(59,130,246,.25)" },
-    { label: "Shows", value: data.showsSq, color: "var(--green)", bgColor: "rgba(16,185,129,.06)", borderColor: "rgba(16,185,129,.3)" },
-    { label: "Qualified Shows", value: data.showsCq, color: "var(--amber)", bgColor: "rgba(245,158,11,.06)", borderColor: "rgba(245,158,11,.3)" },
-    { label: "Deals", value: data.deals, color: "var(--purple)", bgColor: "rgba(139,92,246,.07)", borderColor: "rgba(139,92,246,.3)" },
+    { label: "Prospects", value: data.prospects, color: "var(--blue)", bgColor: "rgba(59,130,246,.06)", borderColor: "rgba(59,130,246,.3)", tip: TIP.funnelProspects },
+    { label: "Prospects (SQ)", value: data.prospectsSq, color: "var(--blue)", bgColor: "rgba(59,130,246,.05)", borderColor: "rgba(59,130,246,.25)", tip: TIP.funnelProspectsSq },
+    { label: "Shows", value: data.showsSq, color: "var(--green)", bgColor: "rgba(16,185,129,.06)", borderColor: "rgba(16,185,129,.3)", tip: TIP.funnelShows },
+    { label: "Qualified Shows", value: data.showsCq, color: "var(--amber)", bgColor: "rgba(245,158,11,.06)", borderColor: "rgba(245,158,11,.3)", tip: TIP.funnelQualifiedShows },
+    { label: "Deals", value: data.deals, color: "var(--purple)", bgColor: "rgba(139,92,246,.07)", borderColor: "rgba(139,92,246,.3)", tip: TIP.funnelDeals },
   ];
   return (
     <section className={styles.section}>
@@ -162,7 +172,7 @@ function SectionC({ data }: { data: SectionCData }) {
                   width: `${(s.value / pros) * 100}%`,
                 }}
               >
-                <span className={styles.fLabel} style={{ color: s.color }}>{s.label}</span>
+                <span className={styles.fLabel} style={{ color: s.color, cursor: "help" }} data-tip={s.tip}>{s.label}</span>
                 <span className={styles.fVal} style={{ color: s.color }}>{fmtInt(s.value)}</span>
               </div>
             </div>
@@ -177,21 +187,21 @@ function SectionC({ data }: { data: SectionCData }) {
 
       <div className={styles.sh} style={{ marginTop: 8 }}>Funnel Rates</div>
       <div className={styles.kpiGridMini}>
-        <MiniCard emoji="📈" label="Show Rate" value={fmtPct(data.showRate)} change="Shows / Pros (SQ)" />
-        <MiniCard emoji="🎯" label="Close Rate (Shows)" value={fmtPct(data.closeRateShows)} change="Deals / Shows" />
-        <MiniCard emoji="🎯" label="Close Rate (CQ)" value={fmtPct(data.closeRate)} change="Deals / Qualified Shows" />
-        <MiniCard emoji="🚫" label="Setter DQ Rate" value={fmtPct(data.setterDqRate)} change="Setter DQ / Pros (D'd)" />
-        <MiniCard emoji="🚫" label="Closer DQ Rate" value={fmtPct(data.closerDqRate)} change="Closer DQ / Shows" />
+        <MiniCard emoji="📈" label="Show Rate" value={fmtPct(data.showRate)} change="Shows / Pros (SQ)" tip={TIP.showRate} />
+        <MiniCard emoji="🎯" label="Close Rate (Shows)" value={fmtPct(data.closeRateShows)} change="Deals / Shows" tip={TIP.closeRateShows} />
+        <MiniCard emoji="🎯" label="Close Rate (CQ)" value={fmtPct(data.closeRate)} change="Deals / Qualified Shows" tip={TIP.closeRateCq} />
+        <MiniCard emoji="🚫" label="Setter DQ Rate" value={fmtPct(data.setterDqRate)} change="Setter DQ / Pros (D'd)" tip={TIP.setterDqRate} />
+        <MiniCard emoji="🚫" label="Closer DQ Rate" value={fmtPct(data.closerDqRate)} change="Closer DQ / Shows" tip={TIP.closerDqRate} />
       </div>
 
       <div className={styles.sh} style={{ marginTop: 8 }}>Prospect Efficiency (D'd → Downstream)</div>
       <div className={styles.kpiGridMini}>
-        <MiniCard emoji="⚙" label="D'd → CQ" value={fmtPct(data.ddToCq)} change="Shows (CQ) / Pros (D'd)" />
-        <MiniCard emoji="⚙" label="D'd → Close" value={fmtPct(data.ddToClose)} change="Deals / Pros (D'd)" />
-        <MiniCard emoji="💰" label="$ (CC) / Pros (D'd)" value={fmtUsd2(data.dollarsCcPerPdd)} change="Cash / Pros (D'd)" />
-        <MiniCard emoji="💰" label="$ (CC) / Shows (SQ)" value={fmtUsd2(data.dollarsCcPerShowsSq)} change="Cash / Shows (SQ)" />
-        <MiniCard emoji="📦" label="$ (TCV) / Pros (D'd)" value={fmtUsd2(data.dollarsTcvPerPdd)} change="TCV / Pros (D'd)" />
-        <MiniCard emoji="📦" label="$ (TCV) / Shows (SQ)" value={fmtUsd2(data.dollarsTcvPerShowsSq)} change="TCV / Shows (SQ)" />
+        <MiniCard emoji="⚙" label="D'd → CQ" value={fmtPct(data.ddToCq)} change="Shows (CQ) / Pros (D'd)" tip={TIP.ddToCq} />
+        <MiniCard emoji="⚙" label="D'd → Close" value={fmtPct(data.ddToClose)} change="Deals / Pros (D'd)" tip={TIP.ddToClose} />
+        <MiniCard emoji="💰" label="$ (CC) / Pros (D'd)" value={fmtUsd2(data.dollarsCcPerPdd)} change="Cash / Pros (D'd)" tip={TIP.dollarsCcPerPdd} />
+        <MiniCard emoji="💰" label="$ (CC) / Shows (SQ)" value={fmtUsd2(data.dollarsCcPerShowsSq)} change="Cash / Shows (SQ)" tip={TIP.dollarsCcPerShowsSq} />
+        <MiniCard emoji="📦" label="$ (TCV) / Pros (D'd)" value={fmtUsd2(data.dollarsTcvPerPdd)} change="TCV / Pros (D'd)" tip={TIP.dollarsTcvPerPdd} />
+        <MiniCard emoji="📦" label="$ (TCV) / Shows (SQ)" value={fmtUsd2(data.dollarsTcvPerShowsSq)} change="TCV / Shows (SQ)" tip={TIP.dollarsTcvPerShowsSq} />
       </div>
     </section>
   );
@@ -219,12 +229,12 @@ function SectionD() {
 // ============================================================================
 // Mini KPI card primitive
 // ============================================================================
-function MiniCard({ emoji, label, value, change }: { emoji: string; label: string; value: string; change: string }) {
+function MiniCard({ emoji, label, value, change, tip }: { emoji: string; label: string; value: string; change: string; tip?: string }) {
   return (
     <div className={styles.kpiMini}>
       <div className={styles.kpiMiniLbl}>
         <span>{emoji}</span>
-        <span>{label}</span>
+        <span data-tip={tip} style={tip ? { cursor: "help" } : undefined}>{label}</span>
       </div>
       <div className={styles.kpiMiniVal}>{value}</div>
       {change ? <div className={styles.kpiMiniCh}>{change}</div> : null}

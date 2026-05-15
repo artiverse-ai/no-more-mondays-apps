@@ -1,4 +1,5 @@
 import type { KpiStripData } from "@/lib/weekly-report-bq-v2";
+import { TIP } from "@/lib/metric-tips";
 import styles from "./report.module.css";
 
 const fmtPct = (frac: number | null, digits = 1) =>
@@ -21,7 +22,7 @@ export function PersistentKpiStrip({ data }: { data: KpiStripData }) {
         value={fmtPct(data.avgWebinarShowRate)}
         isNa={data.avgWebinarShowRate == null}
         meta="Target 24%"
-        tooltip="SUM(unique_attendees) / SUM(total_registrants) across Sun + Wed webinars in the previous Sun-Sat window. Source: mart_webinar_events."
+        tooltip={TIP.avgWebinarShowRate}
       />
       <Card
         kind="webinar"
@@ -29,7 +30,7 @@ export function PersistentKpiStrip({ data }: { data: KpiStripData }) {
         value={fmtPct(data.pctTierOneLeads)}
         isNa={data.pctTierOneLeads == null}
         meta="Awaiting mart fields"
-        tooltip="tier_one_submissions / form_submissions. Field not yet ingested into mart_webinar_events."
+        tooltip={TIP.pctTierOneLeads}
       />
 
       <div className={styles.kpiDivider} aria-hidden="true" />
@@ -40,7 +41,7 @@ export function PersistentKpiStrip({ data }: { data: KpiStripData }) {
         value={fmtX(data.blendedCashRoas)}
         isNa={data.blendedCashRoas == null}
         meta="Target 4×"
-        tooltip="Fanbasis cash / total Meta ad spend (ALL campaigns) over the previous Sun-Sat."
+        tooltip={TIP.blendedCashRoas}
       />
       <Card
         kind="company"
@@ -48,7 +49,7 @@ export function PersistentKpiStrip({ data }: { data: KpiStripData }) {
         value={fmtUsd(data.cplBlended)}
         isNa={data.cplBlended == null}
         meta="Target <$7"
-        tooltip="Blended cost-per-lead. Denominator field not yet decided (Open Item #2)."
+        tooltip={TIP.cplBlended}
       />
       <Card
         kind="company"
@@ -56,7 +57,7 @@ export function PersistentKpiStrip({ data }: { data: KpiStripData }) {
         value={fmtUsd(data.cashPerBookedCall)}
         isNa={data.cashPerBookedCall == null}
         meta="Sergio's KPI"
-        tooltip="Fanbasis cash / total_calls_booked. Calendly strategy-call grain, deduped by invitee_email."
+        tooltip={TIP.cashPerBookedCall}
       />
     </div>
   );
@@ -81,7 +82,7 @@ function Card({
   return (
     <div className={`${styles.kpiCard} ${kindCls}`}>
       <div className={styles.kpiLabel}>
-        <span className={styles.tip} title={tooltip}>
+        <span className={styles.tip} data-tip={tooltip} style={{ cursor: "help" }}>
           {label}
         </span>
       </div>

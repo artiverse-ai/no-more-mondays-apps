@@ -447,10 +447,26 @@ export async function updateSnapshot(
 
 export async function deleteSnapshot(slug: string): Promise<void> {
   await ensure();
-  await bq().query({
-    query: `UPDATE ${SNAPSHOTS} SET deleted_at = CURRENT_TIMESTAMP() WHERE slug = @slug`,
-    params: { slug }, types: { slug: "STRING" },
-  });
+  // Cascade soft-delete so re-creating the same slug doesn't surface
+  // orphaned insight cards or Marketing/Sales Solutions posts from the
+  // prior snapshot.
+  const SOLUTIONS = table("weekly_report_solutions");
+  await Promise.all([
+    bq().query({
+      query: `UPDATE ${SNAPSHOTS} SET deleted_at = CURRENT_TIMESTAMP() WHERE slug = @slug AND deleted_at IS NULL`,
+      params: { slug }, types: { slug: "STRING" },
+    }),
+    bq().query({
+      query: `UPDATE ${INSIGHTS} SET deleted_at = CURRENT_TIMESTAMP() WHERE snapshot_slug = @slug AND deleted_at IS NULL`,
+      params: { slug }, types: { slug: "STRING" },
+    }),
+    bq().query({
+      query: `UPDATE ${SOLUTIONS} SET deleted_at = CURRENT_TIMESTAMP() WHERE report_week = @slug AND deleted_at IS NULL`,
+      params: { slug }, types: { slug: "STRING" },
+    }).catch(() => {
+      // weekly_report_solutions may not exist on a fresh env. Best effort.
+    }),
+  ]);
 }
 
 // ─── insights ──────────────────────────────────────────────────────────

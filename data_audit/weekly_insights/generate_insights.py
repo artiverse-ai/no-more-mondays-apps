@@ -34,13 +34,16 @@ VALID_TONES = {"ctx", "win", "watch", "flag", "fix", "fwd"}
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
 CLAUDE_TIMEOUT_SEC = int(os.environ.get("CLAUDE_TIMEOUT_SEC", "300"))
 
-# Model selection. We default to Sonnet 4.6 — strong reasoning + reliable
-# math for our task (produce structured JSON with cited numbers from the
-# supplied data) while staying within the user's 3-5 min latency budget.
-# Haiku is faster but more error-prone on math; Opus is more capable but
-# typically exceeds the latency budget on a 14K-char prompt. Sonnet hits
-# the sweet spot.
-CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "sonnet")
+# Hybrid model strategy. First attempt uses Haiku for speed (~1-3 min on
+# our 15K-char prompt). If validation rejects the output (too few
+# insights, malformed JSON, short body, etc.) the retry uses Sonnet, which
+# is slower (5-10 min) but more reliable on math + structured output.
+#
+# Pre-calculated WoW deltas + strict output validation cover most of
+# Haiku's failure modes upfront, so the happy path stays fast. Sonnet
+# fallback handles edge cases without us paying the latency tax every run.
+CLAUDE_MODEL_PRIMARY = os.environ.get("CLAUDE_MODEL", "haiku")
+CLAUDE_MODEL_RETRY = os.environ.get("CLAUDE_MODEL_RETRY", "sonnet")
 CLAUDE_FALLBACK_MODEL = os.environ.get("CLAUDE_FALLBACK_MODEL", "opus")
 
 
@@ -77,9 +80,9 @@ def assemble_prompt(template: str, payload: dict[str, Any]) -> str:
 CLAUDE_MAX_ATTEMPTS = int(os.environ.get("CLAUDE_MAX_ATTEMPTS", "3"))
 
 
-def _run_claude_once(prompt: str) -> str:
-    """Single subprocess invocation of `claude -p`. Raises on non-zero
-    exit or timeout. Caller layers retry on top.
+def _run_claude_once(prompt: str, model: str) -> str:
+    """Single subprocess invocation of `claude -p` with the given model.
+    Raises on non-zero exit or timeout. Caller layers retry on top.
     """
     if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
         raise RuntimeError(
@@ -88,7 +91,7 @@ def _run_claude_once(prompt: str) -> str:
     cmd = [
         CLAUDE_BIN, "-p", prompt,
         "--output-format", "text",
-        "--model", CLAUDE_MODEL,
+        "--model", model,
         "--fallback-model", CLAUDE_FALLBACK_MODEL,
     ]
     proc = subprocess.run(
@@ -105,24 +108,43 @@ def _run_claude_once(prompt: str) -> str:
     return proc.stdout
 
 
-def run_claude(prompt: str) -> str:
-    """Retry-wrapped Claude call. Transient failures (rate limit, network
-    blip, occasional malformed parse upstream) get a second + third
-    attempt with exponential backoff before bubbling the exception."""
-    _log(
-        f"Calling: {CLAUDE_BIN} -p <…{len(prompt)} chars…> "
-        f"--model {CLAUDE_MODEL} (fallback {CLAUDE_FALLBACK_MODEL})"
-    )
-    last_exc: Exception | None = None
+def generate_validated_output(
+    prompt: str,
+) -> tuple[list[dict[str, Any]], dict[str, str] | None, dict[str, str] | None]:
+    """Hybrid generate-extract-validate loop.
+
+    Attempt 1 uses the PRIMARY model (Haiku) for speed. If extraction or
+    validation rejects the output (too few insights, short body, malformed
+    JSON, subprocess error), the next attempt escalates to RETRY model
+    (Sonnet) which is slower but more reliable on structured output.
+
+    Returns (insights, context_banner, tab2_narrative) on success.
+    Raises the last exception if all attempts fail.
+    """
     import time
+    last_exc: Exception | None = None
     for attempt in range(1, CLAUDE_MAX_ATTEMPTS + 1):
+        model = CLAUDE_MODEL_PRIMARY if attempt == 1 else CLAUDE_MODEL_RETRY
+        _log(
+            f"Calling: {CLAUDE_BIN} -p <…{len(prompt)} chars…> "
+            f"--model {model} (attempt {attempt}/{CLAUDE_MAX_ATTEMPTS})"
+        )
         try:
-            return _run_claude_once(prompt)
+            raw = _run_claude_once(prompt, model)
+            obj = extract_json_object(raw)
+            items = validate_items(obj.get("insights", []))
+            context_banner = _validate_banner(obj.get("context_banner"), "context_banner")
+            tab2_narrative = _validate_banner(obj.get("tab2_narrative"), "tab2_narrative")
+            _log(f"  attempt {attempt} produced {len(items)} valid insights using {model}")
+            return items, context_banner, tab2_narrative
         except Exception as e:  # noqa: BLE001
             last_exc = e
             if attempt < CLAUDE_MAX_ATTEMPTS:
                 backoff = 5 * attempt  # 5s, 10s
-                _log(f"  attempt {attempt} failed: {e}; retrying in {backoff}s")
+                _log(
+                    f"  attempt {attempt} failed: {e}; "
+                    f"retrying in {backoff}s with {CLAUDE_MODEL_RETRY}"
+                )
                 time.sleep(backoff)
             else:
                 _log(f"  attempt {attempt} failed (final): {e}")
@@ -249,11 +271,7 @@ def process_one() -> int:
         payload = bq_data.assemble_report_payload(slug)
         prompt = assemble_prompt(template, payload)
 
-        raw = run_claude(prompt)
-        obj = extract_json_object(raw)
-        items = validate_items(obj.get("insights", []))
-        context_banner = _validate_banner(obj.get("context_banner"), "context_banner")
-        tab2_narrative = _validate_banner(obj.get("tab2_narrative"), "tab2_narrative")
+        items, context_banner, tab2_narrative = generate_validated_output(prompt)
 
         # Claude can take 1-4 minutes. The user may have deleted the snapshot
         # or reset its status in the meantime — don't pollute a snapshot they

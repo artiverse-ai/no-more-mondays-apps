@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { getCurrentUser } from "@/lib/auth";
 import { getDevMode } from "@/lib/dev-mode";
 import {
@@ -7,23 +5,30 @@ import {
   computeCeoKpis,
   getHighLevelRange,
   getSalesCyclesRange,
-  isPeriodKey,
-  resolvePeriod,
   suggestGranularity,
-  type PeriodKey,
   type TrendGranularity,
 } from "@/lib/highLevel";
+import {
+  DATE_RANGE_OPTIONS,
+  isDateRangeKey,
+  resolveDateRange,
+  type DateRangeKey,
+} from "@/lib/period";
+import { cn } from "@/lib/utils";
 import { DataFreshness } from "@/components/DataFreshness";
 import { DailyTrendChart } from "@/components/highLevel/DailyTrendChart";
 import { MarketingKpis } from "@/components/highLevel/MarketingKpis";
-import { PeriodFilter } from "@/components/highLevel/PeriodFilter";
 import { SalesCycleKpis } from "@/components/highLevel/SalesCycleKpis";
 import { SalesKpis } from "@/components/highLevel/SalesKpis";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DevModeToggle } from "@/components/DevModeToggle";
 import { GranularityPicker } from "@/components/ui/granularity-picker";
 import { GRANS_TIME } from "@/lib/granularity";
 import { Kpi } from "@/components/webinar/Kpi";
 import { fmt } from "@/components/webinar/format";
+import Link from "next/link";
+
+const PATHNAME = "/dashboards/high-level";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +52,14 @@ export default async function HighLevelDashboardPage(
   props: PageProps<"/dashboards/high-level">,
 ) {
   const sp = await props.searchParams;
-  const rawPeriod = pickStr(sp.period, "30d");
-  const periodKey: PeriodKey = isPeriodKey(rawPeriod) ? rawPeriod : "30d";
-  const resolved = resolvePeriod({
+  // Unified DateRangeKey with Sun-Sat semantics; matches Sales/Setter.
+  // Old PeriodKey values (`30d`, `7d`, …) are auto-translated for back-compat.
+  const rawPeriod = pickStr(sp.period, "this-week");
+  const translatedPeriod = translateLegacyPeriodKey(rawPeriod);
+  const periodKey: DateRangeKey = isDateRangeKey(translatedPeriod)
+    ? translatedPeriod
+    : "this-week";
+  const resolved = resolveDateRange({
     period: periodKey,
     from: pickStr(sp.from),
     to: pickStr(sp.to),
@@ -75,7 +85,7 @@ export default async function HighLevelDashboardPage(
     days.length > 0 ? days[days.length - 1].dbt_updated_at : null;
 
   return (
-    <main className="mx-auto max-w-7xl space-y-8 p-4 md:p-8 lg:p-10">
+    <main className="mx-auto max-w-7xl space-y-6 p-3 sm:p-4 md:p-8 lg:p-10">
       {/* Hero */}
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-8">
         <div className="flex flex-col gap-1">
@@ -97,13 +107,10 @@ export default async function HighLevelDashboardPage(
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
+          <DateRangePicker pathname={PATHNAME} resolved={resolved} />
           <DataFreshness asOf={updatedAt} />
-          <p className="text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">{resolved.label}</span>{" "}
-            &middot;{" "}
-            <span className="tabular-nums">
-              {fmt.date(resolved.from)} → {fmt.date(resolved.to)}
-            </span>
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {fmt.date(resolved.from)} → {fmt.date(resolved.to)}
           </p>
           <div className="flex items-center gap-2">
             {user?.isAdmin ? <DevModeToggle current={devMode} /> : null}
@@ -120,14 +127,8 @@ export default async function HighLevelDashboardPage(
         </div>
       </header>
 
-      {/* Period filter */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-        <PeriodFilter
-          period={resolved.period}
-          from={resolved.from}
-          to={resolved.to}
-        />
-      </section>
+      {/* Quick-button rail — same nine windows as Sales/Setter for parity. */}
+      <DateRangeQuickButtons currentKey={periodKey} pathname={PATHNAME} />
 
       {/* Hero KPIs — 4 primary metrics */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -196,5 +197,52 @@ export default async function HighLevelDashboardPage(
         </section>
       )}
     </main>
+  );
+}
+
+// Old PeriodFilter keys → new DateRangeKey, so existing bookmarks /
+// shared links don't 404 to the default after the switch.
+const LEGACY_PERIOD_MAP: Record<string, DateRangeKey> = {
+  "7d": "last-7d",
+  "30d": "last-30d",
+  "90d": "last-90d",
+  mtd: "this-month",
+  qtd: "ytd", // QTD has no exact replacement; YTD is the closest still-supported window.
+  ytd: "ytd",
+  custom: "custom",
+};
+
+function translateLegacyPeriodKey(s: string): string {
+  return LEGACY_PERIOD_MAP[s] ?? s;
+}
+
+function DateRangeQuickButtons({
+  currentKey,
+  pathname,
+}: {
+  currentKey: DateRangeKey;
+  pathname: string;
+}) {
+  return (
+    <div className="-mx-1 flex flex-wrap gap-1 overflow-x-auto px-1 pb-1">
+      {DATE_RANGE_OPTIONS.filter((o) => o.key !== "custom").map((o) => {
+        const active = o.key === currentKey;
+        return (
+          <Link
+            key={o.key}
+            href={`${pathname}?period=${o.key}`}
+            className={cn(
+              "shrink-0 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
+              active
+                ? "border-foreground bg-foreground text-background"
+                : "border-border bg-card text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+            )}
+            style={{ transitionTimingFunction: "var(--ease-out)" }}
+          >
+            {o.label}
+          </Link>
+        );
+      })}
+    </div>
   );
 }

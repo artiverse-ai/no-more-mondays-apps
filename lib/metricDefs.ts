@@ -162,7 +162,7 @@ export const METRIC_DEFS: Record<string, MetricDef> = {
     key: "roas_cash_running",
     label: "Live ROAS",
     description:
-      "Running cash return — sums every Fanbasis payment from deal-prospect emails attributable to this webinar, including payment-plan installments collected after the close. Grows over time. NULL for legacy rows (Fanbasis coverage starts mid-2025).",
+      "Running cash return — sums every Fanbasis payment received to date from deal-prospect emails attributable to this webinar, including payment-plan installments collected after the close. Grows over time as plans pay down. NULL for legacy rows (Fanbasis coverage starts mid-2025). May read LOWER than ROAS Cash for recent webinars: the closer enters cash_collected at-close in Airtable, but Fanbasis only counts dollars actually received — so an installment plan starts below ROAS Cash and crosses above it once the plan completes.",
     formula: "Σ Fanbasis payments by deal-prospect emails / total_webinar_ad_spend",
     source: "stg_fanbasis_sales → mart_webinar_events.roas_cash_running",
   },

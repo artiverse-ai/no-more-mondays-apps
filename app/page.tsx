@@ -68,10 +68,11 @@ const dashboards: Tile[] = [
 
 const sops: SopRailEntry[] = [
   {
-    href: "/sops/weekly-report",
+    href: "https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc",
+    external: true,
     title: "Weekly Report — Mon recap & Thu midweek",
     description:
-      "Snapshot creation, the 6 tabs, AI insights, Solutions tabs, and Dev Mode for the exact SQL.",
+      "Snapshot creation, the 6 tabs, AI insights, Solutions tabs, and Dev Mode for the exact SQL. (Notion)",
   },
   {
     href: "/sops/high-level-dashboard",
@@ -98,10 +99,11 @@ const sops: SopRailEntry[] = [
       "Per-webinar breakdown — spend, regs, attendance, bookings, cash, ROAS.",
   },
   {
-    href: "/sops/solutions-tabs",
+    href: "https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb",
+    external: true,
     title: "Solutions tabs (Alvaro & Ben)",
     description:
-      "How to fill in the weekly Marketing / Sales Solutions tabs — template, what to look at, what not to post.",
+      "How to fill in the weekly Marketing / Sales Solutions tabs — template, what to look at, what not to post. (Notion)",
   },
   {
     href: "/sops/funnel-search",

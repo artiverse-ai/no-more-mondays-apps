@@ -15,12 +15,12 @@ const SOP_GROUPS: SopGroup[] = [
     title: "Reporting dashboards",
     sops: [
       {
-        href: "/sops/weekly-report",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc",
+        external: true,
         title: "Weekly Report — Monday recap & Thursday midweek",
         audience: "Leadership · Marketing · Sales",
         description:
-          "How the two report formats differ, how to create a snapshot, what each tab covers, the AI insights pipeline, and Dev Mode for surfacing the exact SQL.",
+          "How the two report formats differ, how to create a snapshot, what each tab covers, the AI insights pipeline, and Dev Mode for surfacing the exact SQL. (Notion)",
       },
       {
         href: "/sops/high-level-dashboard",
@@ -55,12 +55,12 @@ const SOP_GROUPS: SopGroup[] = [
           "Per-webinar breakdown of every Sun + Wed event since launch. Spend, registration, attendance, bookings, cash, ROAS — plus the drill-down to a single webinar.",
       },
       {
-        href: "/sops/solutions-tabs",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb",
+        external: true,
         title: "Filling in the Solutions tabs (Alvaro & Ben)",
         audience: "Alvaro · Ben · Admins",
         description:
-          "When to post, what to look at first, the 3-question template for a useful solution, and what NOT to post on the Marketing/Sales Solutions tabs.",
+          "When to post, what to look at first, the 3-question template for a useful solution, and what NOT to post on the Marketing/Sales Solutions tabs. (Notion)",
       },
     ],
   },

@@ -239,6 +239,27 @@ export default async function Page({
           Latest Webinar: {snapshot.latestWebinar ?? "—"} · KPI window {fmtKpiWindow(kpiStart, kpiEnd)}
         </span>
         <span className={styles.badge}>{snapshot.badge}</span>
+        <a
+          href="https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            marginLeft: 12,
+            fontSize: 11,
+            padding: "4px 10px",
+            borderRadius: 6,
+            border: "1px solid rgba(59,130,246,.35)",
+            background: "rgba(59,130,246,.08)",
+            color: "#1d4ed8",
+            textDecoration: "none",
+            fontWeight: 500,
+            textTransform: "uppercase",
+            letterSpacing: ".08em",
+          }}
+          title="Open the Weekly Report SOP in Notion"
+        >
+          📖 SOP →
+        </a>
         {isAdmin ? (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8, marginLeft: 12 }}>
             <DevModeToggle current={devMode} />

@@ -26,6 +26,10 @@ import { DataFreshness } from "@/components/DataFreshness";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DevModeToggle } from "@/components/DevModeToggle";
 import { Kpi } from "@/components/webinar/Kpi";
+import {
+  UnderDevelopmentBanner,
+  UnderDevelopmentGate,
+} from "@/components/UnderDevelopment";
 import { ViewTabs } from "@/components/ui/view-tabs";
 import { parseViewTab } from "@/lib/view-tabs";
 import { cn } from "@/lib/utils";
@@ -79,12 +83,20 @@ export default async function SetterDashboardPage(
   const dir: "asc" | "desc" = pickStr(sp.dir, "desc") === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(pickStr(sp.page, "1"), 10) || 1);
 
-  const [allCurrent, allPrior, updatedAt, user, devMode] = await Promise.all([
+  // Gate before the BigQuery work — hidden from exec view until signed
+  // off against the Monday spec.
+  const [user, devMode] = await Promise.all([
+    getCurrentUser(),
+    getDevMode(),
+  ]);
+  if (!devMode) {
+    return <UnderDevelopmentGate title="Setter Performance" />;
+  }
+
+  const [allCurrent, allPrior, updatedAt] = await Promise.all([
     getCalls({ from: resolved.from, to: resolved.to }),
     getCalls({ from: prior.from, to: prior.to }),
     getCallsTableFreshness(),
-    getCurrentUser(),
-    getDevMode(),
   ]);
 
   const options = deriveFilterOptions(allCurrent);
@@ -122,6 +134,7 @@ export default async function SetterDashboardPage(
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-3 sm:p-4 md:p-8 lg:p-10">
+      <UnderDevelopmentBanner />
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-accent">

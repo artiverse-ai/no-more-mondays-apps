@@ -26,6 +26,10 @@ import { DataFreshness } from "@/components/DataFreshness";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DevModeToggle } from "@/components/DevModeToggle";
 import { Kpi } from "@/components/webinar/Kpi";
+import {
+  UnderDevelopmentBanner,
+  UnderDevelopmentGate,
+} from "@/components/UnderDevelopment";
 import { ViewTabs } from "@/components/ui/view-tabs";
 import { parseViewTab } from "@/lib/view-tabs";
 import { cn } from "@/lib/utils";
@@ -84,16 +88,25 @@ export default async function SalesDashboardPage(
   const dir: "asc" | "desc" = pickStr(sp.dir, "desc") === "asc" ? "asc" : "desc";
   const page = Math.max(1, parseInt(pickStr(sp.page, "1"), 10) || 1);
 
+  // Gate BEFORE the expensive BigQuery work: this dashboard is hidden
+  // from the executive view until it's signed off against the Monday
+  // spec. Exec-mode viewers get the placeholder and no query runs.
+  const [user, devMode] = await Promise.all([
+    getCurrentUser(),
+    getDevMode(),
+  ]);
+  if (!devMode) {
+    return <UnderDevelopmentGate title="Sales Performance" />;
+  }
+
   // -----------------------------------------------------------------
   // Single canonical query per page-load (current + prior periods in
   // parallel for Δ-vs-prior computation).
   // -----------------------------------------------------------------
-  const [allCurrent, allPrior, updatedAt, user, devMode] = await Promise.all([
+  const [allCurrent, allPrior, updatedAt] = await Promise.all([
     getCalls({ from: resolved.from, to: resolved.to }),
     getCalls({ from: prior.from, to: prior.to }),
     getCallsTableFreshness(),
-    getCurrentUser(),
-    getDevMode(),
   ]);
 
   // Cross-filter options derived from UNFILTERED rows so chips don't shrink.
@@ -132,6 +145,7 @@ export default async function SalesDashboardPage(
 
   return (
     <main className="mx-auto max-w-7xl space-y-6 p-3 sm:p-4 md:p-8 lg:p-10">
+      <UnderDevelopmentBanner />
       {/* Hero */}
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
         <div className="flex flex-col gap-1">

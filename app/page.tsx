@@ -117,10 +117,11 @@ const sops: SopRailEntry[] = [
       "Trace one Calendly booking through the funnel by tag, closer, host, or status. (Notion)",
   },
   {
-    href: "/sops/how-to-read-capacity-dashboard",
+    href: "https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34",
+    external: true,
     title: "How to read the capacity dashboard",
     description:
-      "What every chart, KPI, and matrix cell means on the team-availability dashboard.",
+      "What every chart, KPI, and matrix cell means on the team-availability dashboard. (Notion)",
   },
   {
     href: "/sops/closer-calendar-management",

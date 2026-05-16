@@ -68,12 +68,12 @@ const SOP_GROUPS: SopGroup[] = [
     title: "Sales ops tooling",
     sops: [
       {
-        href: "/sops/how-to-read-capacity-dashboard",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34",
+        external: true,
         title: "How to read the capacity dashboard",
         audience: "Ops · Sales managers",
         description:
-          "What each chart and number on the team-availability dashboard means, how to filter, and what to do when something looks off.",
+          "What each chart and number on the team-availability dashboard means, how to filter, and what to do when something looks off. (Notion)",
       },
       {
         href: "https://www.notion.so/nomoremondays/SOP-Funnel-Search-3629b9a6796a8009819ad89561108f89",

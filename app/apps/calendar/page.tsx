@@ -162,12 +162,15 @@ export default async function Page(props: PageProps<"/apps/calendar">) {
                 Admin
               </Link>
             ) : null}
-            <Link
-              href="/sops/how-to-read-capacity-dashboard"
-              className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground hover:text-accent"
+            <a
+              href="https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-md border border-alert-blue/40 bg-alert-blue/10 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-alert-blue shadow-sm transition-colors hover:bg-alert-blue/15"
+              title="Open the Capacity Dashboard SOP in Notion"
             >
-              How to read this →
-            </Link>
+              📖 SOP
+            </a>
           </div>
         </div>
       </header>

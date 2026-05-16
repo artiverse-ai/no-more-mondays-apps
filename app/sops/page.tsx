@@ -39,12 +39,12 @@ const SOP_GROUPS: SopGroup[] = [
           "Every call rolled up by closer with cross-filters for source / setter / outcome / OCC·FUC. Δ-vs-prior pills on every KPI. (Notion)",
       },
       {
-        href: "/sops/setter-performance-dashboard",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-Setter-Performance-Dashboard-3629b9a6796a80fe88cff0294415a19f",
+        external: true,
         title: "Setter Performance dashboard",
         audience: "Sales managers · Setters",
         description:
-          "Same call data, setter perspective. Show rate, Setter DQ rate, cash per booking, and the $300/week bonus eligibility view.",
+          "Same call data, setter perspective. Show rate, Setter DQ rate, cash per booking, and the $300/week bonus eligibility view. (Notion)",
       },
       {
         href: "/sops/webinar-performance-dashboard",

@@ -89,10 +89,11 @@ const sops: SopRailEntry[] = [
       "Per-closer rollup with cross-filters and Δ-vs-prior on every KPI. (Notion)",
   },
   {
-    href: "/sops/setter-performance-dashboard",
+    href: "https://www.notion.so/nomoremondays/SOP-Setter-Performance-Dashboard-3629b9a6796a80fe88cff0294415a19f",
+    external: true,
     title: "Setter Performance",
     description:
-      "Per-setter view including the $300/week bonus eligibility check.",
+      "Per-setter view including the $300/week bonus eligibility check. (Notion)",
   },
   {
     href: "/sops/webinar-performance-dashboard",

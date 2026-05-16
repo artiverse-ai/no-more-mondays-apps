@@ -17,9 +17,15 @@ export default function Page() {
           </h1>
           <p className="text-sm text-muted-foreground">
             Find Calendly bookings by <strong>when they were created</strong>{" "}
-            (not when the call is scheduled). Default range is the last 7
-            days of bookings. Same funnel-tag filters, hosts, and charts as
-            Funnel Search.
+            (not when the call is scheduled). Default range is the last
+            30 days. Same funnel-tag filters, hosts, and charts as Funnel
+            Search.
+          </p>
+          <p className="mt-2 text-xs text-amber-700">
+            ⏱ Searches typically take <strong>60–120 seconds</strong> — the
+            app fetches a wide Calendly window then joins to BigQuery for
+            held/deal/cash data. Be patient on first load; the loading
+            strip shows progress.
           </p>
         </div>
       </header>

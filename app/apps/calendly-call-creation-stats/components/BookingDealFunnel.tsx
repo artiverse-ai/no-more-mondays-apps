@@ -1,6 +1,8 @@
 "use client";
 
 import { Row } from "../lib/types";
+import type { EnrichmentMeta } from "../lib/enrich";
+import { BqEnrichInfoButton } from "./BqEnrichInfoButton";
 
 const fmtUsd = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
@@ -10,8 +12,15 @@ const fmtUsd = (n: number) =>
 //
 // Held / Deals / Cash depend on BQ enrichment. If no rows have been
 // enriched yet, we render dashes for those columns and show a small
-// "Enriching..." badge in the corner.
-export function BookingDealFunnel({ rows }: { rows: Row[] }) {
+// "Enriching..." badge in the corner. The (i) badge next to the heading
+// pops the resolved BQ SQL so you can debug a mismatch.
+export function BookingDealFunnel({
+  rows,
+  enrichMeta,
+}: {
+  rows: Row[];
+  enrichMeta: EnrichmentMeta | null;
+}) {
   const total = rows.length;
   const future = rows.filter((r) => r.callStatus === "future").length;
   const canceled = rows.filter((r) => r.callStatus === "canceled").length;
@@ -32,10 +41,19 @@ export function BookingDealFunnel({ rows }: { rows: Row[] }) {
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
           Booking → Cash funnel
+          <BqEnrichInfoButton meta={enrichMeta} />
         </h3>
-        {!enrichedAny ? (
+        {enrichMeta?.error ? (
+          <span className="text-[10px] uppercase tracking-[0.14em] text-rose-700">
+            ⚠ Enrichment failed — click (i)
+          </span>
+        ) : !enrichedAny ? (
           <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            Awaiting BQ enrichment…
+            {enrichMeta ? `0 of ${enrichMeta.total} matched in BQ — click (i)` : "Awaiting BQ enrichment…"}
+          </span>
+        ) : enrichMeta ? (
+          <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            {enrichMeta.matched}/{enrichMeta.total} BQ-matched
           </span>
         ) : null}
       </div>

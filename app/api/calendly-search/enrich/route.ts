@@ -57,26 +57,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "createdMin + createdMax required" }, { status: 400 });
   }
 
+  const sql = `SELECT
+    LOWER(prospect_email_lc)                            AS email_lc,
+    FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', calendly_created_ts, 'UTC')
+                                                        AS created_at_iso,
+    is_call_held,
+    is_not_taken,
+    is_show_up,
+    is_dispositioned,
+    is_canceled,
+    is_deal,
+    cash_collected,
+    revenue_generated,
+    closer_owner,
+    setter_owner,
+    call_outcome
+  FROM ${ENRICHED}
+  WHERE LOWER(prospect_email_lc) IN UNNEST(@emails)
+    AND calendly_created_ts BETWEEN TIMESTAMP(@createdMin) AND TIMESTAMP(@createdMax)`;
+
+  // Resolved-SQL string for the Dev Mode info button. Caps the email list
+  // preview so the modal stays readable when the user has thousands of rows.
+  const previewEmails = emails.slice(0, 50);
+  const emailLiteral = `[${previewEmails.map((e) => `'${e.replace(/'/g, "''")}'`).join(", ")}${emails.length > 50 ? `, /* + ${emails.length - 50} more */` : ""}]`;
+  const resolvedSql = sql
+    .replace("@emails", emailLiteral)
+    .replace("@createdMin", `'${body.createdMin}'`)
+    .replace("@createdMax", `'${body.createdMax}'`);
+
   try {
     const [rows] = await bq().query({
-      query: `SELECT
-          LOWER(prospect_email_lc)                            AS email_lc,
-          FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', calendly_created_ts, 'UTC')
-                                                              AS created_at_iso,
-          is_call_held,
-          is_not_taken,
-          is_show_up,
-          is_dispositioned,
-          is_canceled,
-          is_deal,
-          cash_collected,
-          revenue_generated,
-          closer_owner,
-          setter_owner,
-          call_outcome
-        FROM ${ENRICHED}
-        WHERE LOWER(prospect_email_lc) IN UNNEST(@emails)
-          AND calendly_created_ts BETWEEN TIMESTAMP(@createdMin) AND TIMESTAMP(@createdMax)`,
+      query: sql,
       params: { emails, createdMin: body.createdMin, createdMax: body.createdMax },
       types: { emails: ["STRING"], createdMin: "STRING", createdMax: "STRING" },
     });
@@ -97,8 +108,21 @@ export async function POST(req: Request) {
       callOutcome: r.call_outcome ? String(r.call_outcome) : null,
     }));
 
-    return NextResponse.json({ rows: enriched });
+    return NextResponse.json({
+      rows: enriched,
+      sql: resolvedSql,
+      stats: {
+        emailsQueried: emails.length,
+        rowsReturned: enriched.length,
+        createdMin: body.createdMin,
+        createdMax: body.createdMax,
+      },
+    });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json({
+      error: (e as Error).message,
+      sql: resolvedSql,
+      stats: { emailsQueried: emails.length, createdMin: body.createdMin, createdMax: body.createdMax },
+    }, { status: 500 });
   }
 }

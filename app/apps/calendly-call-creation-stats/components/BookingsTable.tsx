@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import { CalendlyEventType, Row } from "../lib/types";
 import { fmtDate } from "../lib/format";
 import { MatchedPills } from "./MatchedPills";
+import { CallStatusBadge } from "./CallStatusBadge";
 
 const PAGE_SIZE = 15;
 
 type SortField =
   | "inviteeName"
   | "inviteeEmail"
-  | "status"
+  | "callStatus"
   | "eventTypeName"
   | "internalNote"
   | "hostName"
@@ -20,7 +21,7 @@ type SortField =
 const COLS: [SortField, string][] = [
   ["inviteeName", "Invitee"],
   ["inviteeEmail", "Email"],
-  ["status", "Status"],
+  ["callStatus", "Call Status"],
   ["eventTypeName", "Event Type"],
   ["internalNote", "Funnel"],
   ["hostName", "Host"],
@@ -118,7 +119,10 @@ export function BookingsTable({
                 <td className="px-3 py-2.5 font-medium">{r.inviteeName}</td>
                 <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{r.inviteeEmailDisplay}</td>
                 <td className="px-3 py-2.5">
-                  <StatusBadge status={r.status} />
+                  <CallStatusBadge status={r.callStatus} />
+                  {r.callOutcome ? (
+                    <div className="mt-1 text-[10px] text-muted-foreground">{r.callOutcome}</div>
+                  ) : null}
                   {r.cancelReason ? (
                     <div className="mt-1 text-[10px] text-rose-700">↳ {r.cancelReason}</div>
                   ) : null}

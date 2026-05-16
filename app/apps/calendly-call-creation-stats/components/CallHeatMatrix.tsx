@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Row } from "../lib/types";
+import type { StatusFilter as GlobalStatusFilter } from "./FiltersBar";
 
 const TZ = "America/New_York";
 const MAX_COLS = 30;
@@ -46,7 +47,7 @@ const cellKey = (date: string, hour: string): CellKey => `${date}|${hour}`;
 
 type StatusSplit = { active: number; canceled: number };
 
-type StatusFilter = "all" | "active" | "canceled";
+type StatusFilter = GlobalStatusFilter;
 
 // Heatmap of call volume by date × hour-of-day (Eastern Time). Cells split
 // left/right: green = active calls, red = canceled, widths proportional to
@@ -366,11 +367,12 @@ function HeatCell({
           style={{ flex: activeCount, backgroundColor: activeBg }}
           className={
             "flex h-full items-center justify-center overflow-hidden font-mono text-[11px] font-semibold tabular-nums text-emerald-950 transition hover:brightness-110 focus:outline-none focus:brightness-110 " +
-            (statusFilter === "active"
+            // Highlight active half when a non-canceled call-status filter is on.
+            (statusFilter === "future" || statusFilter === "held" || statusFilter === "no_show" || statusFilter === "unknown"
               ? "ring-1 ring-inset ring-emerald-900/40"
               : "")
           }
-          title={`${activeCount} active · click to filter`}
+          title={`${activeCount} active · click to inspect`}
           aria-label={`${activeCount} active calls`}
         >
           {activeCount}

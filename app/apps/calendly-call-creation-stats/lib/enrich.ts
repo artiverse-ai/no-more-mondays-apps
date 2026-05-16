@@ -32,10 +32,26 @@ function normalizeIsoToSecond(iso: string): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
+export type EnrichmentMeta = {
+  rows: Row[];
+  matched: number;
+  total: number;
+  error?: string;
+  // The resolved BQ query (with literals inlined) + stats for the Dev Mode
+  // info button so the user can run it themselves in BigQuery.
+  sql?: string;
+  stats?: {
+    emailsQueried: number;
+    rowsReturned?: number;
+    createdMin: string;
+    createdMax: string;
+  };
+};
+
 export async function enrichRows(
   rows: Row[],
   signal: AbortSignal,
-): Promise<{ rows: Row[]; matched: number; total: number; error?: string }> {
+): Promise<EnrichmentMeta> {
   if (rows.length === 0) return { rows, matched: 0, total: 0 };
 
   // Build the request payload from row info.
@@ -51,7 +67,7 @@ export async function enrichRows(
   const createdMin = new Date(Math.min(...createdAts) - 60_000).toISOString();
   const createdMax = new Date(Math.max(...createdAts) + 60_000).toISOString();
 
-  let payload: { rows?: EnrichedRow[]; error?: string };
+  let payload: { rows?: EnrichedRow[]; error?: string; sql?: string; stats?: EnrichmentMeta["stats"] };
   try {
     const res = await fetch("/api/calendly-search/enrich", {
       method: "POST",
@@ -61,7 +77,12 @@ export async function enrichRows(
     });
     payload = await res.json();
     if (!res.ok) {
-      return { rows, matched: 0, total: rows.length, error: payload.error || `HTTP ${res.status}` };
+      return {
+        rows, matched: 0, total: rows.length,
+        error: payload.error || `HTTP ${res.status}`,
+        sql: payload.sql,
+        stats: payload.stats,
+      };
     }
   } catch (e) {
     return { rows, matched: 0, total: rows.length, error: (e as Error).message };
@@ -101,5 +122,11 @@ export async function enrichRows(
     };
   });
 
-  return { rows: out, matched, total: rows.length };
+  return {
+    rows: out,
+    matched,
+    total: rows.length,
+    sql: payload.sql,
+    stats: payload.stats,
+  };
 }

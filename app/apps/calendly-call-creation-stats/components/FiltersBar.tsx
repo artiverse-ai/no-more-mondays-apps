@@ -3,7 +3,10 @@
 import { Row } from "../lib/types";
 
 export type ViewMode = "calendar" | "bookings" | "invitees" | "hosts";
-export type StatusFilter = "all" | "active" | "canceled";
+// Richer call-status filter for the creation-stats app — driven by
+// r.callStatus (future / held / no_show / canceled / unknown) instead
+// of the raw Calendly status.
+export type StatusFilter = "all" | "future" | "held" | "no_show" | "canceled" | "unknown";
 export type CloserScope = "all" | "active" | "inactive";
 
 type Props = {

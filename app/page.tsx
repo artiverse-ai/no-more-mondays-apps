@@ -124,10 +124,11 @@ const sops: SopRailEntry[] = [
       "What every chart, KPI, and matrix cell means on the team-availability dashboard. (Notion)",
   },
   {
-    href: "/sops/closer-calendar-management",
+    href: "https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e",
+    external: true,
     title: "Calendar management for closers",
     description:
-      "Share your calendar, block your busy time, set the right timezone.",
+      "Share your calendar, block your busy time, set the right timezone. (Notion)",
   },
   {
     href: "/sops/new-closer-joins",

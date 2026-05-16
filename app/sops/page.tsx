@@ -84,12 +84,12 @@ const SOP_GROUPS: SopGroup[] = [
           "Find Calendly bookings by funnel tag, then narrow by closer / host / status. The fast way to trace one deal end-to-end. (Notion)",
       },
       {
-        href: "/sops/closer-calendar-management",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e",
+        external: true,
         title: "Calendar management for closers",
         audience: "Closers",
         description:
-          "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week.",
+          "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week. (Notion)",
       },
       {
         href: "/sops/new-closer-joins",

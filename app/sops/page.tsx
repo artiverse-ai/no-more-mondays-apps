@@ -47,12 +47,12 @@ const SOP_GROUPS: SopGroup[] = [
           "Same call data, setter perspective. Show rate, Setter DQ rate, cash per booking, and the $300/week bonus eligibility view. (Notion)",
       },
       {
-        href: "/sops/webinar-performance-dashboard",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-Webinar-Performance-Dashboard-3629b9a6796a8007a796fe291db98bad",
+        external: true,
         title: "Webinar Performance dashboard",
         audience: "Marketing · CEO",
         description:
-          "Per-webinar breakdown of every Sun + Wed event since launch. Spend, registration, attendance, bookings, cash, ROAS — plus the drill-down to a single webinar.",
+          "Per-webinar breakdown of every Sun + Wed event since launch. Spend, registration, attendance, bookings, cash, ROAS — plus the drill-down to a single webinar. (Notion)",
       },
       {
         href: "https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb",

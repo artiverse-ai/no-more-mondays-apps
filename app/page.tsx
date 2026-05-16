@@ -96,10 +96,11 @@ const sops: SopRailEntry[] = [
       "Per-setter view including the $300/week bonus eligibility check. (Notion)",
   },
   {
-    href: "/sops/webinar-performance-dashboard",
+    href: "https://www.notion.so/nomoremondays/SOP-Webinar-Performance-Dashboard-3629b9a6796a8007a796fe291db98bad",
+    external: true,
     title: "Webinar Performance",
     description:
-      "Per-webinar breakdown — spend, regs, attendance, bookings, cash, ROAS.",
+      "Per-webinar breakdown — spend, regs, attendance, bookings, cash, ROAS. (Notion)",
   },
   {
     href: "https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb",

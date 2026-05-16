@@ -131,10 +131,11 @@ const sops: SopRailEntry[] = [
       "Share your calendar, block your busy time, set the right timezone. (Notion)",
   },
   {
-    href: "/sops/new-closer-joins",
+    href: "https://www.notion.so/nomoremondays/SOP-When-a-New-Closer-Joins-3629b9a6796a8042aed3dd334dfc1206",
+    external: true,
     title: "When a new closer joins",
     description:
-      "Ops walkthrough for onboarding a closer end-to-end.",
+      "Ops walkthrough for onboarding a closer end-to-end. (Notion)",
   },
   {
     href: "/sops/closer-removed",

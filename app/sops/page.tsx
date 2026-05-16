@@ -92,12 +92,12 @@ const SOP_GROUPS: SopGroup[] = [
           "Share your calendar, block your busy time, set the right timezone — five minutes once, three minutes a week. (Notion)",
       },
       {
-        href: "/sops/new-closer-joins",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-When-a-New-Closer-Joins-3629b9a6796a8042aed3dd334dfc1206",
+        external: true,
         title: "When a new closer joins",
         audience: "Ops",
         description:
-          "The walkthrough for adding a new closer: get their calendar shared, add them to the active list, verify they appear in the dashboard.",
+          "The walkthrough for adding a new closer: get their calendar shared, add them to the active list, verify they appear in the dashboard. (Notion)",
       },
       {
         href: "/sops/closer-removed",

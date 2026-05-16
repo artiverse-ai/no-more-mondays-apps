@@ -175,7 +175,7 @@ export function SqlInfoButton({ resolved }: { resolved: ResolvedMetricSql }) {
                       border: "1px solid rgba(255,255,255,.05)",
                       borderRadius: 6,
                       padding: "10px 12px",
-                      fontFamily: "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
                       fontSize: 11.5,
                       lineHeight: 1.55,
                       whiteSpace: "pre",

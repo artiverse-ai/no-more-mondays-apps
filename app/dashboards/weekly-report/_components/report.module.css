@@ -26,11 +26,14 @@
   --blue: #3b82f6;
   --purple: #8b5cf6;
 
-  /* Spec specifies SF Pro / SF Mono; system fallbacks below work natively
-     on macOS/iOS and gracefully degrade elsewhere. */
+  /* Spec originally specified SF Pro / SF Mono; per user request the
+     numeric font is now Arial (Google Sheets default) for cleaner read at
+     a glance. We keep the --font-mono name because every metric rule below
+     references it — tabular-nums ensures digit columns line up despite the
+     proportional font. */
   --font-display: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
   --font-body: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
-  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', monospace;
+  --font-mono: Arial, Helvetica, 'Liberation Sans', sans-serif;
 
   background: var(--bg);
   color: var(--text-primary);

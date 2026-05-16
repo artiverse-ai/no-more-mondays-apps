@@ -110,10 +110,11 @@ const sops: SopRailEntry[] = [
       "How to fill in the weekly Marketing / Sales Solutions tabs — template, what to look at, what not to post. (Notion)",
   },
   {
-    href: "/sops/funnel-search",
+    href: "https://www.notion.so/nomoremondays/SOP-Funnel-Search-3629b9a6796a8009819ad89561108f89",
+    external: true,
     title: "Funnel Search",
     description:
-      "Trace one Calendly booking through the funnel by tag, closer, host, or status.",
+      "Trace one Calendly booking through the funnel by tag, closer, host, or status. (Notion)",
   },
   {
     href: "/sops/how-to-read-capacity-dashboard",

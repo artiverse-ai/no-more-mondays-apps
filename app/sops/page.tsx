@@ -76,12 +76,12 @@ const SOP_GROUPS: SopGroup[] = [
           "What each chart and number on the team-availability dashboard means, how to filter, and what to do when something looks off.",
       },
       {
-        href: "/sops/funnel-search",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-Funnel-Search-3629b9a6796a8009819ad89561108f89",
+        external: true,
         title: "Funnel Search",
         audience: "Sales ops · Marketing",
         description:
-          "Find Calendly bookings by funnel tag, then narrow by closer / host / status. The fast way to trace one deal end-to-end.",
+          "Find Calendly bookings by funnel tag, then narrow by closer / host / status. The fast way to trace one deal end-to-end. (Notion)",
       },
       {
         href: "/sops/closer-calendar-management",

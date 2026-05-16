@@ -155,7 +155,7 @@ export function SolutionsTab({
           )}
         </span>
         <a
-          href="/sops/solutions-tabs"
+          href="https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb"
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -170,7 +170,7 @@ export function SolutionsTab({
             textTransform: "uppercase",
             letterSpacing: ".08em",
           }}
-          title="Open the Solutions-tab SOP in a new tab"
+          title="Open the Solutions-tab SOP in Notion"
         >
           How to fill this in →
         </a>

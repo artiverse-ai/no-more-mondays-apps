@@ -34,6 +34,13 @@ function fmtDayDate(iso: string): string {
   });
 }
 
+function isFutureDate(iso: string): boolean {
+  const d = new Date(iso + "T00:00:00Z");
+  const today = new Date();
+  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  return d > todayUtc;
+}
+
 function fmtRange(start: string, end: string): string {
   const s = new Date(start + "T12:00:00Z");
   const e = new Date(end + "T12:00:00Z");
@@ -143,7 +150,7 @@ export function CreateNextSnapshotButton({ initialProposals = [] }: { initialPro
         <div className="space-y-4">
           <div className="space-y-1">
             <label htmlFor="snapshot-date" className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Pick a date (last 12 weeks)
+              Pick a date (next 2 upcoming + last 12 weeks)
             </label>
             <select
               id="snapshot-date"
@@ -152,14 +159,18 @@ export function CreateNextSnapshotButton({ initialProposals = [] }: { initialPro
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:border-accent focus:outline-none"
             >
               {proposals.map((p) => {
+                const future = isFutureDate(p.runOn);
                 const statusTag = p.existing
                   ? "already exists"
+                  : future
+                  ? "upcoming — data not yet ready"
                   : p.dataReady
                   ? "ready"
                   : `missing ${p.availability.missing.join(" + ")}`;
+                const prefix = future ? "⏳ " : "";
                 return (
                   <option key={p.runOn} value={p.runOn}>
-                    {fmtDayDate(p.runOn)} · {REPORT_LABEL[p.reportType]} — {statusTag}
+                    {prefix}{fmtDayDate(p.runOn)} · {REPORT_LABEL[p.reportType]} — {statusTag}
                   </option>
                 );
               })}
@@ -185,6 +196,11 @@ export function CreateNextSnapshotButton({ initialProposals = [] }: { initialPro
               </div>
               {selected.existing ? (
                 <div className="text-amber-700">Snapshot already exists.</div>
+              ) : isFutureDate(selected.runOn) ? (
+                <div className="text-amber-700">
+                  Upcoming Mon/Thu — wait for the webinar + sales-cycle data to land,
+                  then this date will flip to <strong>ready</strong>.
+                </div>
               ) : !selected.dataReady ? (
                 <div className="text-rose-700">
                   Cannot create — missing <strong>{selected.availability.missing.join(", ")}</strong> in BQ.
@@ -209,10 +225,12 @@ export function CreateNextSnapshotButton({ initialProposals = [] }: { initialPro
               <button
                 type="button"
                 onClick={() => void create()}
-                disabled={!selected || !selected.dataReady || creating}
+                disabled={!selected || isFutureDate(selected.runOn) || !selected.dataReady || creating}
                 title={
                   !selected
                     ? "Select a date first"
+                    : isFutureDate(selected.runOn)
+                    ? `Upcoming ${REPORT_LABEL[selected.reportType]} — BQ data for ${fmtRange(selected.weekStart, selected.weekEnd)} hasn't arrived yet. Come back after the cycle closes.`
                     : !selected.dataReady
                     ? `BQ data not ready — missing ${selected.availability.missing.join(", ")} for ${fmtRange(selected.weekStart, selected.weekEnd)}. Wait for the dbt pipeline to finish.`
                     : ""

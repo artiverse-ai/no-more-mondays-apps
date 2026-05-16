@@ -172,25 +172,93 @@ export function proposeFromRunDate(runDate: Date, now: Date = new Date()): Propo
 
 /**
  * Enumerate every Mon + Thu from `weeksBack` weeks ago up to and including
- * the most-recent Mon/Thu on or before `now`. Newest-first.
+ * the next `weeksForward` Mon/Thu after today. Newest-first ordering, but
+ * future dates appear at the TOP (most-distant future first → today → past).
+ *
+ * Future dates are emitted in the same shape as past dates so callers can
+ * present them uniformly. The dataReady check (separate flow) is what gates
+ * whether they're actually creatable — for a future Sun/Wed, `webinars` +
+ * `calls` will be 0 until BQ catches up, which keeps the Create button
+ * disabled with the standard "missing data" tooltip.
  */
-export function enumerateMonThuRange(now: Date = new Date(), weeksBack = 12): ProposedSnapshot[] {
+export function enumerateMonThuRange(
+  now: Date = new Date(),
+  weeksBack = 12,
+  futureCount = 2,
+): ProposedSnapshot[] {
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const cutoff = addDays(today, -weeksBack * 7);
 
-  // Walk back from today to the most recent Mon/Thu.
+  // 1) Past-and-present: walk back from today to the most recent Mon/Thu, then
+  //    keep walking back until cutoff.
   let cursor = today;
   while (cursor.getUTCDay() !== 1 && cursor.getUTCDay() !== 4) {
     cursor = addDays(cursor, -1);
   }
-  const out: ProposedSnapshot[] = [];
+  const past: ProposedSnapshot[] = [];
   while (cursor >= cutoff) {
-    out.push(proposeFromDate(cursor));
+    past.push(proposeFromDate(cursor));
     // Step back to the previous Mon or Thu. Mon (1) → prev Thu = -4 days;
     // Thu (4) → prev Mon = -3 days.
     cursor = addDays(cursor, cursor.getUTCDay() === 1 ? -4 : -3);
   }
-  return out;
+
+  // 2) Future: walk FORWARD from today to the next `futureCount` Mon/Thu.
+  //    proposeFromDate normally rejects future dates — we build these manually.
+  const future: ProposedSnapshot[] = [];
+  let fwd = addDays(today, 1);
+  while (future.length < futureCount) {
+    if (fwd.getUTCDay() === 1 || fwd.getUTCDay() === 4) {
+      future.push(buildFutureProposal(fwd));
+    }
+    fwd = addDays(fwd, 1);
+  }
+  // future was filled chronologically; reverse so the latest future date is
+  // last (closest-future first, then today, then past). Final ordering:
+  //   [closest_future, second_future, latest_past, ..., earliest_past]
+  // Actually we want NEWEST-FIRST overall: furthest_future → today → oldest.
+  // Reverse future so [future_furthest, future_closer], then concat past.
+  return [...future.reverse(), ...past];
+}
+
+/**
+ * Same shape as proposeFromDate but skips the "future" guard. Used only for
+ * the picker — never reaches the POST-create path because the server-side
+ * proposeFromRunDate guard still blocks future creation.
+ */
+function buildFutureProposal(runDate: Date): ProposedSnapshot {
+  const day = runDate.getUTCDay();
+  if (day !== 1 && day !== 4) {
+    throw new Error(`buildFutureProposal: ${isoDate(runDate)} is not Mon/Thu`);
+  }
+  const isMonday = day === 1;
+  const reportType: ReportType = isMonday ? "weekly_recap" : "midweek_check";
+  let weekStart: Date;
+  let weekEnd: Date;
+  let weekLabel: string;
+  let badge: string;
+  if (isMonday) {
+    weekStart = addDays(runDate, -8);
+    weekEnd = addDays(runDate, -2);
+    weekLabel = `Week ${fmtRange(weekStart, weekEnd)}, ${weekEnd.getUTCFullYear()}`;
+    badge = fmtBadgeDate(runDate);
+  } else {
+    weekStart = addDays(runDate, -4);
+    weekEnd = addDays(runDate, -1);
+    weekLabel = fmtThuMidweekLabel(weekStart, weekEnd);
+    badge = `${fmtBadgeDate(runDate)} · MIDWEEK`;
+  }
+  const latestWebinarDay = addDays(runDate, -1);
+  return {
+    slug: isoDate(runDate),
+    runOn: isoDate(runDate),
+    weekStart: isoDate(weekStart),
+    weekEnd: isoDate(weekEnd),
+    reportType,
+    weekLabel,
+    badge,
+    latestWebinar: fmtLatestWebinar(latestWebinarDay, reportType),
+  };
 }
 
 /**

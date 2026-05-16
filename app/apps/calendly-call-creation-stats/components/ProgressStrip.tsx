@@ -43,7 +43,7 @@ export function ProgressStrip({ progress, initialMessage }: Props) {
         )}
       </div>
       <p className="font-mono text-[11px] text-muted-foreground">
-        Hang tight — usually 10–20 seconds.
+        Hang tight — usually 60–120 seconds (Calendly API is the bottleneck).
         {progress ? (
           <>
             {" "}

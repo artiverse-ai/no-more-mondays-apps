@@ -19,13 +19,6 @@ import { HostDistributionChart } from "./components/HostDistributionChart";
 import { FunnelDistributionChart } from "./components/FunnelDistributionChart";
 import { JsonModal } from "./components/JsonModal";
 import { runSearch } from "./lib/search";
-import { enrichRows, type EnrichmentMeta } from "./lib/enrich";
-import { BookingDealFunnel } from "./components/BookingDealFunnel";
-import { TimeToCallStat } from "./components/TimeToCallStat";
-import { BookingPaceSparkline } from "./components/BookingPaceSparkline";
-import { FunnelByCashChart } from "./components/FunnelByCashChart";
-import { CohortTable } from "./components/CohortTable";
-import { BqEnrichInfoButton } from "./components/BqEnrichInfoButton";
 import { PresetKey, Row, SearchProgress, SearchResult } from "./lib/types";
 import { exportCsv } from "./lib/csv";
 import { normHostValue } from "./lib/format";
@@ -33,7 +26,7 @@ import { normHostValue } from "./lib/format";
 type SortField =
   | "inviteeName"
   | "inviteeEmail"
-  | "callStatus"
+  | "status"
   | "eventTypeName"
   | "internalNote"
   | "hostName"
@@ -64,7 +57,6 @@ export function SearchClient() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<SearchProgress | null>(null);
   const [result, setResult] = useState<SearchResult | null>(null);
-  const [enrichMeta, setEnrichMeta] = useState<EnrichmentMeta | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // ---- view + filters ----
@@ -103,17 +95,7 @@ export function SearchClient() {
         signal: controller.signal,
         onProgress: setProgress,
       });
-      // Enrichment step — non-fatal: if BQ join fails the search still
-      // shows the Calendly-only data. We surface the SQL + error via the
-      // BqEnrichInfoButton on the Booking → Cash funnel header so the
-      // user can diagnose.
-      setProgress({ message: "Enriching with NMM call outcomes...", pct: 97, apiCalls: 0, elapsedSec: 0 });
-      const enriched = await enrichRows(res.rows, controller.signal);
-      setEnrichMeta(enriched);
-      if (enriched.error) {
-        console.warn("[calendly-call-creation-stats] enrichment failed:", enriched.error);
-      }
-      setResult({ ...res, rows: enriched.rows });
+      setResult(res);
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         setError((e as Error).message);
@@ -192,7 +174,7 @@ export function SearchClient() {
   const filtered = useMemo(() => {
     if (!result) return [] as Row[];
     return result.rows
-      .filter((r) => statusFilter === "all" || r.callStatus === statusFilter)
+      .filter((r) => statusFilter === "all" || r.status === statusFilter)
       .filter((r) => closerScopeMatches(r, closerScope, activeClosers, inactiveClosers))
       .filter((r) => hostMatches(r, hostFilter))
       .sort((a, b) => {
@@ -281,15 +263,6 @@ export function SearchClient() {
 
       {result ? (
         <>
-          {/* CEO-focused insights — added for creation-stats app.
-              Booking → Cash funnel + Time-to-Call + Booking pace
-              go above the standard Metrics strip. */}
-          <BookingDealFunnel rows={filtered} enrichMeta={enrichMeta} />
-          <div className="grid gap-3 md:grid-cols-2">
-            <TimeToCallStat rows={filtered} />
-            <BookingPaceSparkline rows={filtered} />
-          </div>
-
           <Metrics
             rows={filtered}
             allRows={closerScopedAll}
@@ -303,8 +276,6 @@ export function SearchClient() {
               regardless of which view tab is active. They give the
               aggregate view; the Calendar tab below gives the drill-down. */}
           <DailyVolumeChart rows={filtered} />
-          <FunnelByCashChart rows={filtered} />
-          <CohortTable rows={filtered} />
           <div className="grid gap-4 lg:grid-cols-2">
             <FunnelDistributionChart rows={filtered} />
             <HostDistributionChart rows={filtered} />

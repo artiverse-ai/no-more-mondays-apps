@@ -118,20 +118,16 @@ export function SearchForm(props: Props) {
           ) : null}
         </div>
 
-        {/* Call Status — richer than Calendly's active/canceled because we
-            enrich with int_calls_enriched (held/no-show/dispositioned). */}
+        {/* Status */}
         <div>
-          <Label>Call Status</Label>
+          <Label>Status</Label>
           <Dropdown
             value={statusFilter}
             onChange={(v) => setStatusFilter(v as StatusFilter)}
             options={[
               { value: "all", label: "All" },
-              { value: "future", label: "🟢 Future" },
-              { value: "held", label: "✅ Held" },
-              { value: "no_show", label: "❌ No-show" },
-              { value: "canceled", label: "✖ Canceled" },
-              { value: "unknown", label: "⋯ Awaiting BQ" },
+              { value: "active", label: "Active" },
+              { value: "canceled", label: "Canceled" },
             ]}
           />
         </div>

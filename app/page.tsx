@@ -75,10 +75,11 @@ const sops: SopRailEntry[] = [
       "Snapshot creation, the 6 tabs, AI insights, Solutions tabs, and Dev Mode for the exact SQL. (Notion)",
   },
   {
-    href: "/sops/high-level-dashboard",
+    href: "https://www.notion.so/nomoremondays/SOP-High-Level-CEO-Dashboard-3629b9a6796a805096c8e55cabba420c",
+    external: true,
     title: "High-Level (CEO) dashboard",
     description:
-      "Daily marketing + sales + sales-cycle rollup — the pre-standup scan.",
+      "Daily marketing + sales + sales-cycle rollup — the pre-standup scan. (Notion)",
   },
   {
     href: "/sops/sales-performance-dashboard",

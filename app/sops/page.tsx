@@ -23,12 +23,12 @@ const SOP_GROUPS: SopGroup[] = [
           "How the two report formats differ, how to create a snapshot, what each tab covers, the AI insights pipeline, and Dev Mode for surfacing the exact SQL. (Notion)",
       },
       {
-        href: "/sops/high-level-dashboard",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-High-Level-CEO-Dashboard-3629b9a6796a805096c8e55cabba420c",
+        external: true,
         title: "High-Level (CEO) dashboard",
         audience: "CEO · Leadership",
         description:
-          "Daily marketing + sales + sales-cycle rollup. The pre-standup scan: cash, TCV, ad spend, ROAS, OCC/FUC cycle times.",
+          "Daily marketing + sales + sales-cycle rollup. The pre-standup scan: cash, TCV, ad spend, ROAS, OCC/FUC cycle times. (Notion)",
       },
       {
         href: "/sops/sales-performance-dashboard",

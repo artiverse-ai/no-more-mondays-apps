@@ -29,6 +29,13 @@ const apps: Tile[] = [
       "Find bookings whose event-type internal note matches a query (setter, vip, webinar, …). Live Calendly API.",
     status: "live",
   },
+  {
+    href: "/apps/calendly-call-creation-stats",
+    title: "Calendly Call Creation Stats",
+    description:
+      "Same UI as Funnel Search, but filtered by when bookings were CREATED — not when the call is scheduled. Default last 7 days. Live Calendly API.",
+    status: "live",
+  },
 ];
 
 const dashboards: Tile[] = [

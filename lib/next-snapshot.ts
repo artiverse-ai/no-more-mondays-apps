@@ -156,17 +156,18 @@ export async function checkAvailability(weekStart: string, weekEnd: string): Pro
 
 /**
  * Build a proposed snapshot from a specific Mon/Thu run date. Throws if the
- * given date is not a Monday or Thursday, or if it is in the future.
+ * given date is not a Monday or Thursday. Future run dates are ALLOWED — the
+ * caller's data-readiness check (BQ webinars + calls in the window) is the
+ * real gate. This lets users build, e.g., the Mon May 18 recap on Sun May 17
+ * the moment last week's data has fully landed.
  */
-export function proposeFromRunDate(runDate: Date, now: Date = new Date()): ProposedSnapshot {
+export function proposeFromRunDate(runDate: Date): ProposedSnapshot {
   const day = runDate.getUTCDay();
   if (day !== 1 && day !== 4) {
     throw new Error(`Run date ${isoDate(runDate)} is not a Monday or Thursday`);
   }
-  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  if (runDate > todayUtc) {
-    throw new Error(`Run date ${isoDate(runDate)} is in the future`);
-  }
+  // Use the same builder path past + future dates take so the proposal shape
+  // is identical regardless of whether the run date has arrived.
   return proposeFromDate(runDate);
 }
 

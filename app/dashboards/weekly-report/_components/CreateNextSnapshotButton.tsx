@@ -162,8 +162,6 @@ export function CreateNextSnapshotButton({ initialProposals = [] }: { initialPro
                 const future = isFutureDate(p.runOn);
                 const statusTag = p.existing
                   ? "already exists"
-                  : future
-                  ? "upcoming — data not yet ready"
                   : p.dataReady
                   ? "ready"
                   : `missing ${p.availability.missing.join(" + ")}`;
@@ -196,17 +194,15 @@ export function CreateNextSnapshotButton({ initialProposals = [] }: { initialPro
               </div>
               {selected.existing ? (
                 <div className="text-amber-700">Snapshot already exists.</div>
-              ) : isFutureDate(selected.runOn) ? (
-                <div className="text-amber-700">
-                  Upcoming Mon/Thu — wait for the webinar + sales-cycle data to land,
-                  then this date will flip to <strong>ready</strong>.
-                </div>
               ) : !selected.dataReady ? (
                 <div className="text-rose-700">
-                  Cannot create — missing <strong>{selected.availability.missing.join(", ")}</strong> in BQ.
+                  Cannot create — missing <strong>{selected.availability.missing.join(", ")}</strong> in BQ for this window.
+                  {isFutureDate(selected.runOn) ? " The button will enable as soon as the cycle's data lands." : ""}
                 </div>
               ) : (
-                <div className="text-emerald-700">Ready to create.</div>
+                <div className="text-emerald-700">
+                  Ready to create{isFutureDate(selected.runOn) ? " — BQ already has the window's data even though the run date is upcoming." : ""}.
+                </div>
               )}
             </div>
           ) : null}
@@ -225,14 +221,12 @@ export function CreateNextSnapshotButton({ initialProposals = [] }: { initialPro
               <button
                 type="button"
                 onClick={() => void create()}
-                disabled={!selected || isFutureDate(selected.runOn) || !selected.dataReady || creating}
+                disabled={!selected || !selected.dataReady || creating}
                 title={
                   !selected
                     ? "Select a date first"
-                    : isFutureDate(selected.runOn)
-                    ? `Upcoming ${REPORT_LABEL[selected.reportType]} — BQ data for ${fmtRange(selected.weekStart, selected.weekEnd)} hasn't arrived yet. Come back after the cycle closes.`
                     : !selected.dataReady
-                    ? `BQ data not ready — missing ${selected.availability.missing.join(", ")} for ${fmtRange(selected.weekStart, selected.weekEnd)}. Wait for the dbt pipeline to finish.`
+                    ? `BQ data not ready — missing ${selected.availability.missing.join(", ")} for ${fmtRange(selected.weekStart, selected.weekEnd)}. As soon as BQ has webinars + calls in this window, the button enables.`
                     : ""
                 }
                 className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"

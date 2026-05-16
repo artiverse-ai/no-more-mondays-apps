@@ -18,8 +18,8 @@ Find Calendly bookings by funnel tag — then narrow by closer scope, host, or s
 ## 03 — When to use this vs. another dashboard
 
 - **One prospect or one deal** — use this. The Sales / Setter dashboards roll up to numbers; this shows the underlying call rows.
-- **Volume / rate questions** ("how many Sunday-webinar bookings did we get?") — use the **Sales dashboard** cross-filters.
-- **Webinar-level reads** — use the **Webinar dashboard**.
+- **Volume / rate questions** ("how many Sunday-webinar bookings did we get?") — use the [SOP: Sales Performance](https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9) cross-filters.
+- **Webinar-level reads** — use the [SOP: Webinar Performance Dashboard](https://www.notion.so/nomoremondays/SOP-Webinar-Performance-Dashboard-3629b9a6796a8007a796fe291db98bad).
 
 ## 04 — When results look wrong
 
@@ -29,9 +29,9 @@ Find Calendly bookings by funnel tag — then narrow by closer scope, host, or s
 
 ## 05 — Related SOPs
 
-- **Sales (Closer) Performance dashboard**
-- **Setter Performance dashboard**
-- **How to read the capacity dashboard** — same Calendly source data, capacity perspective.
+- [SOP: Sales Performance](https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9) — per-closer rollup of the same Calendly data.
+- [SOP: Setter Performance Dashboard](https://www.notion.so/nomoremondays/SOP-Setter-Performance-Dashboard-3629b9a6796a80fe88cff0294415a19f) — per-setter rollup of the same data.
+- [SOP: How to Read the Capacity Dashboard](https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34) — same Calendly source data, capacity perspective.
 
 ---
 

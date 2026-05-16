@@ -9,7 +9,7 @@ The weekly report is the single source of truth for "how did the business do thi
 - **Monday recap (6 tabs)** — full retro on the prior Sun–Sat. Tabs: Overview / Latest Webinar / Last Week's Sales / AI Strategic Insights / Marketing Solutions / Sales Solutions. The "Last Week's Sales" tab is the deep dive — per-closer, per-setter, by booking mode, with week-over-week deltas.
 - **Thursday midweek check (5 tabs)** — same KPI strip + Overview, but the "Last Week's Sales" tab is removed because the Wednesday cycle's sales haven't landed yet. The latest-webinar column shows partial cycle data with a `partial` tag.
 
-> 💡 **Solutions tabs (Marketing + Sales)** are preserved on *both* formats. Alvaro and Ben can edit them independently of the AI insights.
+> 💡 **Solutions tabs (Marketing + Sales)** are preserved on *both* formats. See [SOP: Weekly Report — Monday Solution Writing](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb) for how Alvaro and Ben fill them in.
 
 ## 02 — Creating a snapshot
 
@@ -81,6 +81,8 @@ Two designated humans — Alvaro for Marketing, Ben for Sales — post solutions
 - Posts persist across snapshots — the tab is keyed by `report_week`, so editing a future snapshot doesn't change the past.
 - Both tabs render on Monday *and* Thursday reports. (This was a deliberate decision after the v2 refactor briefly removed them — never drop them again.)
 
+> 💡 **For Alvaro & Ben:** see [SOP: Weekly Report — Monday Solution Writing](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb) for when to post, what to look at first, the 3-question template, and what NOT to post.
+
 ## 09 — Dev Mode — see the exact SQL
 
 > **Why:** When a number looks wrong, the fastest way to verify it is to run the same query in BigQuery and inspect the rows.
@@ -101,9 +103,11 @@ Two designated humans — Alvaro for Marketing, Ben for Sales — post solutions
 
 ## 11 — Related SOPs
 
-- **High-Level (CEO) dashboard** — the broader rollup the weekly report aggregates from.
-- **Sales (Closer) Performance dashboard** — the per-call detail behind the weekly closer rollup.
-- **Setter Performance dashboard** — per-setter detail behind the weekly setter rollup.
+- [SOP: Weekly Report — Monday Solution Writing](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb) — how Alvaro + Ben post solutions in response to each week's flags.
+- [SOP: High-Level (CEO) Dashboard](https://www.notion.so/nomoremondays/SOP-High-Level-CEO-Dashboard-3629b9a6796a805096c8e55cabba420c) — the broader daily rollup the weekly report aggregates from.
+- [SOP: Sales Performance](https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9) — the per-call detail behind the weekly closer rollup.
+- [SOP: Setter Performance Dashboard](https://www.notion.so/nomoremondays/SOP-Setter-Performance-Dashboard-3629b9a6796a80fe88cff0294415a19f) — per-setter detail behind the weekly setter rollup.
+- [SOP: Webinar Performance Dashboard](https://www.notion.so/nomoremondays/SOP-Webinar-Performance-Dashboard-3629b9a6796a8007a796fe291db98bad) — per-webinar breakdown behind the Latest Webinar tab.
 
 ---
 

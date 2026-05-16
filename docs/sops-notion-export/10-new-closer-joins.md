@@ -6,7 +6,7 @@ A new closer is useless to the booking system until two things are true: their c
 
 > **Why:** They have to do the share step themselves (Google requires the calendar owner to grant access). Don't re-explain — link them to the canonical instructions.
 
-1. Send them the Calendar management for closers SOP.
+1. Send them this link: [SOP: Calendar Management for Closers](https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e).
 2. Highlight section **01 — Share your calendar with ops@nomoremondays.io**. That's the only one they need to act on right away.
 3. Sections 02–08 are their ongoing hygiene playbook — they can read those at their own pace, but the share has to happen before they take their first booking.
 
@@ -35,10 +35,10 @@ A new closer is useless to the booking system until two things are true: their c
 > **Why:** The end-to-end check. If they don't appear here, the booking system can't see them — fix the pipeline before you mark them "onboarded".
 
 1. Wait **5–10 minutes** for the next sync run to pick up the new row in the active-closers list (and the calendar share, if it's the first sync since they shared).
-2. Open the capacity dashboard (`/apps/calendar`).
+2. Open the capacity dashboard (`/apps/calendar`). See [SOP: How to Read the Capacity Dashboard](https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34) if you need a tour.
 3. Their short-name pill should appear in the **Filter by closer** row. If it doesn't — calendar share didn't land or active-list change wasn't saved. Recheck steps 02 and 03.
 4. Click their name to filter to just them. The matrix should show their busy times (sleep, recurring meetings, etc.) — empty cells are when they'd be offered for booking.
-5. If the matrix is completely empty: their calendar has zero events in the visible window. Either no recurring blockers set up yet (a problem — they need to do steps 02–05 of the closer SOP), or the calendar share permission is wrong (recheck step 02 above).
+5. If the matrix is completely empty: their calendar has zero events in the visible window. Either no recurring blockers set up yet (a problem — they need to do steps 02–05 of the [closer SOP](https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e)), or the calendar share permission is wrong (recheck step 02 above).
 
 ## 05 — Train them on calendar hygiene
 
@@ -47,7 +47,13 @@ A new closer is useless to the booking system until two things are true: their c
 1. On the call, share the capacity dashboard with their name filtered.
 2. Walk them through what every empty cell means: a real prospect could be offered that slot in 5 minutes. Does that match reality?
 3. Pick one obvious miss (e.g. they don't have a sleep block) and have them add it live on the call. Show them the dashboard refresh.
-4. Bookmark the closer SOP for them. Encourage the 3-minute weekly check from section 08 of that doc.
+4. Bookmark the [SOP: Calendar Management for Closers](https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e) for them. Encourage the 3-minute weekly check from section 08 of that doc.
+
+## 06 — Related SOPs
+
+- [SOP: Calendar Management for Closers](https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e) — the closer-side doc you're sending them.
+- [SOP: How to Read the Capacity Dashboard](https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34) — what you'll be verifying against.
+- [SOP: When a Closer Is Removed](https://www.notion.so/nomoremondays/SOP-When-a-Closer-Is-Removed-3629b9a6796a80228f23ddef8f7448ac) — the mirror playbook for offboarding.
 
 ---
 

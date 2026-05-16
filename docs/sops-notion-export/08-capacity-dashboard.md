@@ -70,7 +70,7 @@ One TZ-independent signal — the team lives in many timezones:
 - **Hours blocked per day** — total busy minutes in the visible range, divided by days. Even a single nightly sleep block clears 8 hours. Below **8h/day**: something structural is missing.
 - OOO events, all-day blockers, and long meetings all count as blocked time — raw event count isn't used, since some healthy calendars have one big OOO covering most of the day.
 
-> 💡 **Action:** send them the **Calendar management for closers** SOP. If they aren't ready to fix it today, pause them via `/admin/closers` (flip *Available* off) so the dashboard stops offering them until they've set things up.
+> 💡 **Action:** send them the [SOP: Calendar Management for Closers](https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e). If they aren't ready to fix it today, pause them via `/admin/closers` (flip *Available* off) so the dashboard stops offering them until they've set things up.
 
 ## 08 — When numbers look wrong
 
@@ -83,9 +83,10 @@ One TZ-independent signal — the team lives in many timezones:
 
 ## 09 — Related SOPs
 
-- **Calendar management for closers** — what every closer is supposed to be doing on their end. Read it once so you know what to ask a closer to fix when the dashboard shows something weird.
-- **When a new closer joins** — the steps to add them so they appear here.
-- **When a closer is removed** — how to take them off cleanly.
+- [SOP: Calendar Management for Closers](https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e) — what every closer is supposed to be doing on their end. Read it once so you know what to ask a closer to fix when the dashboard shows something weird.
+- [SOP: When a New Closer Joins](https://www.notion.so/nomoremondays/SOP-When-a-New-Closer-Joins-3629b9a6796a8042aed3dd334dfc1206) — the steps to add them so they appear here.
+- [SOP: When a Closer Is Removed](https://www.notion.so/nomoremondays/SOP-When-a-Closer-Is-Removed-3629b9a6796a80228f23ddef8f7448ac) — how to take them off cleanly.
+- [SOP: Funnel Search](https://www.notion.so/nomoremondays/SOP-Funnel-Search-3629b9a6796a8009819ad89561108f89) — same Calendly source data, single-booking trace.
 
 ---
 

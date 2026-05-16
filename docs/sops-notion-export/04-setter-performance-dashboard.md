@@ -17,7 +17,7 @@ Same calls table as the Sales dashboard, rolled up by setter instead of closer. 
 
 ## 03 — Cross-filters
 
-Identical filter set to the **Sales dashboard** — Source, Closer, Setter, Triage, Call Outcome, OCC·FUC, email search. Cross-filters compose; chip lists are derived from unfiltered data.
+Identical filter set to the [SOP: Sales Performance](https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9) dashboard — Source, Closer, Setter, Triage, Call Outcome, OCC·FUC, email search. Cross-filters compose; chip lists are derived from unfiltered data.
 
 ## 04 — The per-setter rollup
 
@@ -33,8 +33,9 @@ Identical filter set to the **Sales dashboard** — Source, Closer, Setter, Tria
 
 ## 06 — Related SOPs
 
-- **Sales (Closer) Performance dashboard**
-- **Weekly Report dashboard** — Setter Performance section in Tab 3 (Monday only).
+- [SOP: Sales Performance](https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9) — same data, closer-perspective.
+- [SOP: Weekly Report — Monday recap & Thursday midweek check](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc) — Setter Performance section in Tab 3 (Monday only).
+- [SOP: Funnel Search](https://www.notion.so/nomoremondays/SOP-Funnel-Search-3629b9a6796a8009819ad89561108f89) — trace a specific call when the rollup looks suspect.
 
 ---
 

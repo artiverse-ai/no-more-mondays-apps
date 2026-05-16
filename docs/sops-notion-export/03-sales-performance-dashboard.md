@@ -47,9 +47,10 @@ Admin only. Click **Dev** in the header to toggle. Each KPI grows an `(i)` badge
 
 ## 07 — Related SOPs
 
-- **Setter Performance dashboard** — same data, setter-perspective.
-- **Weekly Report dashboard** — the snapshotted Mon/Thu retro using the same closer rollup.
-- **Funnel Search** — trace one Calendly booking through the funnel.
+- [SOP: Setter Performance Dashboard](https://www.notion.so/nomoremondays/SOP-Setter-Performance-Dashboard-3629b9a6796a80fe88cff0294415a19f) — same data, setter-perspective.
+- [SOP: Weekly Report — Monday recap & Thursday midweek check](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc) — the snapshotted Mon/Thu retro using the same closer rollup.
+- [SOP: Funnel Search](https://www.notion.so/nomoremondays/SOP-Funnel-Search-3629b9a6796a8009819ad89561108f89) — trace one Calendly booking through the funnel.
+- [SOP: High-Level (CEO) Dashboard](https://www.notion.so/nomoremondays/SOP-High-Level-CEO-Dashboard-3629b9a6796a805096c8e55cabba420c) — the broader daily rollup.
 
 ---
 

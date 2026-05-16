@@ -19,6 +19,8 @@ Every weekly report has two designated humans posting solutions in response to t
 3. If it's Monday, open **Tab 3 · Last Week's Sales** for per-closer / per-setter patterns. The Bonus column in "Setter Performance by Booking Mode" is the most common Sales-Solutions trigger.
 4. Skim the **Persistent KPI strip** at the top — if Blended ROAS dropped below 4× or Cash/Booked Call moved 20%+ from last week, those usually need a response.
 
+> 💡 **Need a full tour of the report?** See [SOP: Weekly Report — Monday recap & Thursday midweek check](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc) for what every tab covers.
+
 ## 03 — How to post
 
 1. On the report, click the **Marketing Solutions** (Alvaro) or **Sales Solutions** (Ben) tab.
@@ -60,9 +62,9 @@ e.g. "Alvaro · re-evaluation by Thu May 22."
 
 ## 07 — Related SOPs
 
-- **Weekly Report dashboard** — the full tour of the report you're responding to.
-- **Sales Performance dashboard** — for Ben: the per-call detail behind a Monday rollup.
-- **Webinar Performance dashboard** — for Alvaro: per-webinar drill-down behind a campaign flag.
+- [SOP: Weekly Report — Monday recap & Thursday midweek check](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc) — the full tour of the report you're responding to.
+- [SOP: Sales Performance](https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9) — for Ben: the per-call detail behind a Monday rollup.
+- [SOP: Webinar Performance Dashboard](https://www.notion.so/nomoremondays/SOP-Webinar-Performance-Dashboard-3629b9a6796a8007a796fe291db98bad) — for Alvaro: per-webinar drill-down behind a campaign flag.
 
 ---
 

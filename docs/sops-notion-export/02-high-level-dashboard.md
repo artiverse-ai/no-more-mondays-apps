@@ -30,7 +30,7 @@ The CEO dashboard is the daily marketing-plus-sales-plus-cycle rollup. One page,
 
 The line chart plots Cash / TCV / Ad Spend over time at the chosen granularity. Below it: ROAS Cash, ROAS Revenue, Cost per Booked Call, AOV, ACV, PIF Rate, Cash Collection Rate — plus median OCC and FUC days from the sales-cycles rollup.
 
-> 💡 **Reading tip:** a flat or declining ROAS Cash line with rising Ad Spend = a likely flag for next week's Monday report. Cross-check with the Weekly Report once it drops.
+> 💡 **Reading tip:** a flat or declining ROAS Cash line with rising Ad Spend = a likely flag for next week's Monday report. Cross-check with the [SOP: Weekly Report — Monday recap & Thursday midweek check](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc) once it drops.
 
 ## 05 — Dev Mode — see the SQL
 
@@ -47,9 +47,10 @@ Click the **Dev** toggle in the header (admin only). The `(i)` badges appear nex
 
 ## 07 — Related SOPs
 
-- **Weekly Report dashboard** — the Mon/Thu retro built off the same numbers.
-- **Sales (Closer) Performance dashboard** — per-call detail when CEO needs to drill in.
-- **Webinar Performance dashboard** — per-webinar breakdown of registration → attendance → close.
+- [SOP: Weekly Report — Monday recap & Thursday midweek check](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc) — the Mon/Thu retro built off the same numbers.
+- [SOP: Sales Performance](https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9) — per-call detail when CEO needs to drill in.
+- [SOP: Setter Performance Dashboard](https://www.notion.so/nomoremondays/SOP-Setter-Performance-Dashboard-3629b9a6796a80fe88cff0294415a19f) — per-setter detail.
+- [SOP: Webinar Performance Dashboard](https://www.notion.so/nomoremondays/SOP-Webinar-Performance-Dashboard-3629b9a6796a8007a796fe291db98bad) — per-webinar breakdown of registration → attendance → close.
 
 ---
 

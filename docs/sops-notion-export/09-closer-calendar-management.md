@@ -86,6 +86,11 @@ Examples worth making recurring:
 3. Verify recurring blockers (sleep, lunch, gym) are still active for the week.
 4. If you're going to be OOO any day this week, add the OOO event now — not the morning of.
 
+## 09 — Related SOPs
+
+- [SOP: How to Read the Capacity Dashboard](https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34) — the dashboard your shared calendar feeds into. Useful to skim so you understand what ops sees about you.
+- [SOP: When a New Closer Joins](https://www.notion.so/nomoremondays/SOP-When-a-New-Closer-Joins-3629b9a6796a8042aed3dd334dfc1206) — the ops-side onboarding playbook that mirrors this doc.
+
 ---
 
 *Questions or something not working — email ops@nomoremondays.io or post in #sales-ops on Slack.*

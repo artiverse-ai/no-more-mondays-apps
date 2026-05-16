@@ -38,8 +38,9 @@ Same shared cookie as the other dashboards. Toggling Dev Mode here also flips it
 
 ## 06 — Related SOPs
 
-- **Weekly Report dashboard** — Tab 2 is the snapshotted version of this dashboard for the last 3 webinars.
-- **High-Level (CEO) dashboard** — the daily rollup that aggregates these webinar cycles.
+- [SOP: Weekly Report — Monday recap & Thursday midweek check](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-recap-Thursday-midweek-check-3629b9a6796a80818391ca056b4b0efc) — Tab 2 is the snapshotted version of this dashboard for the last 3 webinars.
+- [SOP: High-Level (CEO) Dashboard](https://www.notion.so/nomoremondays/SOP-High-Level-CEO-Dashboard-3629b9a6796a805096c8e55cabba420c) — the daily rollup that aggregates these webinar cycles.
+- [SOP: Weekly Report — Monday Solution Writing](https://www.notion.so/nomoremondays/SOP-Weekly-Report-Monday-Solution-Writing-3629b9a6796a809480a4d7d49b1bdffb) — for Alvaro when a campaign-level flag needs a solution post.
 
 ---
 

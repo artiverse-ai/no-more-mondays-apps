@@ -16,7 +16,7 @@ Removing a closer is a two-side action: stop the booking system from offering th
 > **Why:** Confirms the kill-switch worked end-to-end.
 
 1. Wait **5–10 minutes** for the next sync run.
-2. Open the capacity dashboard (`/apps/calendar`).
+2. Open the capacity dashboard (`/apps/calendar`). See [SOP: How to Read the Capacity Dashboard](https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34) if you need a tour.
 3. Their name should no longer appear in the **Filter by closer** row, and the slot matrix should have one fewer column of contributors.
 4. If they're still there after ~15 minutes, recheck step 01 — the row probably didn't save, or you flipped the flag on the wrong row.
 
@@ -24,7 +24,7 @@ Removing a closer is a two-side action: stop the booking system from offering th
 
 > **Why:** The active-list flip stops *future* bookings, not ones already on their Calendly. A prospect with a confirmed call on their calendar will still expect a human to show up.
 
-1. Pull their upcoming bookings from `/apps/calendly-search`: search their name or email in the "Filter by host" chips with date range "Next 14 Days".
+1. Pull their upcoming bookings via [SOP: Funnel Search](https://www.notion.so/nomoremondays/SOP-Funnel-Search-3629b9a6796a8009819ad89561108f89): search their name or email in the "Filter by host" chips with date range "Next 14 Days".
 2. For each upcoming call, decide: reassign to another closer (preferred) or cancel with a personal note to the prospect (last resort).
 3. If reassigning: edit the Calendly event to a new host, or rebook the prospect via DM. Update the new closer in #sales-ops so they know to expect it.
 
@@ -50,6 +50,13 @@ Removing a closer is a two-side action: stop the booking system from offering th
 1. Post in #sales-ops: name, last day, who's catching their follow-ups. Tag the manager.
 2. If there are open opportunities in their pipeline, reassign in Airtable (or wherever the CRM lives today).
 3. Remove from any internal Slack groups, Notion docs, etc. that key on their email.
+
+## 07 — Related SOPs
+
+- [SOP: When a New Closer Joins](https://www.notion.so/nomoremondays/SOP-When-a-New-Closer-Joins-3629b9a6796a8042aed3dd334dfc1206) — the mirror onboarding playbook.
+- [SOP: Calendar Management for Closers](https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e) — what the departing closer was supposed to be maintaining.
+- [SOP: How to Read the Capacity Dashboard](https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34) — verify in step 02.
+- [SOP: Funnel Search](https://www.notion.so/nomoremondays/SOP-Funnel-Search-3629b9a6796a8009819ad89561108f89) — find their in-flight bookings in step 03.
 
 ---
 

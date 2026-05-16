@@ -129,6 +129,13 @@ const sops: SopRailEntry[] = [
       "Trace one Calendly booking through the funnel by tag, closer, host, or status. (Notion)",
   },
   {
+    href: "https://www.notion.so/nomoremondays/SOP-Calendly-Call-Creation-Stats-3629b9a6796a80a5b3a5e28c877dcab8",
+    external: true,
+    title: "Calendly Call Creation Stats",
+    description:
+      "Same UI as Funnel Search, filtered by when bookings were CREATED. 30-day default. (Notion)",
+  },
+  {
     href: "https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34",
     external: true,
     title: "How to read the capacity dashboard",

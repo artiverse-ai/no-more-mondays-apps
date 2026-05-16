@@ -22,12 +22,20 @@ export default function Page() {
             Search.
           </p>
           <p className="mt-2 text-xs text-amber-700">
-            ⏱ Searches typically take <strong>60–120 seconds</strong> — the
-            app fetches a wide Calendly window then joins to BigQuery for
-            held/deal/cash data. Be patient on first load; the loading
-            strip shows progress.
+            ⏱ Searches typically take <strong>60–120 seconds</strong> —
+            Calendly&apos;s API is the bottleneck. Be patient on first
+            load; the loading strip shows progress.
           </p>
         </div>
+        <a
+          href="https://www.notion.so/nomoremondays/SOP-Calendly-Call-Creation-Stats-3629b9a6796a80a5b3a5e28c877dcab8"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-7 items-center rounded-md border border-alert-blue/40 bg-alert-blue/10 px-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-alert-blue shadow-sm transition-colors hover:bg-alert-blue/15"
+          title="Open the Calendly Call Creation Stats SOP in Notion"
+        >
+          📖 SOP
+        </a>
       </header>
 
       <SearchClient />

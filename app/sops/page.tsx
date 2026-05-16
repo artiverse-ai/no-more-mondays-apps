@@ -84,6 +84,14 @@ const SOP_GROUPS: SopGroup[] = [
           "Find Calendly bookings by funnel tag, then narrow by closer / host / status. The fast way to trace one deal end-to-end. (Notion)",
       },
       {
+        href: "https://www.notion.so/nomoremondays/SOP-Calendly-Call-Creation-Stats-3629b9a6796a80a5b3a5e28c877dcab8",
+        external: true,
+        title: "Calendly Call Creation Stats",
+        audience: "Sales ops · Marketing · CEO",
+        description:
+          "Sibling to Funnel Search — filtered by when bookings were CREATED, not when the call is scheduled. 30-day default. (Notion)",
+      },
+      {
         href: "https://www.notion.so/nomoremondays/SOP-Calendar-Management-for-Closers-3629b9a6796a80c7b5eec8a2d9a8f29e",
         external: true,
         title: "Calendar management for closers",

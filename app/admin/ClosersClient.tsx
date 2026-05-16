@@ -139,7 +139,9 @@ export function ClosersClient({ initial }: Props) {
           calendar is shared with <code>ops@nomoremondays.io</code> (see{" "}
           <a
             className="text-accent underline"
-            href="/sops/new-closer-joins"
+            href="https://www.notion.so/nomoremondays/SOP-When-a-New-Closer-Joins-3629b9a6796a8042aed3dd334dfc1206"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             new closer joins SOP
           </a>

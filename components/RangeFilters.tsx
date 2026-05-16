@@ -332,7 +332,9 @@ export function RangeFilters({
             <InfoCircle /> next to a name = thin calendar for this date range.
             Hover for detail, or read{" "}
             <a
-              href="/sops/how-to-read-capacity-dashboard"
+              href="https://www.notion.so/nomoremondays/SOP-How-to-Read-the-Capacity-Dashboard-3629b9a6796a803e8b26eeae2fef5a34"
+              target="_blank"
+              rel="noopener noreferrer"
               className="underline underline-offset-2 hover:text-foreground"
             >
               how to read this

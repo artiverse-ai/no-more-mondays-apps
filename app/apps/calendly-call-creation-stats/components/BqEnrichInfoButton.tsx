@@ -41,21 +41,30 @@ export function BqEnrichInfoButton({ meta }: { meta: EnrichmentMeta | null }) {
 
   return (
     <>
+      {/* Visible, click-friendly pill — replaces the tiny (i) badge that
+          was easy to miss. Lives next to the heading. */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-        title="Show the BQ enrichment query"
+        title="Show the BQ enrichment query + diagnostic"
         aria-label="Show BQ enrichment query"
         style={{
-          marginLeft: 6, width: 16, height: 16, fontSize: 10, fontWeight: 700,
-          color: "#3b82f6", background: "rgba(59,130,246,.10)",
-          border: "1px solid rgba(59,130,246,.35)", borderRadius: "50%",
-          cursor: "pointer", display: "inline-flex", alignItems: "center",
-          justifyContent: "center", padding: 0, lineHeight: 1,
+          marginLeft: 8,
+          padding: "3px 10px",
+          fontSize: 11,
+          fontWeight: 600,
+          color: meta.error ? "#b91c1c" : "#1d4ed8",
+          background: meta.error ? "rgba(220,38,38,.10)" : "rgba(59,130,246,.10)",
+          border: meta.error ? "1px solid rgba(220,38,38,.45)" : "1px solid rgba(59,130,246,.45)",
+          borderRadius: 6,
+          cursor: "pointer",
+          textTransform: "uppercase",
+          letterSpacing: ".08em",
           verticalAlign: "middle",
+          lineHeight: 1.4,
         }}
       >
-        i
+        {meta.error ? "⚠ Diagnose enrichment" : `Diagnose · ${meta.matched}/${meta.total} matched`}
       </button>
 
       {open ? (

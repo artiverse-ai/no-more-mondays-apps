@@ -38,24 +38,13 @@ export function BookingDealFunnel({
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          Booking → Cash funnel
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="flex items-center text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <span>Booking → Cash funnel</span>
           <BqEnrichInfoButton meta={enrichMeta} />
         </h3>
-        {enrichMeta?.error ? (
-          <span className="text-[10px] uppercase tracking-[0.14em] text-rose-700">
-            ⚠ Enrichment failed — click (i)
-          </span>
-        ) : !enrichedAny ? (
-          <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            {enrichMeta ? `0 of ${enrichMeta.total} matched in BQ — click (i)` : "Awaiting BQ enrichment…"}
-          </span>
-        ) : enrichMeta ? (
-          <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-            {enrichMeta.matched}/{enrichMeta.total} BQ-matched
-          </span>
-        ) : null}
+        {/* The corner badge is also a button — same modal — for users who
+            don't notice the inline Diagnose pill in the header. */}
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <FunnelCard

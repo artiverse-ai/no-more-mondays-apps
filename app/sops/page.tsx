@@ -100,12 +100,12 @@ const SOP_GROUPS: SopGroup[] = [
           "The walkthrough for adding a new closer: get their calendar shared, add them to the active list, verify they appear in the dashboard. (Notion)",
       },
       {
-        href: "/sops/closer-removed",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-When-a-Closer-Is-Removed-3629b9a6796a80228f23ddef8f7448ac",
+        external: true,
         title: "When a closer is removed",
         audience: "Ops",
         description:
-          "How to cleanly remove a closer from the booking system without breaking attribution, and what to do with their in-flight calls.",
+          "How to cleanly remove a closer from the booking system without breaking attribution, and what to do with their in-flight calls. (Notion)",
       },
     ],
   },

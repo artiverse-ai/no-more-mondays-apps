@@ -138,10 +138,11 @@ const sops: SopRailEntry[] = [
       "Ops walkthrough for onboarding a closer end-to-end. (Notion)",
   },
   {
-    href: "/sops/closer-removed",
+    href: "https://www.notion.so/nomoremondays/SOP-When-a-Closer-Is-Removed-3629b9a6796a80228f23ddef8f7448ac",
+    external: true,
     title: "When a closer is removed",
     description:
-      "Cleanly remove a closer without breaking attribution.",
+      "Cleanly remove a closer without breaking attribution. (Notion)",
   },
 ];
 

@@ -13,6 +13,12 @@ const fmtUsd = (n: number) =>
 // "Enriching..." badge in the corner.
 export function BookingDealFunnel({ rows }: { rows: Row[] }) {
   const total = rows.length;
+  const future = rows.filter((r) => r.callStatus === "future").length;
+  const canceled = rows.filter((r) => r.callStatus === "canceled").length;
+  // Eligible for "Held" = past, non-canceled bookings. Future calls can't
+  // be held yet; canceled ones never had a chance. This matches the show-
+  // rate denominator used in the Sales / Weekly Report dashboards.
+  const eligibleForShow = total - future - canceled;
   const held = rows.filter((r) => r.wasHeld === true).length;
   const deals = rows.filter((r) => r.isDeal === true).length;
   const cash = rows.reduce((sum, r) => sum + (r.cashCollected ?? 0), 0);
@@ -37,19 +43,19 @@ export function BookingDealFunnel({ rows }: { rows: Row[] }) {
         <FunnelCard
           label="Bookings created"
           value={String(total)}
-          sub="100%"
+          sub={`${future} future · ${canceled} canceled · ${eligibleForShow} eligible`}
           tone="accent"
         />
         <FunnelCard
           label="Held"
           value={enrichedAny ? String(held) : "—"}
-          sub={enrichedAny ? `${pct(held, total)} of bookings` : ""}
+          sub={enrichedAny ? `${pct(held, eligibleForShow)} show rate (of ${eligibleForShow} eligible)` : ""}
           tone="emerald"
         />
         <FunnelCard
           label="Deals closed"
           value={enrichedAny ? String(deals) : "—"}
-          sub={enrichedAny ? `${pct(deals, held)} of held` : ""}
+          sub={enrichedAny ? `${pct(deals, held)} close rate (of ${held} held)` : ""}
           tone="violet"
         />
         <FunnelCard

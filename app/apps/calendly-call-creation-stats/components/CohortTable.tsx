@@ -14,11 +14,26 @@ const fmtWeek = new Intl.DateTimeFormat("en-US", {
 });
 
 // Group bookings by Sunday-of-creation. Each row tells you: of bookings made
-// that week, how many got held, how many closed, how much cash. Lets the CEO
-// compare "are last week's bookings converting better than 3 weeks ago?"
+// that week, how many were eligible for show (past + non-canceled), how many
+// got held, how many closed, how much cash. Lets the CEO compare "are last
+// week's bookings converting better than 3 weeks ago?".
+//
+// Show % denominator = eligible (past + non-canceled), matching the Sales /
+// Weekly Report dashboards. NOT total bookings — future calls can't be held
+// yet, canceled ones never had a chance.
 export function CohortTable({ rows }: { rows: Row[] }) {
   // Bucket by Sunday-of-creation (ET).
-  const cohorts = new Map<string, { bookings: number; held: number; deals: number; cash: number; enriched: number }>();
+  type Bucket = {
+    bookings: number;
+    future: number;
+    canceled: number;
+    eligible: number; // past + non-canceled
+    held: number;
+    deals: number;
+    cash: number;
+    enriched: number;
+  };
+  const cohorts = new Map<string, Bucket>();
   for (const r of rows) {
     const created = new Date(r.createdAt);
     if (Number.isNaN(created.getTime())) continue;
@@ -27,8 +42,14 @@ export function CohortTable({ rows }: { rows: Row[] }) {
     sunday.setUTCDate(sunday.getUTCDate() - sunday.getUTCDay());
     sunday.setUTCHours(0, 0, 0, 0);
     const key = sunday.toISOString().slice(0, 10);
-    const cur = cohorts.get(key) ?? { bookings: 0, held: 0, deals: 0, cash: 0, enriched: 0 };
+    const cur = cohorts.get(key) ?? {
+      bookings: 0, future: 0, canceled: 0, eligible: 0,
+      held: 0, deals: 0, cash: 0, enriched: 0,
+    };
     cur.bookings++;
+    if (r.callStatus === "future") cur.future++;
+    else if (r.callStatus === "canceled") cur.canceled++;
+    else cur.eligible++;
     if (r.wasHeld !== null || r.isDeal !== null) cur.enriched++;
     if (r.wasHeld === true) cur.held++;
     if (r.isDeal === true) cur.deals++;
@@ -52,10 +73,11 @@ export function CohortTable({ rows }: { rows: Row[] }) {
             <tr>
               <th className="px-3 py-2 text-left font-medium">Week of</th>
               <th className="px-3 py-2 text-right font-medium">Bookings</th>
+              <th className="px-3 py-2 text-right font-medium" title="Past + non-canceled bookings — could have been held">Eligible</th>
               <th className="px-3 py-2 text-right font-medium">Held</th>
-              <th className="px-3 py-2 text-right font-medium">Show %</th>
+              <th className="px-3 py-2 text-right font-medium" title="Held / Eligible">Show %</th>
               <th className="px-3 py-2 text-right font-medium">Deals</th>
-              <th className="px-3 py-2 text-right font-medium">Close % (held)</th>
+              <th className="px-3 py-2 text-right font-medium" title="Deals / Held">Close %</th>
               <th className="px-3 py-2 text-right font-medium">Cash</th>
               <th className="px-3 py-2 text-right font-medium">Cash / booking</th>
             </tr>
@@ -63,12 +85,13 @@ export function CohortTable({ rows }: { rows: Row[] }) {
           <tbody className="font-mono tabular-nums">
             {sorted.map(([weekStart, c]) => {
               const date = new Date(weekStart + "T12:00:00Z");
-              const showPct = c.enriched > 0 ? c.held / c.enriched : null;
+              const showPct = c.eligible > 0 ? c.held / c.eligible : null;
               const closePct = c.held > 0 ? c.deals / c.held : null;
               return (
                 <tr key={weekStart} className="border-t border-border">
                   <td className="px-3 py-2 text-left">{fmtWeek.format(date)}</td>
                   <td className="px-3 py-2 text-right">{c.bookings}</td>
+                  <td className="px-3 py-2 text-right text-muted-foreground">{c.eligible}</td>
                   <td className="px-3 py-2 text-right">{c.enriched > 0 ? c.held : "—"}</td>
                   <td className="px-3 py-2 text-right">{fmtPct(showPct)}</td>
                   <td className="px-3 py-2 text-right">{c.enriched > 0 ? c.deals : "—"}</td>

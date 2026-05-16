@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import { getDevMode } from "@/lib/dev-mode";
 import { SopsRail, type SopRailEntry } from "./SopsRail";
 import { AuthButtons } from "./AuthButtons";
 
@@ -9,6 +10,8 @@ type Tile = {
   description: string;
   status: "live" | "coming_soon";
   external?: boolean;
+  /** Hidden from the executive view; only listed in Dev view. */
+  devOnly?: boolean;
 };
 
 const apps: Tile[] = [
@@ -47,15 +50,17 @@ const dashboards: Tile[] = [
     href: "/dashboards/sales",
     title: "Sales Performance",
     description:
-      "Per-closer rollup — calls, shows, deals, close rate, AOV, ACV, collection rate. Live over the closer mart; replaces Looker's closer dashboard.",
-    status: "live",
+      "Per-closer rollup — calls, shows, deals, close rate, AOV, ACV, collection rate. Under development; visible in Dev view only.",
+    status: "coming_soon",
+    devOnly: true,
   },
   {
     href: "/dashboards/setter",
     title: "Setter Performance",
     description:
-      "Per-setter rollup — bookings, show rate, Setter DQ rate, qualified-show rate, deal contribution. Live over int_calls_enriched.",
-    status: "live",
+      "Per-setter rollup — bookings, show rate, Setter DQ rate, qualified-show rate, deal contribution. Under development; visible in Dev view only.",
+    status: "coming_soon",
+    devOnly: true,
   },
   {
     href: "/dashboards/weekly-report",
@@ -221,7 +226,11 @@ function Section({ title, tiles }: { title: string; tiles: Tile[] }) {
 }
 
 export default async function HomePage() {
-  const user = await getCurrentUser();
+  const [user, devMode] = await Promise.all([getCurrentUser(), getDevMode()]);
+  // Dev-only dashboards are hidden from the executive view entirely.
+  const visibleDashboards = devMode
+    ? dashboards
+    : dashboards.filter((d) => !d.devOnly);
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row lg:items-stretch">
@@ -264,7 +273,7 @@ export default async function HomePage() {
           </header>
 
           <Section title="Apps" tiles={apps} />
-          <Section title="Dashboards" tiles={dashboards} />
+          <Section title="Dashboards" tiles={visibleDashboards} />
         </main>
       </div>
 

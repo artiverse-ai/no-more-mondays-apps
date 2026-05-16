@@ -98,6 +98,12 @@ const sops: SopRailEntry[] = [
       "Per-webinar breakdown — spend, regs, attendance, bookings, cash, ROAS.",
   },
   {
+    href: "/sops/solutions-tabs",
+    title: "Solutions tabs (Alvaro & Ben)",
+    description:
+      "How to fill in the weekly Marketing / Sales Solutions tabs — template, what to look at, what not to post.",
+  },
+  {
     href: "/sops/funnel-search",
     title: "Funnel Search",
     description:

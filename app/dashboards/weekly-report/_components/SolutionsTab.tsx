@@ -141,17 +141,39 @@ export function SolutionsTab({
 
   return (
     <>
-      <div className={styles.sh} style={{ marginBottom: 20 }}>
-        {tabTitle} —{" "}
-        {canPost ? (
-          <span style={{ color: "var(--green)" }}>
-            you can post here ({editorEmail})
-          </span>
-        ) : (
-          <span style={{ color: "var(--text-muted)" }}>
-            posting restricted to {editorEmail}
-          </span>
-        )}
+      <div className={styles.sh} style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span>
+          {tabTitle} —{" "}
+          {canPost ? (
+            <span style={{ color: "var(--green)" }}>
+              you can post here ({editorEmail})
+            </span>
+          ) : (
+            <span style={{ color: "var(--text-muted)" }}>
+              posting restricted to {editorEmail}
+            </span>
+          )}
+        </span>
+        <a
+          href="/sops/solutions-tabs"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 11,
+            padding: "3px 10px",
+            borderRadius: 5,
+            border: "1px solid rgba(59,130,246,.35)",
+            background: "rgba(59,130,246,.08)",
+            color: "#1d4ed8",
+            textDecoration: "none",
+            fontWeight: 500,
+            textTransform: "uppercase",
+            letterSpacing: ".08em",
+          }}
+          title="Open the Solutions-tab SOP in a new tab"
+        >
+          How to fill this in →
+        </a>
       </div>
 
       {canPost ? (

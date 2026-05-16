@@ -54,6 +54,14 @@ const SOP_GROUPS: SopGroup[] = [
         description:
           "Per-webinar breakdown of every Sun + Wed event since launch. Spend, registration, attendance, bookings, cash, ROAS — plus the drill-down to a single webinar.",
       },
+      {
+        href: "/sops/solutions-tabs",
+        external: false,
+        title: "Filling in the Solutions tabs (Alvaro & Ben)",
+        audience: "Alvaro · Ben · Admins",
+        description:
+          "When to post, what to look at first, the 3-question template for a useful solution, and what NOT to post on the Marketing/Sales Solutions tabs.",
+      },
     ],
   },
   {

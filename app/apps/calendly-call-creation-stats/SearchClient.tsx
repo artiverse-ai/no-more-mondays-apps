@@ -19,6 +19,12 @@ import { HostDistributionChart } from "./components/HostDistributionChart";
 import { FunnelDistributionChart } from "./components/FunnelDistributionChart";
 import { JsonModal } from "./components/JsonModal";
 import { runSearch } from "./lib/search";
+import { enrichRows } from "./lib/enrich";
+import { BookingDealFunnel } from "./components/BookingDealFunnel";
+import { TimeToCallStat } from "./components/TimeToCallStat";
+import { BookingPaceSparkline } from "./components/BookingPaceSparkline";
+import { FunnelByCashChart } from "./components/FunnelByCashChart";
+import { CohortTable } from "./components/CohortTable";
 import { PresetKey, Row, SearchProgress, SearchResult } from "./lib/types";
 import { exportCsv } from "./lib/csv";
 import { normHostValue } from "./lib/format";
@@ -95,7 +101,15 @@ export function SearchClient() {
         signal: controller.signal,
         onProgress: setProgress,
       });
-      setResult(res);
+      // Enrichment step — non-fatal: if BQ join fails the search still
+      // shows the Calendly-only data.
+      setProgress({ message: "Enriching with NMM call outcomes...", pct: 97, apiCalls: 0, elapsedSec: 0 });
+      const enriched = await enrichRows(res.rows, controller.signal);
+      if (enriched.error) {
+        // Log but don't block the user — they still get the Calendly view.
+        console.warn("[calendly-call-creation-stats] enrichment failed:", enriched.error);
+      }
+      setResult({ ...res, rows: enriched.rows });
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         setError((e as Error).message);
@@ -263,6 +277,15 @@ export function SearchClient() {
 
       {result ? (
         <>
+          {/* CEO-focused insights — added for creation-stats app.
+              Booking → Cash funnel + Time-to-Call + Booking pace
+              go above the standard Metrics strip. */}
+          <BookingDealFunnel rows={filtered} />
+          <div className="grid gap-3 md:grid-cols-2">
+            <TimeToCallStat rows={filtered} />
+            <BookingPaceSparkline rows={filtered} />
+          </div>
+
           <Metrics
             rows={filtered}
             allRows={closerScopedAll}
@@ -276,6 +299,8 @@ export function SearchClient() {
               regardless of which view tab is active. They give the
               aggregate view; the Calendar tab below gives the drill-down. */}
           <DailyVolumeChart rows={filtered} />
+          <FunnelByCashChart rows={filtered} />
+          <CohortTable rows={filtered} />
           <div className="grid gap-4 lg:grid-cols-2">
             <FunnelDistributionChart rows={filtered} />
             <HostDistributionChart rows={filtered} />

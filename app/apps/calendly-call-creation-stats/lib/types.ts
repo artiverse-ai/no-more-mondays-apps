@@ -70,6 +70,18 @@ export type Row = {
   oldInvitee: string | null;
   newInvitee: string | null;
   rescheduled: boolean;
+  // ---- Optional BQ enrichment (populated after the Calendly fetch by
+  //     /api/calendly-search/enrich). All fields can be null if no match
+  //     was found in int_calls_enriched. ----
+  callStatus: "future" | "held" | "no_show" | "canceled" | "unknown";
+  wasHeld: boolean | null;
+  wasNoShow: boolean | null;
+  isDeal: boolean | null;
+  cashCollected: number | null;
+  revenueGenerated: number | null;
+  closerOwner: string | null;
+  setterOwner: string | null;
+  callOutcome: string | null;
   // Internal references for the JSON modal — not serialized into CSV.
   _event: CalendlyScheduledEvent;
   _invitee: CalendlyInvitee;

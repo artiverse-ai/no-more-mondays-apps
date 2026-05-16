@@ -414,6 +414,18 @@ export async function runSearch(opts: SearchOptions): Promise<SearchResult> {
           oldInvitee: inv.old_invitee || null,
           newInvitee: inv.new_invitee || null,
           rescheduled: Boolean(inv.rescheduled),
+          // BQ-enrichment defaults — filled in by the SearchClient after the
+          // Calendly fetch completes. Status defaults to a calendar-derived
+          // value so the UI works even without enrichment.
+          callStatus: deriveStatusFromCalendar(event.start_time, event.status, inv.status),
+          wasHeld: null,
+          wasNoShow: null,
+          isDeal: null,
+          cashCollected: null,
+          revenueGenerated: null,
+          closerOwner: null,
+          setterOwner: null,
+          callOutcome: null,
           _event: event,
           _invitee: inv,
           _eventType: eventType,
@@ -489,4 +501,21 @@ function expandToFetchWindow(userRange: { start: Date; end: Date }): { start: Da
     start: new Date(userRange.start.getTime() - FETCH_BACK_PAD_MS),
     end: new Date(userRange.end.getTime() + FETCH_FORWARD_HORIZON_MS),
   };
+}
+
+// Derive a baseline call status from calendar-only data — used as a fallback
+// before the BQ enrichment lands. After enrichment we promote unknown→held
+// or unknown→no_show based on the int_calls_enriched flags.
+function deriveStatusFromCalendar(
+  startTime: string,
+  eventStatus: string,
+  inviteeStatus: string,
+): "future" | "held" | "no_show" | "canceled" | "unknown" {
+  if (inviteeStatus === "canceled" || eventStatus === "canceled") return "canceled";
+  const start = Date.parse(startTime);
+  if (Number.isNaN(start)) return "unknown";
+  if (start > Date.now()) return "future";
+  // Past start_time, not canceled — but we can't tell held vs no-show from
+  // Calendly alone. Wait for BQ enrichment to promote this row.
+  return "unknown";
 }

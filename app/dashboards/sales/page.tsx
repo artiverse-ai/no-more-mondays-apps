@@ -155,6 +155,15 @@ export default async function SalesDashboardPage(
           <DateRangePicker pathname={PATHNAME} resolved={resolved} />
           <DataFreshness asOf={updatedAt} />
           <div className="flex items-center gap-2">
+            <a
+              href="https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-7 items-center rounded-md border border-alert-blue/40 bg-alert-blue/10 px-2.5 text-[11px] font-medium uppercase tracking-[0.12em] text-alert-blue shadow-sm transition-colors hover:bg-alert-blue/15"
+              title="Open the Sales Performance SOP in Notion"
+            >
+              📖 SOP
+            </a>
             {user?.isAdmin ? <DevModeToggle current={devMode} /> : null}
             {user?.isAdmin ? (
               <Link

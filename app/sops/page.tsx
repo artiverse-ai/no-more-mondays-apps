@@ -31,12 +31,12 @@ const SOP_GROUPS: SopGroup[] = [
           "Daily marketing + sales + sales-cycle rollup. The pre-standup scan: cash, TCV, ad spend, ROAS, OCC/FUC cycle times. (Notion)",
       },
       {
-        href: "/sops/sales-performance-dashboard",
-        external: false,
+        href: "https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9",
+        external: true,
         title: "Sales (Closer) Performance dashboard",
         audience: "Sales managers · CEO",
         description:
-          "Every call rolled up by closer with cross-filters for source / setter / outcome / OCC·FUC. Δ-vs-prior pills on every KPI.",
+          "Every call rolled up by closer with cross-filters for source / setter / outcome / OCC·FUC. Δ-vs-prior pills on every KPI. (Notion)",
       },
       {
         href: "/sops/setter-performance-dashboard",

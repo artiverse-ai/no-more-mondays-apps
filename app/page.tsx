@@ -82,10 +82,11 @@ const sops: SopRailEntry[] = [
       "Daily marketing + sales + sales-cycle rollup — the pre-standup scan. (Notion)",
   },
   {
-    href: "/sops/sales-performance-dashboard",
+    href: "https://www.notion.so/nomoremondays/SOP-Sales-Performance-3629b9a6796a809f9822fecf1f09a2d9",
+    external: true,
     title: "Sales (Closer) Performance",
     description:
-      "Per-closer rollup with cross-filters and Δ-vs-prior on every KPI.",
+      "Per-closer rollup with cross-filters and Δ-vs-prior on every KPI. (Notion)",
   },
   {
     href: "/sops/setter-performance-dashboard",

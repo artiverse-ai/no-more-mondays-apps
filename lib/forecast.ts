@@ -112,7 +112,18 @@ export async function getForecastForWindow(
   };
 }
 
-/** Convenience: pull all common metrics for a window in a single round-trip. */
+/** Convenience: pull all common metrics for a window in a single round-trip.
+ *
+ * Volumes sum per-day per-channel rows (channels are disjoint, no double
+ * count). Rates are DERIVED from the volume sums so the target's denominator
+ * stays in lock-step with the actuals' denominator:
+ *   show_rate   = SUM(calls_held)  / SUM(calls_booked)
+ *   close_rate  = SUM(deals_closed) / SUM(calls_held)         ← held basis, matches sectionC.closeRateShows
+ *   aov_cash    = SUM(cash) / SUM(deals_closed)
+ *
+ * Per-channel rate constants exist in the table as REFERENCE only — not
+ * returned here. Query them directly via getForecastForWindow() if needed.
+ */
 export async function getForecastBundleForWindow(
   start: string,
   end: string,
@@ -141,19 +152,25 @@ export async function getForecastBundleForWindow(
   }
   const [rows] = await bq().query({
     query: `
+      WITH v AS (
+        SELECT
+          SUM(IF(metric_key='ad_spend',     metric_value, NULL)) AS ad_spend,
+          SUM(IF(metric_key='cash',         metric_value, NULL)) AS cash,
+          SUM(IF(metric_key='revenue',      metric_value, NULL)) AS revenue,
+          SUM(IF(metric_key='deals_closed', metric_value, NULL)) AS deals_closed,
+          SUM(IF(metric_key='calls_booked', metric_value, NULL)) AS calls_booked,
+          SUM(IF(metric_key='calls_held',   metric_value, NULL)) AS calls_held
+        FROM ${FORECAST_TABLE}
+        WHERE forecast_id = @forecastId
+          AND metric_type = 'volume'
+          AND target_date BETWEEN @start AND @end
+      )
       SELECT
-        SUM(IF(metric_key='ad_spend'      AND metric_type='volume' AND target_date BETWEEN @start AND @end, metric_value, NULL)) AS ad_spend,
-        SUM(IF(metric_key='cash'          AND metric_type='volume' AND target_date BETWEEN @start AND @end, metric_value, NULL)) AS cash,
-        SUM(IF(metric_key='revenue'       AND metric_type='volume' AND target_date BETWEEN @start AND @end, metric_value, NULL)) AS revenue,
-        SUM(IF(metric_key='deals_closed'  AND metric_type='volume' AND target_date BETWEEN @start AND @end, metric_value, NULL)) AS deals_closed,
-        SUM(IF(metric_key='calls_booked'  AND metric_type='volume' AND target_date BETWEEN @start AND @end, metric_value, NULL)) AS calls_booked,
-        SUM(IF(metric_key='calls_held'    AND metric_type='volume' AND target_date BETWEEN @start AND @end, metric_value, NULL)) AS calls_held,
-        MAX(IF(metric_key='show_rate'  AND metric_type='rate', metric_value, NULL)) AS show_rate,
-        MAX(IF(metric_key='close_rate' AND metric_type='rate', metric_value, NULL)) AS close_rate,
-        MAX(IF(metric_key='aov_cash'   AND metric_type='rate', metric_value, NULL)) AS aov_cash
-      FROM ${FORECAST_TABLE}
-      WHERE forecast_id = @forecastId
-        AND (channel IS NULL OR channel = 'all' OR channel IN ('webinar','setter','workshop'))
+        ad_spend, cash, revenue, deals_closed, calls_booked, calls_held,
+        SAFE_DIVIDE(calls_held, calls_booked)   AS show_rate,
+        SAFE_DIVIDE(deals_closed, calls_held)   AS close_rate,
+        SAFE_DIVIDE(cash, deals_closed)         AS aov_cash
+      FROM v
     `,
     params: { forecastId, start, end },
     types: { forecastId: "STRING", start: "DATE", end: "DATE" },

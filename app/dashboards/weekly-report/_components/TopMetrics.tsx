@@ -39,7 +39,11 @@ export function TopMetrics({ sectionA, sectionB, sectionC, forecast }: TopMetric
   // green if actual ≥ target, orange if within 90%, red below.
   const callsBookedActual = sectionB.totalCallsBooked;
   const showRateActual = sectionC.showRate;
-  const closeRateActual = sectionC.closeRate;
+  // Use closeRateShows (deals / shows) — its denominator matches the CSV
+  // projection model's "deals / held" basis, so target comparisons are
+  // apples-to-apples. SectionC.closeRate (deals / qualified_shows, CQ basis)
+  // is a stricter ratio without a CSV-side equivalent target.
+  const closeRateActual = sectionC.closeRateShows;
   const aovActual = sectionA.aov;
 
   const callsChip = forecast?.calls_booked != null
@@ -79,7 +83,7 @@ export function TopMetrics({ sectionA, sectionB, sectionC, forecast }: TopMetric
         emoji="🎯"
         label="Close Rate"
         value={fmtPct(closeRateActual)}
-        sub="Deals / Qualified Shows"
+        sub="Deals / Shows"
         chip={closeRateChip}
       />
       <TopCard

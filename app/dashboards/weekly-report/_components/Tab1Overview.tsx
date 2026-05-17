@@ -1,6 +1,11 @@
 import type { SectionAData, SectionBData, SectionCData } from "@/lib/weekly-report-bq-v2";
 import { getResolvedSql, type MetricKey, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
+import {
+  getTrafficLight,
+  trafficLightTextClass,
+  type ThresholdKey,
+} from "@/lib/metric-thresholds";
 import { SqlInfoButton } from "./SqlInfoButton";
 import styles from "./report.module.css";
 
@@ -51,8 +56,8 @@ function SectionA({ data, weekLabel, sqlFor }: { data: SectionAData; weekLabel: 
       <div className={styles.kpiGridMini}>
         <MiniCard emoji="💰" label="Cash Collected" value={fmtUsd(data.cashCollected)} change="Fanbasis + Whop" tip={TIP.cashCollected} sqlInfo={sqlFor("cashCollected")} />
         <MiniCard emoji="💼" label="Revenue (TCV)" value={fmtUsd(data.revenueTcv)} change="Total Contract Value" tip={TIP.revenueTcv} sqlInfo={sqlFor("revenueTcv")} />
-        <MiniCard emoji="📈" label="ROAS (Cash)" value={fmtX(data.roasCash)} change={target("4×")} tip={TIP.roasCash} sqlInfo={sqlFor("roasCash")} />
-        <MiniCard emoji="📈" label="ROAS (TCV)" value={fmtX(data.roasTcv)} change="TCV / Ad Spend" tip={TIP.roasTcv} sqlInfo={sqlFor("roasTcv")} />
+        <MiniCard emoji="📈" label="ROAS (Cash)" value={fmtX(data.roasCash)} change={target("4×")} tip={TIP.roasCash} sqlInfo={sqlFor("roasCash")} trafficKey="roas" rawValue={data.roasCash} />
+        <MiniCard emoji="📈" label="ROAS (TCV)" value={fmtX(data.roasTcv)} change="TCV / Ad Spend" tip={TIP.roasTcv} sqlInfo={sqlFor("roasTcv")} trafficKey="roas" rawValue={data.roasTcv} />
         <MiniCard emoji="📣" label="Ad Spend (Blended)" value={fmtUsd(data.adSpendBlended)} change="All Meta campaigns" tip={TIP.adSpendBlended} sqlInfo={sqlFor("adSpendBlended")} />
         <MiniCard emoji="🤝" label="Deals Closed" value={fmtInt(data.dealsClosed)} change="" tip={TIP.dealsClosed} sqlInfo={sqlFor("dealsClosed")} />
         <MiniCard emoji="💵" label="AOV" value={fmtUsd(data.aov)} change="Fanbasis cash / deals" tip={TIP.aov} sqlInfo={sqlFor("aov")} />
@@ -128,6 +133,8 @@ function SectionB({ data, sqlFor }: { data: SectionBData; sqlFor: SqlForFn }) {
           change="Ad Spend / Calls Booked"
           tip={TIP.costPerBookedCall}
           sqlInfo={sqlFor("costPerBookedCall")}
+          trafficKey="costPerBookedCall"
+          rawValue={data.costPerBookedCall}
         />
         <MiniCard
           emoji="💰"
@@ -141,9 +148,11 @@ function SectionB({ data, sqlFor }: { data: SectionBData; sqlFor: SqlForFn }) {
           emoji="📊"
           label="Avg Webinar Show Rate"
           value={fmtPct(data.avgWebinarShowRate)}
-          change={target("24%")}
+          change={target("25%")}
           tip={TIP.avgWebinarShowRate}
           sqlInfo={sqlFor("avgWebinarShowRate")}
+          trafficKey="webinarShowUpRate"
+          rawValue={data.avgWebinarShowRate}
         />
         <MiniCard
           emoji="📈"
@@ -247,7 +256,29 @@ function SectionD() {
 // ============================================================================
 // Mini KPI card primitive
 // ============================================================================
-function MiniCard({ emoji, label, value, change, tip, sqlInfo }: { emoji: string; label: string; value: string; change: string; tip?: string; sqlInfo?: import("@/lib/dev-sql").ResolvedMetricSql | null }) {
+function MiniCard({
+  emoji,
+  label,
+  value,
+  change,
+  tip,
+  sqlInfo,
+  trafficKey,
+  rawValue,
+}: {
+  emoji: string;
+  label: string;
+  value: string;
+  change: string;
+  tip?: string;
+  sqlInfo?: import("@/lib/dev-sql").ResolvedMetricSql | null;
+  /** Threshold key to color the value (green/orange/red). */
+  trafficKey?: ThresholdKey;
+  /** Raw numeric value for the threshold check (the rendered `value` is pre-formatted). */
+  rawValue?: number | null;
+}) {
+  const light = trafficKey ? getTrafficLight(rawValue, trafficKey) : "neutral";
+  const colorClass = trafficLightTextClass(light);
   return (
     <div className={styles.kpiMini}>
       <div className={styles.kpiMiniLbl}>
@@ -255,7 +286,7 @@ function MiniCard({ emoji, label, value, change, tip, sqlInfo }: { emoji: string
         <span data-tip={tip} style={tip ? { cursor: "help" } : undefined}>{label}</span>
         {sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}
       </div>
-      <div className={styles.kpiMiniVal}>{value}</div>
+      <div className={`${styles.kpiMiniVal} ${colorClass}`}>{value}</div>
       {change ? <div className={styles.kpiMiniCh}>{change}</div> : null}
     </div>
   );

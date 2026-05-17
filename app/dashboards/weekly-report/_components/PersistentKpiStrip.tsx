@@ -1,6 +1,11 @@
 import type { KpiStripData } from "@/lib/weekly-report-bq-v2";
 import { getResolvedSql, type MetricKey, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
+import {
+  getTrafficLight,
+  trafficLightTextClass,
+  type ThresholdKey,
+} from "@/lib/metric-thresholds";
 import { SqlInfoButton } from "./SqlInfoButton";
 import styles from "./report.module.css";
 
@@ -32,6 +37,8 @@ export function PersistentKpiStrip({
     meta: string,
     tooltip: string,
     metricKey: MetricKey,
+    trafficKey?: ThresholdKey,
+    rawValue?: number | null,
   ) => (
     <Card
       kind={kind}
@@ -41,17 +48,19 @@ export function PersistentKpiStrip({
       meta={meta}
       tooltip={tooltip}
       sqlInfo={devMode && sqlCtx ? getResolvedSql(metricKey, sqlCtx) : null}
+      trafficKey={trafficKey}
+      rawValue={rawValue}
     />
   );
 
   return (
     <div className={styles.kpiStrip}>
-      {card("webinar", "Avg Webinar Show Rate", fmtPct(data.avgWebinarShowRate), data.avgWebinarShowRate == null, "Target 24%", TIP.avgWebinarShowRate, "avgWebinarShowRate")}
+      {card("webinar", "Avg Webinar Show Rate", fmtPct(data.avgWebinarShowRate), data.avgWebinarShowRate == null, "≥25% green · 20–25% orange · <20% red", TIP.avgWebinarShowRate, "avgWebinarShowRate", "webinarShowUpRate", data.avgWebinarShowRate)}
       {card("webinar", "% Tier 1 Leads", fmtPct(data.pctTierOneLeads), data.pctTierOneLeads == null, "Awaiting mart fields", TIP.pctTierOneLeads, "pctTierOneLeads")}
 
       <div className={styles.kpiDivider} aria-hidden="true" />
 
-      {card("company", "Blended Cash ROAS", fmtX(data.blendedCashRoas), data.blendedCashRoas == null, "Target 4×", TIP.blendedCashRoas, "blendedCashRoas")}
+      {card("company", "Blended Cash ROAS", fmtX(data.blendedCashRoas), data.blendedCashRoas == null, "≥3× green · 2–3× orange · <2× red", TIP.blendedCashRoas, "blendedCashRoas", "roas", data.blendedCashRoas)}
       {card("company", "CPL Blended", fmtUsd(data.cplBlended), data.cplBlended == null, "Target <$7", TIP.cplBlended, "cplBlended")}
       {card("company", "Cash / Booked Call (DPC)", fmtUsd(data.cashPerBookedCall), data.cashPerBookedCall == null, "Sergio's KPI", TIP.cashPerBookedCall, "cashPerBookedCall")}
     </div>
@@ -66,6 +75,8 @@ function Card({
   meta,
   tooltip,
   sqlInfo,
+  trafficKey,
+  rawValue,
 }: {
   kind: "webinar" | "company";
   label: string;
@@ -74,8 +85,12 @@ function Card({
   meta: string;
   tooltip: string;
   sqlInfo?: import("@/lib/dev-sql").ResolvedMetricSql | null;
+  trafficKey?: ThresholdKey;
+  rawValue?: number | null;
 }) {
   const kindCls = kind === "webinar" ? styles.kpiWebinar : styles.kpiCompany;
+  const light = trafficKey ? getTrafficLight(rawValue, trafficKey) : "neutral";
+  const trafficClass = trafficLightTextClass(light);
   return (
     <div className={`${styles.kpiCard} ${kindCls}`}>
       <div className={styles.kpiLabel}>
@@ -84,7 +99,7 @@ function Card({
         </span>
         {sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}
       </div>
-      <div className={`${styles.kpiValue} ${isNa ? styles.kpiValueNa : ""}`}>{value}</div>
+      <div className={`${styles.kpiValue} ${isNa ? styles.kpiValueNa : ""} ${trafficClass}`}>{value}</div>
       <div className={styles.kpiMeta}>{meta}</div>
     </div>
   );

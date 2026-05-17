@@ -2,6 +2,11 @@ import type { ReactNode } from "react";
 import type { WebinarComparisonRowV2, MetaCampaignRow } from "@/lib/weekly-report-bq-v2";
 import { getResolvedSql, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
+import {
+  getTrafficLight,
+  trafficLightTextClass,
+  type ThresholdKey,
+} from "@/lib/metric-thresholds";
 import { ContextBannerEditor } from "./ContextBannerEditor";
 import { SqlInfoButton } from "./SqlInfoButton";
 import styles from "./report.module.css";
@@ -87,7 +92,7 @@ export function Tab2LatestWebinar({
               <DataRow label="Ad Spend" values={webinars.map((w) => fmtUsd(w.totalWebinarAdSpend))} tip={TIP.adSpendMart} />
               <DataRow label="LP Page Views" values={webinars.map((w) => fmtInt(w.lpPageViews))} tip={TIP.lpPageViews} />
               <DataRow label="LP Opt-Ins" values={webinars.map((w) => fmtInt(w.lpOptIns))} tip={TIP.lpOptIns} />
-              <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} />
+              <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} trafficKey="lpOptInRate" rawValues={webinars.map((w) => w.lpOptInRate)} />
               <DataRow label="Total Registrants" values={webinars.map((w) => fmtInt(w.totalRegistrants))} tip={TIP.totalRegistrantsGhl} />
               <DataRow label="↳ Meta" values={webinars.map((w) => fmtInt(w.metaRegistrants))} />
               <DataRow label="↳ ManyChat" values={webinars.map((w) => fmtInt(w.manychatRegistrants))} />
@@ -97,7 +102,7 @@ export function Tab2LatestWebinar({
               <DivRow>Attendance</DivRow>
               <DataRow label="Unique Attendees" values={webinars.map((w) => fmtInt(w.uniqueAttendees))} tip={TIP.uniqueAttendees} />
               <DataRow label="Pitched (>25 min)" values={webinars.map((w) => fmtInt(w.pitchedAttendees))} tip={TIP.pitchedAttendees} />
-              <DataRow label="Attend Rate (Zoom/Reg)" values={webinars.map((w) => fmtPct(w.regToAttendRate))} tip={TIP.attendRateRegToZoom} />
+              <DataRow label="Attend Rate (Zoom/Reg)" values={webinars.map((w) => fmtPct(w.regToAttendRate))} tip={TIP.attendRateRegToZoom} trafficKey="webinarShowUpRate" rawValues={webinars.map((w) => w.regToAttendRate)} />
               <DataRow label="Pitch Rate" values={webinars.map((w) => fmtPct(w.attendToPitchedRate))} tip={TIP.pitchRate} />
 
               <DivRow>Meta Funnel · Registration Campaigns Only</DivRow>
@@ -109,9 +114,9 @@ export function Tab2LatestWebinar({
               <DataRow label="Meta CPL" values={webinars.map((w) => fmtUsd2(w.metaCpl))} tip={TIP.metaCpl} />
 
               <DivRow>Cost Efficiency</DivRow>
-              <DataRow label="Cost / Reg (Paid)" values={webinars.map((w) => fmtUsd2(w.paidCpr))} tip={TIP.costPerRegPaid} />
+              <DataRow label="Cost / Reg (Paid)" values={webinars.map((w) => fmtUsd2(w.paidCpr))} tip={TIP.costPerRegPaid} trafficKey="costPerRegistrant" rawValues={webinars.map((w) => w.paidCpr)} />
               <DataRow label="Cost / Attendee" values={webinars.map((w) => fmtUsd2(w.blendedCpa))} tip={TIP.costPerAttendee} />
-              <DataRow label="Cost / Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbc))} tip={TIP.costPerBookedCall} />
+              <DataRow label="Cost / Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbc))} tip={TIP.costPerBookedCall} trafficKey="costPerBookedCall" rawValues={webinars.map((w) => w.blendedCpbc)} />
               <DataRow label="Cost / Active Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbcActive))} tip={TIP.costPerActiveBookedCall} />
               <DataRow
                 label="Cost / Qualified Show"
@@ -178,10 +183,14 @@ export function Tab2LatestWebinar({
                 label="ROAS (Cash)"
                 values={webinars.map((w, i) => (i === 0 && inProgress ? naCell() : fmtX(w.roasCash)))}
                 tip={TIP.roasCash}
+                trafficKey="roas"
+                rawValues={webinars.map((w, i) => (i === 0 && inProgress ? null : w.roasCash))}
               />
               <DataRow
                 label="ROAS (Revenue/TCV)"
                 values={webinars.map((w, i) => (i === 0 && inProgress ? naCell() : fmtX(w.roasRevenue)))}
+                trafficKey="roas"
+                rawValues={webinars.map((w, i) => (i === 0 && inProgress ? null : w.roasRevenue))}
               />
               <DataRow
                 label="CAC"
@@ -222,15 +231,34 @@ export function Tab2LatestWebinar({
 
 // Helper components
 
-function DataRow({ label, values, tip }: { label: string; values: (string | ReactNode)[]; tip?: string }) {
+function DataRow({
+  label,
+  values,
+  tip,
+  trafficKey,
+  rawValues,
+}: {
+  label: string;
+  values: (string | ReactNode)[];
+  tip?: string;
+  /** If set, colors each cell green/orange/red using THRESHOLDS[trafficKey]. */
+  trafficKey?: ThresholdKey;
+  /** Raw numeric values aligned to `values` for threshold checks. */
+  rawValues?: (number | null)[];
+}) {
   return (
     <tr>
       <td data-tip={tip} style={tip ? { cursor: "help" } : undefined}>{label}</td>
-      {values.map((v, i) => (
-        <td key={i} className={i === 0 ? styles.lh : ""}>
-          {v}
-        </td>
-      ))}
+      {values.map((v, i) => {
+        const light = trafficKey ? getTrafficLight(rawValues?.[i] ?? null, trafficKey) : "neutral";
+        const lhClass = i === 0 ? styles.lh : "";
+        const colorClass = trafficLightTextClass(light);
+        return (
+          <td key={i} className={`${lhClass} ${colorClass}`.trim()}>
+            {v}
+          </td>
+        );
+      })}
     </tr>
   );
 }

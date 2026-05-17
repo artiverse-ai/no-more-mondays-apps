@@ -32,9 +32,11 @@ import {
 } from "./weekly-report-bq-v2";
 
 export type SqlCtx = {
-  kpiStart: string;
+  kpiStart: string;             // sales week Sun-Sat ET — closer/funnel/cash metrics
   kpiEnd: string;
-  latestWebinarDate: string;   // anchors the Avg Webinar Show Rate last-3 lookback
+  latestWebinarDate: string;    // anchors Avg Webinar Show Rate last-3 lookback
+  mwStart: string;              // marketing week Mon-Sun ET — webinar/ad-spend metrics
+  mwEnd: string;
   // Tab 2 extras (Latest Webinar). Optional so Phase 1 callers can omit.
   comparisonDates?: string[];   // 3 dates in YYYY-MM-DD order (latest first)
   promoStart?: string;          // Meta campaign promo window start
@@ -116,6 +118,7 @@ export type MetricKey =
 
 const kpiParams = (ctx: SqlCtx) => ({ start: ctx.kpiStart, end: ctx.kpiEnd });
 const latestWebinarParams = (ctx: SqlCtx) => ({ latest: ctx.latestWebinarDate });
+const mwParams = (ctx: SqlCtx) => ({ start: ctx.mwStart, end: ctx.mwEnd });
 
 // ============================================================================
 // Helpers exported below: METRIC_SQL, resolveSql, getResolvedSql,
@@ -134,9 +137,9 @@ export const METRIC_SQL: Record<MetricKey, MetricSqlEntry> = {
     params: latestWebinarParams,
   },
   pctTierOneLeads: {
-    blocks: [{ label: "% Tier 1 Leads (placeholder — fields not yet in mart)", sql: SQL_PCT_TIER_ONE_LEADS }],
-    derivation: "Returns null today — tier_one_submissions + form_submissions not yet ingested into mart_webinar_events.",
-    params: kpiParams,
+    blocks: [{ label: "% Tier 1 Leads (placeholder — fields not yet in mart) · marketing week", sql: SQL_PCT_TIER_ONE_LEADS }],
+    derivation: "Returns null today — tier_one_submissions + form_submissions not yet ingested into mart_webinar_events. Window: marketing week Mon-Sun.",
+    params: mwParams,
   },
   blendedCashRoas: {
     blocks: [{ label: "Blended Cash ROAS", sql: SQL_BLENDED_CASH_ROAS }],

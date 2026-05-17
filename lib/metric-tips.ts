@@ -20,6 +20,7 @@ export const TIP = {
     "Source: mart_webinar_events",
   pctTierOneLeads:
     "tier_one_submissions / form_submissions\n" +
+    "Window: marketing week (Mon-Sun ET)\n" +
     "Source: mart_webinar_events (PENDING — fields not yet ingested)",
   blendedCashRoas:
     "SUM(stg_fanbasis_sales.amount_usd WHERE status='succeeded') / SUM(mart_high_level_daily.total_ad_spend)\n" +
@@ -35,8 +36,11 @@ export const TIP = {
   // --- Section A · money (§3.1) ------------------------------------------
   cashCollected:
     "SUM(amount_usd) WHERE status='succeeded'\n" +
-    "Window: sale_date in the KPI window\n" +
-    "Source: stg_fanbasis_sales (Fanbasis + Whop)",
+    "Window: sale_date in the sales week (Sun-Sat ET)\n" +
+    "Source: stg_fanbasis_sales — Fanbasis AND Whop transactions\n" +
+    "(stg_fanbasis_sales holds both processors, no platform filter applied).\n" +
+    "Money-in basis — includes installment payments from prior-month deals.\n" +
+    "For closer-attributed (new deals booked this week), see Tab 3 Sales.",
   revenueTcv:
     "SUM(total_revenue_contracted)\n" +
     "Window: date_closed in the KPI window\n" +

@@ -64,6 +64,12 @@ export default async function Page({
   // (the just-closed week ending the Saturday before latest_wed).
   const { kpiStart, kpiEnd, latestWebinarDate } = computeWindows(snapshot.weekStart, snapshot.weekEnd, reportType);
 
+  // Marketing week (Mon-Sun) — anchored on the Mon-Sun containing the
+  // latest webinar. Used for webinar/marketing-source metrics so the
+  // window always wraps the focus webinar instead of ending one day
+  // before it (the sales-week problem). See computeMarketingWindow below.
+  const { mwStart, mwEnd } = computeMarketingWindow(latestWebinarDate);
+
   // Comparison IN-list per spec §7 — depends on report type.
   const compDates = comparisonDatesForMode(latestWebinarDate, reportType);
 
@@ -93,7 +99,7 @@ export default async function Page({
     bookingMode,
     sectionATab3,
   ] = await Promise.all([
-    fetchKpiStrip(kpiStart, kpiEnd, latestWebinarDate),
+    fetchKpiStrip(kpiStart, kpiEnd, latestWebinarDate, mwStart, mwEnd),
     fetchSectionA(kpiStart, kpiEnd),
     fetchSectionC(kpiStart, kpiEnd),
     fetchWebinarComparisonV2(compDates),
@@ -158,6 +164,8 @@ export default async function Page({
     kpiStart,
     kpiEnd,
     latestWebinarDate,
+    mwStart,
+    mwEnd,
     comparisonDates: compDates,
     promoStart: promoWindow.start,
     promoEnd: promoWindow.end,
@@ -328,6 +336,22 @@ function addDays(iso: string, days: number): string {
   const d = new Date(iso + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Marketing week = Mon-Sun ET (per Taziem confirmation 2026-05-18).
+ * Anchored on the latest webinar so the window always WRAPS the focus
+ * event of the report instead of ending one day before it.
+ *   Sun latest → marketing week = Mon-6d ... Sun (same day)
+ *   Wed latest → marketing week = Mon-2d ... Sun+4d (same week containing Wed)
+ */
+function computeMarketingWindow(latestWebinarDate: string): { mwStart: string; mwEnd: string } {
+  const d = new Date(latestWebinarDate + "T00:00:00Z");
+  const dow = d.getUTCDay();              // 0=Sun .. 6=Sat
+  const daysToNextSun = (7 - dow) % 7;    // 0 if latest is already Sun
+  const mwEnd = addDays(latestWebinarDate, daysToNextSun);
+  const mwStart = addDays(mwEnd, -6);
+  return { mwStart, mwEnd };
 }
 
 function fmtKpiWindow(startIso: string, endIso: string): string {

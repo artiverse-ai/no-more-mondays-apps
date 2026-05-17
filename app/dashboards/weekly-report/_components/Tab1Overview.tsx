@@ -54,7 +54,7 @@ function SectionA({ data, weekLabel, sqlFor }: { data: SectionAData; weekLabel: 
         Company-wide money, deals, and cycle times. {weekLabel}.
       </p>
       <div className={styles.kpiGridMini}>
-        <MiniCard emoji="💰" label="Cash Collected" value={fmtUsd(data.cashCollected)} change="Fanbasis + Whop" tip={TIP.cashCollected} sqlInfo={sqlFor("cashCollected")} />
+        <MiniCard emoji="💰" label="Cash Collected" value={fmtUsd(data.cashCollected)} change="Fanbasis + Whop · money-in" tip={TIP.cashCollected} sqlInfo={sqlFor("cashCollected")} />
         <MiniCard emoji="💼" label="Revenue (TCV)" value={fmtUsd(data.revenueTcv)} change="Total Contract Value" tip={TIP.revenueTcv} sqlInfo={sqlFor("revenueTcv")} />
         <MiniCard emoji="📈" label="ROAS (Cash)" value={fmtX(data.roasCash)} change={target("4×")} tip={TIP.roasCash} sqlInfo={sqlFor("roasCash")} trafficKey="roas" rawValue={data.roasCash} />
         <MiniCard emoji="📈" label="ROAS (TCV)" value={fmtX(data.roasTcv)} change="TCV / Ad Spend" tip={TIP.roasTcv} sqlInfo={sqlFor("roasTcv")} trafficKey="roas" rawValue={data.roasTcv} />

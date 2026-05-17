@@ -52,7 +52,8 @@ FROM ${MART_WEBINAR}
 WHERE webinar_date BETWEEN DATE(@start) AND DATE(@end)`;
 
 export const SQL_BLENDED_CASH_ROAS = `WITH cash AS (
-  SELECT SUM(amount_usd) AS cash_fanbasis
+  -- Fanbasis + Whop money-in (stg_fanbasis_sales holds both, no platform filter)
+  SELECT SUM(amount_usd) AS cash_money_in
   FROM ${FANBASIS}
   WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
     AND status = 'succeeded'
@@ -62,11 +63,12 @@ spend AS (
   FROM ${MART_HL_DAILY}
   WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)
 )
-SELECT SAFE_DIVIDE(cash.cash_fanbasis, spend.total_ad_spend) AS blended_cash_roas
+SELECT SAFE_DIVIDE(cash.cash_money_in, spend.total_ad_spend) AS blended_cash_roas
 FROM cash, spend`;
 
 export const SQL_CASH_PER_BOOKED_CALL = `WITH cash AS (
-  SELECT SUM(amount_usd) AS cash_fanbasis
+  -- Fanbasis + Whop money-in (stg_fanbasis_sales holds both, no platform filter)
+  SELECT SUM(amount_usd) AS cash_money_in
   FROM ${FANBASIS}
   WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
     AND status = 'succeeded'
@@ -76,10 +78,15 @@ calls AS (
   FROM ${MART_HL_DAILY}
   WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)
 )
-SELECT SAFE_DIVIDE(cash.cash_fanbasis, calls.total_calls_booked) AS cash_per_booked_call
+SELECT SAFE_DIVIDE(cash.cash_money_in, calls.total_calls_booked) AS cash_per_booked_call
 FROM cash, calls`;
 
-export const SQL_SECTION_A_CASH = `SELECT SUM(amount_usd) AS cash_fanbasis
+// stg_fanbasis_sales is named after the Fanbasis processor but actually
+// contains BOTH Fanbasis (~638 rows) AND Whop (~143 rows) transactions —
+// the platform column distinguishes them. We deliberately don't filter
+// by platform so the card shows total money-in across both processors.
+// Alias is `cash_money_in` (not `cash_fanbasis`) to avoid the misnomer.
+export const SQL_SECTION_A_CASH = `SELECT SUM(amount_usd) AS cash_money_in
 FROM ${FANBASIS}
 WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
   AND status = 'succeeded'`;
@@ -127,6 +134,13 @@ WHERE is_deal
   AND date_closed BETWEEN DATE(@start) AND DATE(@end)
   AND ${EMAIL_EXCLUSION}`;
 
+// NOTE on window convention (Taziem 2026-05-18): calls_booked is sales-week
+// semantic (calls land in the sales week they're scheduled), but ad_spend is
+// marketing-week semantic (when money was spent). This query uses the SALES
+// window for both because the downstream Cost/Booked Call ratio needs a
+// single window. A future enhancement could split into two queries — flagged
+// as a TODO. Today this means the spend portion is within ±2 days of the
+// "true" marketing-week spend (windows overlap heavily).
 export const SQL_SECTION_B = `SELECT
   SUM(total_calls_booked)        AS total_calls_booked,
   SUM(total_calls_booked_active) AS total_calls_booked_active,
@@ -353,12 +367,13 @@ export async function fetchAvgWebinarShowRate(latestWebinarDate: string): Promis
   return v ?? null;
 }
 
-/** §2.2 % Tier 1 Leads — placeholder; returns null until the mart fields land */
-export async function fetchPctTierOneLeads(prevSun: string, prevSat: string): Promise<number | null> {
+/** §2.2 % Tier 1 Leads — placeholder; returns null until the mart fields land.
+ * Scoped to marketing week (Mon-Sun) since it's a webinar/lead-quality metric. */
+export async function fetchPctTierOneLeads(mwStart: string, mwEnd: string): Promise<number | null> {
   try {
     const [rows] = await bq().query({
       query: SQL_PCT_TIER_ONE_LEADS,
-      params: { start: prevSun, end: prevSat },
+      params: { start: mwStart, end: mwEnd },
       types: { start: "STRING", end: "STRING" },
     });
     const v = (rows[0] as { pct_tier_one_leads: number | null } | undefined)?.pct_tier_one_leads;
@@ -398,13 +413,19 @@ export async function fetchCashPerBookedCall(prevSun: string, prevSat: string): 
 }
 
 /** Wrapper that fires all 5 KPI queries in parallel.
- * @param latestWebinarDate anchors the "Avg Webinar Show Rate" last-3 lookback
- *   so the just-happened webinar is always included. */
-export async function fetchKpiStrip(prevSun: string, prevSat: string, latestWebinarDate: string): Promise<KpiStripData> {
+ * Window conventions (Taziem 2026-05-18):
+ *   - prevSun/prevSat   = sales week (Sun-Sat ET) → cash/ROAS/calls metrics
+ *   - latestWebinarDate = anchor for "last 3 webinars" lookback
+ *   - mwStart/mwEnd     = marketing week (Mon-Sun ET) → tier-one leads */
+export async function fetchKpiStrip(
+  prevSun: string, prevSat: string,
+  latestWebinarDate: string,
+  mwStart: string, mwEnd: string,
+): Promise<KpiStripData> {
   const [avgWebinarShowRate, pctTierOneLeads, blendedCashRoas, cplBlended, cashPerBookedCall] =
     await Promise.all([
       fetchAvgWebinarShowRate(latestWebinarDate),
-      fetchPctTierOneLeads(prevSun, prevSat),
+      fetchPctTierOneLeads(mwStart, mwEnd),
       fetchBlendedCashRoas(prevSun, prevSat),
       fetchCplBlended(prevSun, prevSat),
       fetchCashPerBookedCall(prevSun, prevSat),
@@ -451,7 +472,7 @@ export async function fetchSectionAMoney(prevSun: string, prevSat: string): Prom
       types: { start: "STRING", end: "STRING" },
     }),
   ]);
-  const cash = Number((cashRows[0]?.[0] as { cash_fanbasis: number | null })?.cash_fanbasis ?? 0);
+  const cash = Number((cashRows[0]?.[0] as { cash_money_in: number | null })?.cash_money_in ?? 0);
   const hl = (hlRows[0] as Array<{ tcv: number | null; ad_spend: number | null; deals: number | null; pif_deals: number | null }>)[0] ?? {};
   const tcv = Number(hl?.tcv ?? 0);
   const adSpend = Number(hl?.ad_spend ?? 0);

@@ -3,7 +3,7 @@ import { getResolvedSql, type MetricKey, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
 import {
   getTrafficLight,
-  trafficLightTextClass,
+  trafficLightColor,
   type ThresholdKey,
 } from "@/lib/metric-thresholds";
 import { SqlInfoButton } from "./SqlInfoButton";
@@ -90,7 +90,7 @@ function Card({
 }) {
   const kindCls = kind === "webinar" ? styles.kpiWebinar : styles.kpiCompany;
   const light = trafficKey ? getTrafficLight(rawValue, trafficKey) : "neutral";
-  const trafficClass = trafficLightTextClass(light);
+  const color = trafficLightColor(light);
   return (
     <div className={`${styles.kpiCard} ${kindCls}`}>
       <div className={styles.kpiLabel}>
@@ -99,7 +99,7 @@ function Card({
         </span>
         {sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}
       </div>
-      <div className={`${styles.kpiValue} ${isNa ? styles.kpiValueNa : ""} ${trafficClass}`}>{value}</div>
+      <div className={`${styles.kpiValue} ${isNa ? styles.kpiValueNa : ""}`} style={color ? { color } : undefined}>{value}</div>
       <div className={styles.kpiMeta}>{meta}</div>
     </div>
   );

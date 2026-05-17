@@ -4,7 +4,7 @@ import { getResolvedSql, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
 import {
   getTrafficLight,
-  trafficLightTextClass,
+  trafficLightColor,
   type ThresholdKey,
 } from "@/lib/metric-thresholds";
 import { ContextBannerEditor } from "./ContextBannerEditor";
@@ -252,9 +252,9 @@ function DataRow({
       {values.map((v, i) => {
         const light = trafficKey ? getTrafficLight(rawValues?.[i] ?? null, trafficKey) : "neutral";
         const lhClass = i === 0 ? styles.lh : "";
-        const colorClass = trafficLightTextClass(light);
+        const color = trafficLightColor(light);
         return (
-          <td key={i} className={`${lhClass} ${colorClass}`.trim()}>
+          <td key={i} className={lhClass} style={color ? { color, fontWeight: 600 } : undefined}>
             {v}
           </td>
         );

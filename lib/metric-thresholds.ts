@@ -127,6 +127,12 @@ export function getTrafficLight(value: number | null | undefined, key: Threshold
 /**
  * Tailwind text color for each traffic-light bucket.
  * Neutral falls back to the default foreground (no class added).
+ *
+ * NOTE: Prefer `trafficLightColor()` (inline style) on cards that use CSS
+ * modules — Tailwind's utility layer loads BEFORE non-layered module rules
+ * in Tailwind v4, so `text-emerald-600` will be overridden by any
+ * `.kpiValue { color: ... }` rule in a `.module.css` file. Inline styles
+ * bypass the cascade entirely.
  */
 export function trafficLightTextClass(light: TrafficLight): string {
   switch (light) {
@@ -134,5 +140,22 @@ export function trafficLightTextClass(light: TrafficLight): string {
     case "orange": return "text-amber-600";
     case "red": return "text-rose-600";
     case "neutral": return "";
+  }
+}
+
+/**
+ * Hex color for each traffic-light bucket — for inline `style={{ color }}`
+ * on CSS-module-styled elements where Tailwind classes don't win the
+ * cascade. Returns undefined for neutral so React drops the style.
+ *
+ * Palette matches the Tailwind utility colors (emerald-600 / amber-600 /
+ * rose-600) so visual treatment is consistent with non-module surfaces.
+ */
+export function trafficLightColor(light: TrafficLight): string | undefined {
+  switch (light) {
+    case "green":  return "#059669";  // emerald-600
+    case "orange": return "#d97706";  // amber-600
+    case "red":    return "#e11d48";  // rose-600
+    case "neutral": return undefined;
   }
 }

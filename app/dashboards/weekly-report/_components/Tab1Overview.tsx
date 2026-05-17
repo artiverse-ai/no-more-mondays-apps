@@ -3,7 +3,7 @@ import { getResolvedSql, type MetricKey, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
 import {
   getTrafficLight,
-  trafficLightTextClass,
+  trafficLightColor,
   type ThresholdKey,
 } from "@/lib/metric-thresholds";
 import { SqlInfoButton } from "./SqlInfoButton";
@@ -278,7 +278,7 @@ function MiniCard({
   rawValue?: number | null;
 }) {
   const light = trafficKey ? getTrafficLight(rawValue, trafficKey) : "neutral";
-  const colorClass = trafficLightTextClass(light);
+  const color = trafficLightColor(light);
   return (
     <div className={styles.kpiMini}>
       <div className={styles.kpiMiniLbl}>
@@ -286,7 +286,7 @@ function MiniCard({
         <span data-tip={tip} style={tip ? { cursor: "help" } : undefined}>{label}</span>
         {sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}
       </div>
-      <div className={`${styles.kpiMiniVal} ${colorClass}`}>{value}</div>
+      <div className={styles.kpiMiniVal} style={color ? { color } : undefined}>{value}</div>
       {change ? <div className={styles.kpiMiniCh}>{change}</div> : null}
     </div>
   );

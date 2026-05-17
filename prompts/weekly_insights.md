@@ -82,6 +82,76 @@ scales to what the data warrants (1-3 typical, more if signals stack).
 Aim for 12-18 cards distributed across A-H. Cards can blend domains (e.g.,
 "Closer X carrying despite show rate softening" = D + C).
 
+## CRITICAL — Be smart about EACH metric. Read this before writing any card.
+
+Every metric in this payload has its own personality: a window it lives
+in, a time it takes to mature, valid comparisons, and traps. Treating
+every number the same way produces wrong insights. The table below is
+the canonical guide — refer back to it for every card you write.
+
+### Metric maturity & analysis guide
+
+| Metric | Window / Source | When it matures | Valid comparison | Common trap |
+|---|---|---|---|---|
+| **Webinar registrants** (total / by channel) | Per-webinar; `mart_webinar_events` | At time of webinar — mature immediately | Latest vs prior webinar OK; channel mix shifts OK | None — direct comparison fine |
+| **Unique attendees, pitched_attendees** | Per-webinar | Mature immediately (end of webinar) | Latest vs prior OK | None — these are facts at webinar end |
+| **reg_to_attend_rate** (Reg → Zoom) | Per-webinar derived | Mature immediately | Latest vs prior OK; trend across last 3 OK | None — primary leading indicator of marketing quality |
+| **attend_to_pitched_rate** | Per-webinar derived | Mature immediately | Latest vs prior OK | None |
+| **lp_opt_in_rate** | Per-webinar (LP pre-webinar) | Mature 1-2 days BEFORE webinar | Latest vs prior OK | None — direct comparison fine |
+| **paid_cpr, blended_cpr** | Per-webinar (ad spend / registrants) | Mature immediately (registrants frozen at webinar end) | Latest vs prior OK | None |
+| **calls_booked, calls_booked_active** (per webinar) | Per-webinar; most calls book within 72h, stragglers ~7 days | Latest webinar = ~70% mature at T+1, ~95% at T+3, ~100% at T+7 | Latest vs prior OK ONLY IF latest is T+3 or later | Latest webinar fresh from yesterday will look artificially low |
+| **deals_closed, cash_collected, roas_cash, blended_cpbc** (per webinar) | Per-webinar; downstream of calls | Accumulates 1-4 weeks for deals; cash 1-12 weeks (payment plans) | Only compare for webinars **>14 days old** (positions [1], [2] in webinars_comparison only if those positions are >14 days old) | **DO NOT compare on `webinars_comparison[0]` if it's <14 days old — deals_closed=0 / cash=$0 is expected, not a signal** |
+| **Sales funnel** (prospects, shows, deals, cash in `this_week_funnel`) | Sales week (Sun-Sat); `int_calls_enriched` | Calls/shows mature within the week; deals/cash trail by 1-3 days | WoW via `wow_deltas` (use directly) | Comparing partial week to full week — only compare full Sun-Sat to full Sun-Sat |
+| **Closer performance** (`closer_overall`) | Sales week | Show/close rates mature when sales week closes (Saturday EOD) | Within-week ranking OK; per-closer trends need WoW context | Naming a closer's "poor close rate" on 1-2 calls — small-sample variance |
+| **Setter performance** (`setter_performance`) | Sales week, deal attribution | Mature when sales week closes | Within-week ranking OK; per-setter mode split (webinar vs setter-flow) is the key cut | Comparing setter-flow setter to webinar-flow setter — different funnels |
+| **Booking mode** (`booking_mode`) | Sales week | Mature when sales week closes | Setter-flow close% vs webinar-flow close% comparison is the lever | Volume mix can shift dramatically week-to-week — note when comparing |
+| **`section_a_money_fanbasis.cash_money_in`** | Sales week, Fanbasis+Whop | Mature within hours of payment processing | WoW OK; vs forecast target OK | This is **money-in**, includes installments from old deals — NOT a closer performance metric |
+| **`section_a_money_closer.cash`** | Sales week, int_calls_enriched cash_collected for deals closed | Trails 1-3 days for late-week deals | WoW OK; vs Fanbasis OK | This is **new-deal AOV** — some won't actually collect for 60-90 days |
+| **`top_kpis.avg_webinar_show_rate`** | Last 3 Sun/Wed webinars, weighted | Mature when latest webinar ends | vs RED/orange/green thresholds (≥25% / 20-25% / <20%) | None — this is a rolling blend, robust to single-event noise |
+| **`top_kpis.blended_cash_roas`** | Sales week, Fanbasis cash / total ad spend | Mature when sales week closes | vs ≥3×/2-3×/<2× bands | Cash includes installments — ROAS includes "money in this week" not "deals closed this week" |
+| **`top_kpis.cost_per_booked_call`** | Sales week, ad spend / calls booked | Mature when sales week closes | vs ≤$100/$100-150/>$150 bands | None |
+| **`actual_vs_target.<metric>`** | Sales week vs forecast for the same window | Pace check, valid any time during the month | pct_of_target ≥95% green, ≥80% orange, <80% red | If `forecast_id` is null, skip — no forecast covers this window |
+
+### Anti-patterns — DO NOT generate these kinds of cards
+
+> ❌ "May 17 closed 0 deals vs 3 prior — ROAS hit 0×, performance collapsed"
+> **Wrong**: May 17 deals haven't had time to close yet. The "3 deals" on
+> the prior webinar reflects 1-2 weeks of accumulation. Comparing fresh
+> downstream metrics to mature ones is meaningless.
+
+> ❌ "Cost per booked call jumped to $186 on May 17 vs $151 on May 13"
+> **Wrong**: May 17's call_booked count is still trickling in (T+1). Wait
+> until T+3 minimum to call this a trend. Acceptable to write as a `watch`
+> with explicit "still accumulating" caveat.
+
+> ❌ "Cash down 20% WoW — pricing power dropped"
+> **Wrong without checking deal mix**: Cash differences can come from
+> deal count, ACV mix, payment terms (PIF vs payment plan), or
+> installment timing. Check `section_a_money_closer` for actual closer
+> output before attributing to pricing.
+
+> ❌ "Destiny's close rate is 0% — fire her"
+> **Wrong sample size**: A closer with 2 shows and 0 deals isn't proof
+> of failure. Note the pattern, recommend coaching/audit, don't draw
+> structural conclusions from <5 calls.
+
+### Right-pattern examples
+
+> ✓ "Attend rate 13.7% on May 17 vs 18.3% on May 13 (−4.6pp) — registrants
+> showed up at the lowest rate in 4 cycles. The 130 attendees produced 30
+> booked calls so far (T+1); at historical 48% show × 45% close, project
+> ~6-7 deals from May 17 over the next 10 days vs ~10 from May 13. **Watch**
+> Mon-Wed booking velocity to confirm or refute."
+
+> ✓ "Tyler held 6 calls and closed 4 ($4.2k) — 66.7% close rate is the
+> top of any closer this week. Destiny held 1 call, closed 0 (sample too
+> small to flag structurally). **Win** — protect Tyler's pipeline volume."
+
+> ✓ "Fanbasis cash $X vs closer-attributed cash $Y diverges by Z%. This
+> reflects [installment payments from prior month / new deals not yet
+> collected]. **Context** for the CEO: bank deposits ≠ new bookings this
+> week."
+
 ## Output format — strict JSON
 
 Return **only** a JSON object, no prose before or after, no markdown code

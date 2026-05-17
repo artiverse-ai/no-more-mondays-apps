@@ -27,6 +27,7 @@ import { getSnapshot, listInsights, type Insight } from "@/lib/weekly-report-sna
 import { InsightsEditor, type EditableInsight } from "../_components/InsightsEditor";
 import { PersistentKpiStrip } from "../_components/PersistentKpiStrip";
 import { TopMetrics } from "../_components/TopMetrics";
+import { getForecastBundleForWindow } from "@/lib/forecast";
 import { SolutionsTab } from "../_components/SolutionsTab";
 import { Tab1Overview } from "../_components/Tab1Overview";
 import { Tab2LatestWebinar } from "../_components/Tab2LatestWebinar";
@@ -107,6 +108,10 @@ export default async function Page({
 
   // Section B needs the KPI strip values (Cash/Booked, Show Rate, CPL) — compute after.
   const sectionB = await fetchSectionBData(kpiStart, kpiEnd, kpiStrip);
+
+  // Forecast targets (null-safe — returns all nulls if forecast_targets is
+  // empty or no forecast covers this window). Failure is non-fatal.
+  const forecast = await getForecastBundleForWindow(kpiStart, kpiEnd).catch(() => null);
 
   // Determine if the latest column is in-progress. Today: yes only when the
   // latest webinar date == snapshot.run_on date (Thursday → today's Wed
@@ -268,7 +273,7 @@ export default async function Page({
           </span>
         ) : null}
       </div>
-      <TopMetrics sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} />
+      <TopMetrics sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} forecast={forecast} />
       <PersistentKpiStrip data={kpiStrip} devMode={devMode && isAdmin} sqlCtx={sqlCtx} />
       <Tabs tabs={tabs} defaultActive="t1" panels={panels} />
     </div>

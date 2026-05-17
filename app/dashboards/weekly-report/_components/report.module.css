@@ -124,6 +124,20 @@
   color: var(--text-muted);
   margin-top: 4px;
 }
+.topMetricChip {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1.5;
+}
+.topMetricChipGreen   { background: #e9f7ef; color: #1d6a3c; border: 1px solid #b9e3c8; }
+.topMetricChipOrange  { background: #fff4e3; color: #8a5a00; border: 1px solid #f3d49a; }
+.topMetricChipRed     { background: #fdecec; color: #9b1c1c; border: 1px solid #f2bcbc; }
+.topMetricChipNeutral { background: #f0f2f5; color: var(--text-secondary); border: 1px solid var(--border); }
 
 /* ============================================================================
  * §4 Persistent KPI strip

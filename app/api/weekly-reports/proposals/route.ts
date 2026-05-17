@@ -28,7 +28,7 @@ export async function GET() {
   if (!me) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
 
   try {
-    const proposed = enumerateMonThuRange(new Date(), 12);
+    const proposed = enumerateMonThuRange(new Date(), 52);
     const [existingSnapshots, availMap] = await Promise.all([
       listSnapshots(),
       bulkCheckAvailability(proposed.map((p) => ({ weekStart: p.weekStart, weekEnd: p.weekEnd }))),

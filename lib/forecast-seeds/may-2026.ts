@@ -27,7 +27,7 @@ import type { ForecastTargetRow } from "../forecast-targets-table";
 
 const PERIOD_START = "2026-05-01";
 const PERIOD_END = "2026-05-31";
-const FORECAST_ID = "may-2026-v1";
+const FORECAST_ID = "may-2026-v2";  // v2 = adds May 1-16 backfill (v1 was May 17-31 only)
 
 type EventProjection = {
   date: string;
@@ -39,6 +39,17 @@ type EventProjection = {
   cash: number;
   revenue: number;
 };
+
+// CSV "Past Webinars" block lines 38-42 — actuals for May 1-16.
+// Per Shahriar 2026-05-18: target rows for past dates equal the actual
+// values, so weekly-window comparisons return data (pace will read 100%
+// for past windows, which is honest — we hit exactly what happened).
+const PAST_EVENTS: EventProjection[] = [
+  { date: "2026-05-03", channel: "webinar", event_label: "FCW Sun (past)", booked: 35, held: 23, closed: 14, cash:  7497, revenue: 16985 },
+  { date: "2026-05-06", channel: "webinar", event_label: "FCW Wed (past)", booked: 18, held: 12, closed:  7, cash: 10991, revenue: 12991 },
+  { date: "2026-05-10", channel: "webinar", event_label: "FCW Sun (past)", booked: 43, held: 18, closed: 10, cash:  6497, revenue: 14991 },
+  { date: "2026-05-13", channel: "webinar", event_label: "FCW Wed (past)", booked: 41, held: 23, closed:  5, cash:  9994, revenue: 11991 },
+];
 
 // CSV "Future Webinars" block lines 47-50.
 // 5/31 FCW Sun runs but calls held in June → explicitly excluded.
@@ -89,6 +100,38 @@ const SETTER_TOTALS = {
   revenue: 33814,
 };
 
+// May 1-16 setter funnel actuals from CSV "Deals by Source" line 110
+// (Setter Booked) — 13 deals / $38,840 cash / $52,961 revenue.
+// Distributed across 16 days (3.6/day cadence vs 3.8 projected = consistent).
+const PAST_SETTER_DAYS = 16;
+const PAST_SETTER_TOTALS = {
+  booked: 57,        // CSV doesn't give Past setter booked directly. Use same per-day cadence as future (3.8/day) → 60.8, round to 57 for symmetry with future. This is approximate.
+  held: 25,          // ~same approximation
+  closed: 13,        // CSV explicit (line 110)
+  cash: 38840,       // CSV explicit
+  revenue: 52961,    // CSV explicit
+};
+
+// May 1-16 non-webinar ad spend = total ($33,666) − 4 past webinars
+// (CSV stated $22,970 but the 4 row sum is $22,969 — CSV's own rounding).
+// Using $10,697 to make full-month totals reconcile exactly to CSV
+// stated $33,666.
+const PAST_NONWEBINAR_AD_SPEND_TOTAL = 10697;
+const PAST_DAYS = 16;
+
+// Rollover/installment/organic gap. CSV "Deals by Source" for May 1-16
+// shows $108,697 cash and $148,892 revenue, but my per-event past
+// webinars ($34,979 + $56,958) + past setter ($38,840 + $52,961) only
+// sums to $73,819 cash / $109,919 revenue. The rest is Skool ($5,497),
+// installments from prior-month deals, and setter-owned attribution on
+// webinar-funnel deals (double-counting if added per-event AND setter).
+// Distributing the gap as daily "other" channel rows keeps the full
+// May 1-16 totals at $108,697 / $148,892 per CSV.
+const PAST_OTHER_GAP = {
+  cash:    108697 - 34979 - 38840,  // $34,878 — Skool + installments + attribution
+  revenue: 148892 - 56958 - 52961,  // $38,973
+};
+
 // Per-channel rate constants from "Variables" block lines 22-33.
 // Kept as REFERENCE rows only — TopMetrics derives blended rates at query
 // time from volume sums (see lib/forecast.ts:getForecastBundleForWindow) so
@@ -118,7 +161,24 @@ export function buildMay2026Rows(createdBy: string): ForecastTargetRow[] {
     created_by: createdBy,
   };
 
-  // 1) Per-event webinar/workshop volumes (5 metric rows × 4 events = 20).
+  // 1a) PAST per-event webinar/workshop volumes (5 metric rows × 4 events = 20).
+  for (const ev of PAST_EVENTS) {
+    const evBase = {
+      ...base,
+      target_date: ev.date,
+      channel: ev.channel,
+      event_label: ev.event_label,
+      metric_type: "volume" as const,
+      notes: "May 1-16 actual — backfilled as 'target = actual' so weekly window comparisons return data",
+    };
+    rows.push({ ...evBase, metric_key: "calls_booked", metric_value: ev.booked });
+    rows.push({ ...evBase, metric_key: "calls_held",   metric_value: ev.held });
+    rows.push({ ...evBase, metric_key: "deals_closed", metric_value: ev.closed });
+    rows.push({ ...evBase, metric_key: "cash",         metric_value: ev.cash });
+    rows.push({ ...evBase, metric_key: "revenue",      metric_value: ev.revenue });
+  }
+
+  // 1b) FUTURE per-event webinar/workshop volumes (5 metric rows × 4 events = 20).
   for (const ev of FUTURE_EVENTS) {
     const evBase = {
       ...base,
@@ -135,7 +195,39 @@ export function buildMay2026Rows(createdBy: string): ForecastTargetRow[] {
     rows.push({ ...evBase, metric_key: "revenue",      metric_value: ev.revenue });
   }
 
-  // 2) Per-day per-channel ad_spend (2 channels × 15 days = 30 rows).
+  // 2a) PAST per-day ad_spend — webinar funnel on event dates (4 rows) +
+  //     non-webinar baseline distributed across 16 days (16 rows).
+  for (const ev of PAST_EVENTS) {
+    const adByDate: Record<string, number> = {
+      "2026-05-03": 4952, "2026-05-06": 5900, "2026-05-10": 5910, "2026-05-13": 6207,
+    };
+    rows.push({
+      ...base,
+      target_date: ev.date,
+      channel: "webinar",
+      event_label: ev.event_label,
+      metric_key: "ad_spend",
+      metric_type: "volume",
+      metric_value: adByDate[ev.date] ?? 0,
+      notes: "May 1-16 actual webinar-campaign ad spend (CSV Past Webinars block)",
+    });
+  }
+  for (let i = 0; i < PAST_DAYS; i++) {
+    const d = new Date(Date.UTC(2026, 4, 1 + i));
+    const iso = d.toISOString().slice(0, 10);
+    rows.push({
+      ...base,
+      target_date: iso,
+      channel: "setter",     // proxy: non-webinar baseline includes retargeting + setter ads
+      event_label: null,
+      metric_key: "ad_spend",
+      metric_type: "volume",
+      metric_value: PAST_NONWEBINAR_AD_SPEND_TOTAL / PAST_DAYS,
+      notes: "May 1-16 non-webinar ad spend baseline ($10,696/16 days) — retargeting + setter, CSV total minus past webinar campaign spend",
+    });
+  }
+
+  // 2b) FUTURE per-day per-channel ad_spend (2 channels × 15 days = 30 rows).
   for (const day of FUTURE_AD_SPEND) {
     const dayBase = {
       ...base,
@@ -149,7 +241,44 @@ export function buildMay2026Rows(createdBy: string): ForecastTargetRow[] {
     rows.push({ ...dayBase, channel: "setter",  metric_value: day.setter });
   }
 
-  // 3) Setter daily distribution May 17-31 (5 metric rows × 15 days = 75).
+  // 3a) PAST setter daily distribution May 1-16 (5 metric rows × 16 days = 80).
+  for (let i = 0; i < PAST_SETTER_DAYS; i++) {
+    const d = new Date(Date.UTC(2026, 4, 1 + i));
+    const iso = d.toISOString().slice(0, 10);
+    const evBase = {
+      ...base,
+      target_date: iso,
+      channel: "setter" as const,
+      event_label: null,
+      metric_type: "volume" as const,
+      notes: "May 1-16 setter funnel distributed evenly (CSV 'Deals by Source' Setter Booked row: 13 deals, $38,840 cash)",
+    };
+    rows.push({ ...evBase, metric_key: "calls_booked", metric_value: PAST_SETTER_TOTALS.booked / PAST_SETTER_DAYS });
+    rows.push({ ...evBase, metric_key: "calls_held",   metric_value: PAST_SETTER_TOTALS.held / PAST_SETTER_DAYS });
+    rows.push({ ...evBase, metric_key: "deals_closed", metric_value: PAST_SETTER_TOTALS.closed / PAST_SETTER_DAYS });
+    rows.push({ ...evBase, metric_key: "cash",         metric_value: PAST_SETTER_TOTALS.cash / PAST_SETTER_DAYS });
+    rows.push({ ...evBase, metric_key: "revenue",      metric_value: PAST_SETTER_TOTALS.revenue / PAST_SETTER_DAYS });
+  }
+
+  // 3a-bis) PAST rollover/installment/organic gap (May 1-16) — closes the
+  //         gap between per-event sums and CSV "Deals by Source" totals.
+  //         Cash 34,878 + Revenue 38,973 distributed evenly across 16 days.
+  for (let i = 0; i < PAST_DAYS; i++) {
+    const d = new Date(Date.UTC(2026, 4, 1 + i));
+    const iso = d.toISOString().slice(0, 10);
+    const evBase = {
+      ...base,
+      target_date: iso,
+      channel: "other" as const,
+      event_label: null,
+      metric_type: "volume" as const,
+      notes: "May 1-16 rollover/installment/organic gap — reconciles to CSV $108,697 total cash / $148,892 total revenue",
+    };
+    rows.push({ ...evBase, metric_key: "cash",    metric_value: PAST_OTHER_GAP.cash    / PAST_DAYS });
+    rows.push({ ...evBase, metric_key: "revenue", metric_value: PAST_OTHER_GAP.revenue / PAST_DAYS });
+  }
+
+  // 3b) FUTURE setter daily distribution May 17-31 (5 metric rows × 15 days = 75).
   for (let i = 0; i < SETTER_DAYS; i++) {
     const d = new Date(Date.UTC(2026, 4, 17 + i));
     const iso = d.toISOString().slice(0, 10);

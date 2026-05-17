@@ -48,7 +48,7 @@ export default async function WeeklyReportsIndex() {
   let initialProposals: InitialProposal[] = [];
   if (isAdmin) {
     try {
-      const proposed = enumerateMonThuRange(new Date(), 12);
+      const proposed = enumerateMonThuRange(new Date(), 52);
       const existingSlugs = new Set(snapshots.map((s) => s.slug));
       const availMap = await bulkCheckAvailability(
         proposed.map((p) => ({ weekStart: p.weekStart, weekEnd: p.weekEnd })),

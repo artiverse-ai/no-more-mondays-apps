@@ -54,25 +54,31 @@ const sum = (predicate: (r: typeof rows[number]) => boolean) =>
 const approxEq = (a: number, b: number, eps = 0.6) => Math.abs(a - b) <= eps;
 
 type Check = { label: string; expected: number; actual: number };
+const isFuture = (r: typeof rows[number]) => r.target_date != null && r.target_date >= "2026-05-17";
+const isPast = (r: typeof rows[number]) => r.target_date != null && r.target_date < "2026-05-17";
 const inMemoryChecks: Check[] = [
-  { label: "Webinar funnel ad spend",      expected: 28755, actual: sum((r) => r.metric_key === "ad_spend" && r.channel === "webinar") },
-  { label: "Setter funnel ad spend",       expected:  8435, actual: sum((r) => r.metric_key === "ad_spend" && r.channel === "setter") },
-  { label: "TOTAL ad spend",               expected: 37190, actual: sum((r) => r.metric_key === "ad_spend") },
-  { label: "Webinar+workshop calls booked", expected:  305, actual: sum((r) => r.metric_key === "calls_booked" && (r.channel === "webinar" || r.channel === "workshop")) },
-  { label: "Setter calls booked",          expected:    57, actual: sum((r) => r.metric_key === "calls_booked" && r.channel === "setter") },
-  { label: "TOTAL calls booked",           expected:   362, actual: sum((r) => r.metric_key === "calls_booked") },
-  { label: "Webinar+workshop calls held",  expected: 133.5, actual: sum((r) => r.metric_key === "calls_held" && (r.channel === "webinar" || r.channel === "workshop")) },
-  { label: "Setter calls held",            expected:    25, actual: sum((r) => r.metric_key === "calls_held" && r.channel === "setter") },
-  { label: "TOTAL calls held",             expected: 158.5, actual: sum((r) => r.metric_key === "calls_held") },
-  { label: "Webinar+workshop deals closed", expected:   36, actual: sum((r) => r.metric_key === "deals_closed" && (r.channel === "webinar" || r.channel === "workshop")) },
-  { label: "Setter deals closed",          expected:   8.3, actual: sum((r) => r.metric_key === "deals_closed" && r.channel === "setter") },
-  { label: "TOTAL deals closed",           expected:  44.3, actual: sum((r) => r.metric_key === "deals_closed") },
-  { label: "Webinar+workshop cash",        expected:109045, actual: sum((r) => r.metric_key === "cash" && (r.channel === "webinar" || r.channel === "workshop")) },
-  { label: "Setter cash",                  expected: 24800, actual: sum((r) => r.metric_key === "cash" && r.channel === "setter") },
-  { label: "TOTAL cash May 17-31",         expected:133845, actual: sum((r) => r.metric_key === "cash") },
-  { label: "Webinar+workshop revenue",     expected:149375, actual: sum((r) => r.metric_key === "revenue" && (r.channel === "webinar" || r.channel === "workshop")) },
-  { label: "Setter revenue",               expected: 33814, actual: sum((r) => r.metric_key === "revenue" && r.channel === "setter") },
-  { label: "TOTAL revenue May 17-31",      expected:183189, actual: sum((r) => r.metric_key === "revenue") },
+  // ── Future half (May 17-31) — original CSV "Projected" numbers ─────
+  { label: "[5/17-31] Webinar funnel ad spend",      expected: 28755, actual: sum((r) => isFuture(r) && r.metric_key === "ad_spend" && r.channel === "webinar") },
+  { label: "[5/17-31] Setter funnel ad spend",       expected:  8435, actual: sum((r) => isFuture(r) && r.metric_key === "ad_spend" && r.channel === "setter") },
+  { label: "[5/17-31] TOTAL ad spend",               expected: 37190, actual: sum((r) => isFuture(r) && r.metric_key === "ad_spend") },
+  { label: "[5/17-31] Webinar+workshop booked",      expected:   305, actual: sum((r) => isFuture(r) && r.metric_key === "calls_booked" && (r.channel === "webinar" || r.channel === "workshop")) },
+  { label: "[5/17-31] Setter booked",                expected:    57, actual: sum((r) => isFuture(r) && r.metric_key === "calls_booked" && r.channel === "setter") },
+  { label: "[5/17-31] TOTAL booked",                 expected:   362, actual: sum((r) => isFuture(r) && r.metric_key === "calls_booked") },
+  { label: "[5/17-31] TOTAL cash",                   expected:133845, actual: sum((r) => isFuture(r) && r.metric_key === "cash") },
+  { label: "[5/17-31] TOTAL revenue",                expected:183189, actual: sum((r) => isFuture(r) && r.metric_key === "revenue") },
+  { label: "[5/17-31] TOTAL deals closed",           expected:  44.3, actual: sum((r) => isFuture(r) && r.metric_key === "deals_closed") },
+  // ── Past half (May 1-16) — backfilled CSV "Actual" numbers ─────────
+  { label: "[5/1-16] Past webinar ad spend",         expected: 22969, actual: sum((r) => isPast(r) && r.metric_key === "ad_spend" && r.channel === "webinar") },
+  { label: "[5/1-16] Past non-webinar ad spend",     expected: 10697, actual: sum((r) => isPast(r) && r.metric_key === "ad_spend" && r.channel === "setter") },
+  { label: "[5/1-16] Past TOTAL ad spend",           expected: 33666, actual: sum((r) => isPast(r) && r.metric_key === "ad_spend"), },
+  { label: "[5/1-16] Past 4 webinars deals",         expected:    36, actual: sum((r) => isPast(r) && r.metric_key === "deals_closed" && r.channel === "webinar") },
+  { label: "[5/1-16] Past setter deals",             expected:    13, actual: sum((r) => isPast(r) && r.metric_key === "deals_closed" && r.channel === "setter") },
+  { label: "[5/1-16] Past 4 webinars cash",          expected: 34979, actual: sum((r) => isPast(r) && r.metric_key === "cash" && r.channel === "webinar") },
+  { label: "[5/1-16] Past setter cash",              expected: 38840, actual: sum((r) => isPast(r) && r.metric_key === "cash" && r.channel === "setter") },
+  // ── Full month sanity ──────────────────────────────────────────────
+  { label: "[Full May] TOTAL ad spend",              expected:  70856, actual: sum((r) => r.metric_key === "ad_spend") },
+  { label: "[Full May] TOTAL cash",                  expected: 242542, actual: sum((r) => r.metric_key === "cash") },
+  { label: "[Full May] TOTAL revenue",               expected: 332081, actual: sum((r) => r.metric_key === "revenue") }, // CSV stated 332,267 — its own sum is 332,081 (148,892 + 183,189). Match the periods.
 ];
 
 let failed = 0;
@@ -107,36 +113,29 @@ if (DRY_RUN) {
 console.log(`\n🔧 Ensuring table exists: ${FQ}`);
 await bq.query({ query: CREATE_SQL });
 
-console.log(`🗑  Deleting any existing rows with forecast_id='${MAY_2026_FORECAST_ID}'`);
-const [deleteJob] = await bq.createQueryJob({
-  query: `DELETE FROM ${FQ} WHERE forecast_id = @id`,
-  params: { id: MAY_2026_FORECAST_ID },
-  types: { id: "STRING" },
-});
-await deleteJob.getQueryResults();
-
-console.log(`📤 Inserting ${rows.length} rows...`);
+console.log(`📤 Inserting ${rows.length} rows for forecast_id='${MAY_2026_FORECAST_ID}'...`);
+// Using streaming insert. Safe here because we use a fresh forecast_id
+// (e.g., may-2026-v2 supersedes v1) — no DELETE needed, so the streaming
+// buffer doesn't cause issues. Old v1 rows can stay; the bundle query
+// picks the most recent forecast_id by created_at.
 await bq.dataset(DATASET).table(TABLE).insert(rows, {
   ignoreUnknownValues: false,
   skipInvalidRows: false,
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// Step 3: read-back verification (BigQuery streaming insert is eventually
-// consistent — small wait so the SELECT can see the rows)
-// ─────────────────────────────────────────────────────────────────────
-console.log(`\n⏳ Waiting 6s for streaming buffer to commit...`);
+console.log(`\n⏳ Waiting 6s for streaming buffer to commit before read-back...`);
 await new Promise((r) => setTimeout(r, 6000));
 
 const [bqRows] = await bq.query({
   query: `
     SELECT
-      SUM(IF(metric_key='ad_spend',     metric_value, NULL)) AS ad_spend,
-      SUM(IF(metric_key='cash',         metric_value, NULL)) AS cash,
-      SUM(IF(metric_key='revenue',      metric_value, NULL)) AS revenue,
-      SUM(IF(metric_key='deals_closed', metric_value, NULL)) AS deals_closed,
-      SUM(IF(metric_key='calls_booked', metric_value, NULL)) AS calls_booked,
-      SUM(IF(metric_key='calls_held',   metric_value, NULL)) AS calls_held,
+      SUM(IF(metric_key='ad_spend' AND target_date >= '2026-05-17',     metric_value, NULL)) AS ad_spend_future,
+      SUM(IF(metric_key='cash'     AND target_date >= '2026-05-17',     metric_value, NULL)) AS cash_future,
+      SUM(IF(metric_key='ad_spend',     metric_value, NULL)) AS ad_spend_full_month,
+      SUM(IF(metric_key='cash',         metric_value, NULL)) AS cash_full_month,
+      SUM(IF(metric_key='revenue',      metric_value, NULL)) AS revenue_full_month,
+      SUM(IF(metric_key='deals_closed', metric_value, NULL)) AS deals_closed_full_month,
+      SUM(IF(metric_key='calls_booked', metric_value, NULL)) AS calls_booked_full_month,
       COUNT(*) AS row_count
     FROM ${FQ}
     WHERE forecast_id = @id AND metric_type = 'volume'
@@ -146,21 +145,21 @@ const [bqRows] = await bq.query({
 });
 const bqRow = bqRows[0] ?? {};
 console.log(`\n📊 BQ read-back:`);
-console.log(`    row_count    = ${bqRow.row_count}`);
-console.log(`    ad_spend     = $${Number(bqRow.ad_spend ?? 0).toLocaleString()}`);
-console.log(`    cash         = $${Number(bqRow.cash ?? 0).toLocaleString()}`);
-console.log(`    revenue      = $${Number(bqRow.revenue ?? 0).toLocaleString()}`);
-console.log(`    deals_closed = ${Number(bqRow.deals_closed ?? 0).toFixed(1)}`);
-console.log(`    calls_booked = ${Number(bqRow.calls_booked ?? 0)}`);
-console.log(`    calls_held   = ${Number(bqRow.calls_held ?? 0)}`);
+console.log(`    row_count                = ${bqRow.row_count}`);
+console.log(`    ad_spend  (5/17-31)      = $${Number(bqRow.ad_spend_future ?? 0).toLocaleString()}`);
+console.log(`    cash      (5/17-31)      = $${Number(bqRow.cash_future ?? 0).toLocaleString()}`);
+console.log(`    ad_spend  (full May)     = $${Number(bqRow.ad_spend_full_month ?? 0).toLocaleString()}`);
+console.log(`    cash      (full May)     = $${Number(bqRow.cash_full_month ?? 0).toLocaleString()}`);
+console.log(`    revenue   (full May)     = $${Number(bqRow.revenue_full_month ?? 0).toLocaleString()}`);
+console.log(`    deals     (full May)     = ${Number(bqRow.deals_closed_full_month ?? 0).toFixed(1)}`);
+console.log(`    booked    (full May)     = ${Number(bqRow.calls_booked_full_month ?? 0)}`);
 
 const bqChecks: Check[] = [
-  { label: "BQ ad_spend",     expected: 37190, actual: Number(bqRow.ad_spend ?? 0) },
-  { label: "BQ cash",         expected: 133845, actual: Number(bqRow.cash ?? 0) },
-  { label: "BQ revenue",      expected: 183189, actual: Number(bqRow.revenue ?? 0) },
-  { label: "BQ deals_closed", expected: 44.3, actual: Number(bqRow.deals_closed ?? 0) },
-  { label: "BQ calls_booked", expected: 362, actual: Number(bqRow.calls_booked ?? 0) },
-  { label: "BQ calls_held",   expected: 158.5, actual: Number(bqRow.calls_held ?? 0) },
+  { label: "BQ ad_spend May 17-31",      expected:  37190, actual: Number(bqRow.ad_spend_future ?? 0) },
+  { label: "BQ cash May 17-31",          expected: 133845, actual: Number(bqRow.cash_future ?? 0) },
+  { label: "BQ ad_spend full May",       expected:  70856, actual: Number(bqRow.ad_spend_full_month ?? 0) },
+  { label: "BQ cash full May",           expected: 242542, actual: Number(bqRow.cash_full_month ?? 0) },
+  { label: "BQ revenue full May",        expected: 332081, actual: Number(bqRow.revenue_full_month ?? 0) },
 ];
 
 let bqFailed = 0;

@@ -184,7 +184,7 @@ export function proposeFromRunDate(runDate: Date): ProposedSnapshot {
  */
 export function enumerateMonThuRange(
   now: Date = new Date(),
-  weeksBack = 12,
+  weeksBack = 52,
   futureCount = 2,
 ): ProposedSnapshot[] {
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));

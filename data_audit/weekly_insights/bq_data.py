@@ -21,9 +21,19 @@ MART_DATASET = os.environ.get("BQ_MART_DATASET", "dbt_tuddin")
 
 MART = f"`{PROJECT}.{MART_DATASET}.mart_webinar_events`"
 ENRICHED = f"`{PROJECT}.{MART_DATASET}.int_calls_enriched`"
+MART_HL_DAILY = f"`{PROJECT}.{MART_DATASET}.mart_high_level_daily`"
+FANBASIS = f"`{PROJECT}.{MART_DATASET}.stg_fanbasis_sales`"
+FORECAST = f"`{PROJECT}.{DATASET}.forecast_targets`"
 SNAPSHOTS = f"`{PROJECT}.{DATASET}.weekly_report_snapshots`"
 INSIGHTS = f"`{PROJECT}.{DATASET}.weekly_report_insights`"
 CLOSERS = f"`{PROJECT}.{DATASET}.closers`"
+
+# Email exclusion mirrors lib/weekly-report-bq-v2.ts so closer-attributed
+# numbers in the payload match what the dashboard shows.
+EMAIL_EXCLUSION = (
+    "prospect_email_lc NOT LIKE '%@nomoremondays.io%' "
+    "AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')"
+)
 
 
 def _client() -> bigquery.Client:
@@ -438,6 +448,246 @@ def compute_funnel_wow(this_week: dict[str, Any], prior_week: dict[str, Any]) ->
     return {k: _safe_pct_delta(this_week.get(k), prior_week.get(k)) for k in keys}
 
 
+def compute_webinar_wow(webinars: list[dict[str, Any]]) -> dict[str, Any]:
+    """Pre-calculates WoW deltas for the LATEST webinar vs the one before
+    it (positions 0 and 1 in webinars_comparison). Mirrors compute_funnel_wow
+    so Claude can cite webinar-quality deltas just as confidently.
+
+    Keys covered: reg_to_attend_rate, attend_to_pitched_rate, lp_opt_in_rate,
+    paid_cpr, blended_cpbc, roas_cash, total_registrants, unique_attendees,
+    calls_booked, deals_closed, cash_collected.
+
+    Returns empty dict if fewer than 2 webinars available.
+    """
+    if len(webinars) < 2:
+        return {}
+    latest, prior = webinars[0], webinars[1]
+    keys = [
+        "reg_to_attend_rate", "attend_to_pitched_rate", "lp_opt_in_rate",
+        "paid_cpr", "blended_cpbc", "blended_cpr", "roas_cash",
+        "total_registrants", "unique_attendees", "pitched_attendees",
+        "calls_booked", "calls_booked_active", "deals_closed", "cash_collected",
+    ]
+    return {k: _safe_pct_delta(latest.get(k), prior.get(k)) for k in keys}
+
+
+def fetch_section_a_money(start: str, end: str) -> dict[str, Any]:
+    """Tab 1 Overview / Section A — Fanbasis+Whop money-in + mart_high_level_daily
+    aggregates. Mirrors lib/weekly-report-bq-v2.ts::fetchSectionAMoney.
+
+    Note: stg_fanbasis_sales contains BOTH Fanbasis AND Whop transactions
+    (~638 + ~143 rows respectively). No platform filter — total money-in.
+    Includes installments from prior-month deals.
+    """
+    sql = f"""
+      WITH cash AS (
+        SELECT SUM(amount_usd) AS cash_money_in
+        FROM {FANBASIS}
+        WHERE sale_date BETWEEN DATE(@start) AND DATE(@end)
+          AND status = 'succeeded'
+      ),
+      hl AS (
+        SELECT
+          SUM(total_revenue_contracted) AS tcv,
+          SUM(total_ad_spend)           AS ad_spend,
+          SUM(total_deals_closed)       AS deals,
+          SUM(count_pif_deals)          AS pif_deals
+        FROM {MART_HL_DAILY}
+        WHERE metric_date BETWEEN DATE(@start) AND DATE(@end)
+      )
+      SELECT
+        cash.cash_money_in,
+        hl.tcv, hl.ad_spend, hl.deals, hl.pif_deals,
+        SAFE_DIVIDE(cash.cash_money_in, hl.ad_spend) AS roas_cash,
+        SAFE_DIVIDE(hl.tcv, hl.ad_spend)             AS roas_tcv,
+        SAFE_DIVIDE(cash.cash_money_in, hl.deals)    AS aov_fanbasis,
+        SAFE_DIVIDE(hl.tcv, hl.deals)                AS acv,
+        SAFE_DIVIDE(hl.pif_deals, hl.deals)          AS pif_rate,
+        SAFE_DIVIDE(cash.cash_money_in, hl.tcv)      AS cash_collection_rate
+      FROM cash, hl
+    """
+    rows = _rows(sql, [
+        bigquery.ScalarQueryParameter("start", "STRING", start),
+        bigquery.ScalarQueryParameter("end", "STRING", end),
+    ])
+    return rows[0] if rows else {}
+
+
+def fetch_section_a_tab3_closer(start: str, end: str) -> dict[str, Any]:
+    """Tab 3 "Latest Sales Week" Money — closer-attributed from
+    int_calls_enriched (new deals booked this week, NOT money-in).
+    Mirrors lib/weekly-report-bq-v2.ts::fetchSectionATab3Closer.
+    """
+    sql = f"""
+      SELECT
+        COUNT(DISTINCT IF(is_deal,                     prospect_email_lc, NULL)) AS deals,
+        COUNT(DISTINCT IF(is_deal AND is_paid_in_full, prospect_email_lc, NULL)) AS pif_deals,
+        SUM(IF(is_deal, cash_collected, 0))                                      AS cash,
+        SUM(IF(is_deal, revenue_generated, 0))                                   AS revenue,
+        SAFE_DIVIDE(SUM(IF(is_deal, cash_collected, 0)),
+                    COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)))        AS aov_closer,
+        SAFE_DIVIDE(SUM(IF(is_deal, revenue_generated, 0)),
+                    COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)))        AS acv_closer,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(is_deal AND is_paid_in_full, prospect_email_lc, NULL)),
+                    COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL)))        AS pif_rate_closer,
+        SAFE_DIVIDE(SUM(IF(is_deal, cash_collected, 0)),
+                    SUM(IF(is_deal, revenue_generated, 0)))                      AS cash_collection_rate_closer
+      FROM {ENRICHED}
+      WHERE date_closed BETWEEN DATE(@start) AND DATE(@end)
+        AND {EMAIL_EXCLUSION}
+    """
+    rows = _rows(sql, [
+        bigquery.ScalarQueryParameter("start", "STRING", start),
+        bigquery.ScalarQueryParameter("end", "STRING", end),
+    ])
+    return rows[0] if rows else {}
+
+
+def fetch_top_kpis(prev_sun: str, prev_sat: str, latest_webinar_date: str, mw_start: str, mw_end: str) -> dict[str, Any]:
+    """The 5 KPI strip values shown at the top of the report — same SQL
+    the dashboard uses, so Claude reads exactly what the CEO sees.
+
+    Windows:
+      avg_webinar_show_rate → last 3 webinars anchored on latest_webinar_date
+      blended_cash_roas    → sales week (Sun-Sat)
+      cash_per_booked_call → sales week
+      total_calls_booked   → sales week (mart_high_level_daily)
+      cost_per_booked_call → sales week (mart_high_level_daily ad_spend / calls)
+    """
+    show_sql = f"""
+      WITH last_three AS (
+        SELECT unique_attendees, total_registrants
+        FROM {MART}
+        WHERE webinar_date <= DATE(@latest)
+          AND webinar_day IN ('Sunday', 'Wednesday')
+        ORDER BY webinar_date DESC
+        LIMIT 3
+      )
+      SELECT SAFE_DIVIDE(SUM(unique_attendees), NULLIF(SUM(total_registrants), 0)) AS rate
+      FROM last_three
+    """
+    roas_sql = f"""
+      WITH c AS (SELECT SUM(amount_usd) AS cash FROM {FANBASIS}
+                  WHERE sale_date BETWEEN DATE(@start) AND DATE(@end) AND status='succeeded'),
+           s AS (SELECT SUM(total_ad_spend) AS spend, SUM(total_calls_booked) AS calls,
+                        SUM(total_calls_booked_active) AS calls_active
+                  FROM {MART_HL_DAILY} WHERE metric_date BETWEEN DATE(@start) AND DATE(@end))
+      SELECT c.cash, s.spend, s.calls, s.calls_active,
+             SAFE_DIVIDE(c.cash, s.spend) AS blended_cash_roas,
+             SAFE_DIVIDE(c.cash, s.calls) AS cash_per_booked_call,
+             SAFE_DIVIDE(s.spend, s.calls) AS cost_per_booked_call
+      FROM c, s
+    """
+    show_rows = _rows(show_sql, [bigquery.ScalarQueryParameter("latest", "STRING", latest_webinar_date)])
+    roas_rows = _rows(roas_sql, [
+        bigquery.ScalarQueryParameter("start", "STRING", prev_sun),
+        bigquery.ScalarQueryParameter("end", "STRING", prev_sat),
+    ])
+    show_row = show_rows[0] if show_rows else {}
+    roas_row = roas_rows[0] if roas_rows else {}
+    return {
+        "avg_webinar_show_rate": show_row.get("rate"),
+        "avg_webinar_show_rate_scope": "last 3 Sun/Wed webinars (anchored on latest_webinar_date)",
+        "blended_cash_roas": roas_row.get("blended_cash_roas"),
+        "cash_per_booked_call": roas_row.get("cash_per_booked_call"),
+        "cost_per_booked_call": roas_row.get("cost_per_booked_call"),
+        "total_calls_booked": roas_row.get("calls"),
+        "total_calls_booked_active": roas_row.get("calls_active"),
+        "total_ad_spend_sales_week": roas_row.get("spend"),
+        "cash_money_in_sales_week": roas_row.get("cash"),
+        "scope_note": (
+            f"Cash/ROAS/calls window = sales week (Sun-Sat) = {prev_sun}..{prev_sat}. "
+            f"Marketing week (Mon-Sun) = {mw_start}..{mw_end}. "
+            f"Avg show rate = last 3 webinars."
+        ),
+    }
+
+
+def fetch_forecast_bundle(start: str, end: str) -> dict[str, Any]:
+    """Pull forecast targets for the report window from nmm_calendar.forecast_targets.
+    Mirrors lib/forecast.ts::getForecastBundleForWindow.
+
+    Returns volumes summed across days/channels + rates derived from those
+    same sums (so target denominators match actuals denominators). Returns
+    a dict with `forecast_id=None` and all values null if no forecast covers
+    the window — the table may be empty in non-prod environments.
+    """
+    sql = f"""
+      WITH fid AS (
+        SELECT forecast_id
+        FROM {FORECAST}
+        WHERE period_start <= DATE(@start) AND period_end >= DATE(@end)
+        GROUP BY forecast_id
+        ORDER BY MAX(created_at) DESC
+        LIMIT 1
+      ),
+      v AS (
+        SELECT
+          SUM(IF(metric_key='ad_spend',     metric_value, NULL)) AS ad_spend,
+          SUM(IF(metric_key='cash',         metric_value, NULL)) AS cash,
+          SUM(IF(metric_key='revenue',      metric_value, NULL)) AS revenue,
+          SUM(IF(metric_key='deals_closed', metric_value, NULL)) AS deals_closed,
+          SUM(IF(metric_key='calls_booked', metric_value, NULL)) AS calls_booked,
+          SUM(IF(metric_key='calls_held',   metric_value, NULL)) AS calls_held
+        FROM {FORECAST}
+        WHERE forecast_id IN (SELECT forecast_id FROM fid)
+          AND metric_type = 'volume'
+          AND target_date BETWEEN DATE(@start) AND DATE(@end)
+      )
+      SELECT (SELECT forecast_id FROM fid) AS forecast_id,
+             ad_spend, cash, revenue, deals_closed, calls_booked, calls_held,
+             SAFE_DIVIDE(calls_held, calls_booked) AS show_rate,
+             SAFE_DIVIDE(deals_closed, calls_held) AS close_rate,
+             SAFE_DIVIDE(cash, deals_closed)       AS aov
+      FROM v
+    """
+    try:
+        rows = _rows(sql, [
+            bigquery.ScalarQueryParameter("start", "STRING", start),
+            bigquery.ScalarQueryParameter("end", "STRING", end),
+        ])
+        return rows[0] if rows else {"forecast_id": None}
+    except Exception:
+        # Table not created in this env, or schema drift — payload still ships.
+        return {"forecast_id": None, "error": "forecast_targets unavailable"}
+
+
+def compute_actual_vs_target(actuals: dict[str, Any], targets: dict[str, Any]) -> dict[str, Any]:
+    """Pairs each forecast metric with its sales-week actual + pct of target.
+
+    Returns dict keyed by metric_name with shape:
+      { actual: float, target: float, pct_of_target: float, pace_light: 'green'|'orange'|'red'|'unknown' }
+    """
+    if not targets or targets.get("forecast_id") is None:
+        return {"forecast_id": None}
+    pairs = {
+        "ad_spend":     ("total_ad_spend_sales_week", "ad_spend"),
+        "cash":         ("cash_money_in_sales_week",   "cash"),
+        "calls_booked": ("total_calls_booked",         "calls_booked"),
+    }
+    out: dict[str, Any] = {"forecast_id": targets.get("forecast_id")}
+    for label, (actual_key, target_key) in pairs.items():
+        a = actuals.get(actual_key)
+        t = targets.get(target_key)
+        try:
+            af = float(a) if a is not None else None
+            tf = float(t) if t is not None else None
+        except (TypeError, ValueError):
+            af, tf = None, None
+        if af is None or tf is None or tf == 0:
+            out[label] = {"actual": af, "target": tf, "pct_of_target": None, "pace_light": "unknown"}
+            continue
+        pct = af / tf
+        light = "green" if pct >= 0.95 else "orange" if pct >= 0.80 else "red"
+        out[label] = {
+            "actual": round(af, 2),
+            "target": round(tf, 2),
+            "pct_of_target": round(pct * 100, 1),
+            "pace_light": light,
+        }
+    return out
+
+
 def assemble_report_payload(slug: str) -> dict[str, Any]:
     """Pulls every table needed for the prompt, keyed for JSON dump.
 
@@ -457,8 +707,22 @@ def assemble_report_payload(slug: str) -> dict[str, Any]:
     # is the Sunday AFTER week_end (Sat); for midweek_check it's week_end (Wed).
     latest_webinar_date = end if same_weekday else _shift_days(end, 1)
 
+    # Marketing week (Mon-Sun) — anchored on the Mon-Sun containing the
+    # latest webinar. Webinar/ad-spend metrics live here; sales/cash metrics
+    # live on sales week (Sun-Sat).
+    lw_date = dt.date.fromisoformat(latest_webinar_date)
+    days_to_sun = (6 - lw_date.weekday()) % 7  # weekday(): 0=Mon..6=Sun
+    mw_end_date = lw_date + dt.timedelta(days=days_to_sun)
+    mw_start_date = mw_end_date - dt.timedelta(days=6)
+    mw_start, mw_end = mw_start_date.isoformat(), mw_end_date.isoformat()
+
     this_week_funnel = fetch_week_funnel(start, end)
     prior_week_funnel = fetch_week_funnel(prior_start, prior_end)
+    webinars = fetch_webinar_comparison(latest_webinar_date, same_weekday)
+    top_kpis = fetch_top_kpis(start, end, latest_webinar_date, mw_start, mw_end)
+    section_a_money = fetch_section_a_money(start, end)
+    section_a_tab3_closer = fetch_section_a_tab3_closer(start, end)
+    forecast = fetch_forecast_bundle(start, end)
 
     return {
         "snapshot": {
@@ -470,6 +734,8 @@ def assemble_report_payload(slug: str) -> dict[str, Any]:
             "week_end": end,
             "prior_week_start": prior_start,
             "prior_week_end": prior_end,
+            "marketing_week_start": mw_start,
+            "marketing_week_end": mw_end,
             "badge": snap["badge"],
             "latest_webinar": snap.get("latest_webinar"),
             "latest_webinar_date": latest_webinar_date,
@@ -479,7 +745,19 @@ def assemble_report_payload(slug: str) -> dict[str, Any]:
                 "body": snap.get("context_body"),
             },
         },
-        "webinars_comparison": fetch_webinar_comparison(latest_webinar_date, same_weekday),
+        # ─── Top-of-page KPI strip (the 5 cards above every report) ────────
+        "top_kpis": top_kpis,
+        # ─── Tab 1 Overview Section A — Fanbasis+Whop money-in basis ──────
+        "section_a_money_fanbasis": section_a_money,
+        # ─── Tab 3 Latest Sales Week — closer-attributed from int_calls_enriched ─
+        "section_a_money_closer": section_a_tab3_closer,
+        # ─── Forecast vs target (May 2026 projection model) ───────────────
+        "forecast_targets": forecast,
+        "actual_vs_target": compute_actual_vs_target(top_kpis, forecast),
+        # ─── Webinar data ─────────────────────────────────────────────────
+        "webinars_comparison": webinars,
+        "webinar_wow_deltas": compute_webinar_wow(webinars),
+        # ─── Funnel data (closer-side, sales week) ────────────────────────
         "this_week_funnel": this_week_funnel,
         "prior_week_funnel": prior_week_funnel,
         "wow_deltas": compute_funnel_wow(this_week_funnel, prior_week_funnel),

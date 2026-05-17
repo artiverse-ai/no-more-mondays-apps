@@ -13,6 +13,38 @@ per-webinar tables, booking mode split, setter performance, and any context
 banner the team has written). All numbers are real, pulled live from
 BigQuery seconds before you saw them.
 
+## Payload blocks (read all of them — each holds different data)
+
+| Block | What it contains | Window |
+|---|---|---|
+| `snapshot` | slug, report_type, week_label, week_start/end, marketing_week_start/end, latest_webinar, context_banner | metadata |
+| `top_kpis` | The 5 KPI strip cards: avg_webinar_show_rate, blended_cash_roas, cash_per_booked_call, cost_per_booked_call, total_calls_booked, total_ad_spend, cash_money_in | mixed (avg show rate = last 3 webinars; others = sales week) |
+| `section_a_money_fanbasis` | Tab 1 Overview money: cash_money_in (Fanbasis+Whop), tcv, ad_spend, deals, roas_cash, roas_tcv, aov_fanbasis, acv, pif_rate, cash_collection_rate | sales week (Sun-Sat) |
+| `section_a_money_closer` | Tab 3 Sales Week money — CLOSER-ATTRIBUTED from int_calls_enriched: cash, revenue, deals, pif_deals, aov_closer, acv_closer, pif_rate_closer, cash_collection_rate_closer | sales week, date_closed |
+| `forecast_targets` | May 2026 projection model targets summed for the sales week: ad_spend, cash, revenue, deals_closed, calls_booked, calls_held, show_rate, close_rate, aov | sales week |
+| `actual_vs_target` | Pace check vs forecast — for each metric: actual, target, pct_of_target, pace_light ('green'/'orange'/'red'/'unknown') | sales week |
+| `webinars_comparison` | Latest 3 webinars (most recent first). Each has: webinar_date, registrants by channel, unique_attendees, pitched_attendees, reg_to_attend_rate, attend_to_pitched_rate, paid_cpr, blended_cpbc, calls_booked, deals_closed, cash_collected, roas_cash, roas_revenue | last 3 webinars |
+| `webinar_wow_deltas` | Pre-computed deltas between webinars_comparison[0] (latest) and [1] (prior). Use these directly. | per-webinar |
+| `this_week_funnel` / `prior_week_funnel` | Closer-side funnel: prospects, pros_d, setter_dq, closer_dq, pros_sq, shows_sq, shows_cq, deals, cash, revenue | sales week |
+| `wow_deltas` | Pre-computed deltas for the funnel metrics above. Use directly. | sales week |
+| `closer_overall` | Per-closer breakdown: calls held, closed, show rate, close rate, cash, revenue | sales week |
+| `booking_mode` | Webinar-flow vs setter-flow split | sales week |
+| `setter_performance` | Per-setter breakdown by booking mode | sales week |
+
+**Window conventions** (Taziem 2026-05-18):
+- **Sales week** = Sunday-Saturday ET. Deals, cash, closer metrics, ROAS.
+- **Marketing week** = Monday-Sunday ET. Webinar/lead-quality metrics in spirit.
+  In this payload, webinar data is delivered as "last 3 webinars" not a fixed
+  week — even more robust than the marketing-week window.
+
+**Two cash sources, both shown — they answer different questions:**
+- `section_a_money_fanbasis.cash_money_in` = money the bank actually received
+  this week (includes installments from prior-month deals). The CEO's "what
+  came in this week" number.
+- `section_a_money_closer.cash` = new deals booked this week (some won't
+  collect for 60-90 days). The ops "what closers produced" number.
+- If they diverge significantly, that's an insight worth flagging.
+
 ## Your job
 
 Produce **three sections** for this snapshot, all in one JSON object:
@@ -78,17 +110,42 @@ genuinely has nothing notable to frame — usually both should be present.
 
 ## Pre-calculated deltas — use these directly
 
-The data payload includes a `wow_deltas` block with pre-calculated
-`abs_delta` and `pct_delta` for every funnel metric (prospects, deals,
-cash, revenue, shows, etc.). **Always quote these values directly rather
-than recalculating from `this_week_funnel` and `prior_week_funnel`.** The
-pre-calculated values are authoritative; your own arithmetic on the raw
-counts may drift on close calls. Example: if `wow_deltas.deals.pct_delta`
-is `-31.6`, write "−31.6%", not your own computation.
+The payload has TWO pre-computed delta blocks. **Always quote these
+values rather than recalculating.** Your arithmetic on raw counts may
+drift on close calls.
 
-For metrics not in `wow_deltas` (e.g., closer-level deltas, channel mix
-shifts), do the math yourself — but cite the raw numbers from the source
-arrays so a reader can verify.
+1. **`wow_deltas`** — funnel metrics (prospects, deals, cash, revenue,
+   shows, etc.) week-over-week. Example: if `wow_deltas.deals.pct_delta`
+   is `-31.6`, write "−31.6%".
+
+2. **`webinar_wow_deltas`** — latest webinar vs the one before it
+   (positions 0 vs 1 in `webinars_comparison`). Covers
+   `reg_to_attend_rate`, `attend_to_pitched_rate`, `lp_opt_in_rate`,
+   `paid_cpr`, `blended_cpbc`, `roas_cash`, registrants, attendees,
+   calls_booked, deals_closed, cash_collected.
+
+For metrics not in either block (closer-level deltas, channel mix
+shifts), do the math yourself — but cite the raw numbers from the
+source arrays so a reader can verify.
+
+## Required flag rules — if any of these conditions are true, ship a `flag` card
+
+1. **Webinar attend rate dropped ≥5pp** — `webinar_wow_deltas.reg_to_attend_rate.abs_delta ≤ -0.05` (i.e. -5pp or worse). Title: "Show Rate Dropped Xpp to Y% — [hypothesis]". Body cites both numbers + pct_delta. Pace concerns the next 1-2 cycles.
+2. **Show rate is in RED band** — `top_kpis.avg_webinar_show_rate < 0.20`. Even without a WoW drop, sub-20% is the action threshold.
+3. **ROAS in RED band** — `top_kpis.blended_cash_roas < 2.0`.
+4. **Cost per booked call in RED band** — `top_kpis.cost_per_booked_call > 150`.
+5. **Tracking <80% of any forecast target** — `actual_vs_target.<metric>.pct_of_target < 80`. Cite both actual and target.
+6. **Fanbasis cash vs closer cash diverge >20%** — compare `section_a_money_fanbasis.cash_money_in` against `section_a_money_closer.cash`. If diverging, that's either an installment surge (Fanbasis > closer) or a closing surge that won't collect this week (closer > Fanbasis). Worth flagging either way.
+
+Conversely — if any of these conditions hit `green` thresholds (show rate ≥25%, ROAS ≥3×, etc.), ship a `win` card with the same numerical specificity.
+
+## Forecast-vs-target rubric (use the `actual_vs_target` block)
+
+When `actual_vs_target.forecast_id` is not null, write at least one `fwd` card framing pace toward the monthly target. Cite specific numbers:
+- "Tracking at 87% of target ($X actual vs $Y target through Sat) — need $Z more in the remaining N days to hit plan"
+- If `pace_light` is `red`, escalate to `flag` tone instead.
+
+If `actual_vs_target.forecast_id` is null, skip the pace card (no forecast for this window).
 
 ## Style rules
 

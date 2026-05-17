@@ -401,10 +401,13 @@
 .ct tbody tr:hover td, .dt tbody tr:hover td { background: var(--surface-2); }
 .lh {
   background: var(--surface-2) !important;
-  color: var(--text-primary) !important;
+  /* color intentionally NOT !important so inline traffic-light color
+     (style={{ color: '#e11d48' }} etc.) can override it on the latest
+     column. Default text-primary applies when no inline color set. */
+  color: var(--text-primary);
   font-weight: 600;
 }
-.lhh { background: var(--surface-2) !important; color: var(--text-primary) !important; }
+.lhh { background: var(--surface-2) !important; color: var(--text-primary); }
 .divRow td {
   background: var(--surface) !important;
   font-family: var(--font-display) !important;

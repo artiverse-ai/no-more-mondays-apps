@@ -26,6 +26,7 @@ import {
 import { getSnapshot, listInsights, type Insight } from "@/lib/weekly-report-snapshots";
 import { InsightsEditor, type EditableInsight } from "../_components/InsightsEditor";
 import { PersistentKpiStrip } from "../_components/PersistentKpiStrip";
+import { TopMetrics } from "../_components/TopMetrics";
 import { SolutionsTab } from "../_components/SolutionsTab";
 import { Tab1Overview } from "../_components/Tab1Overview";
 import { Tab2LatestWebinar } from "../_components/Tab2LatestWebinar";
@@ -267,6 +268,7 @@ export default async function Page({
           </span>
         ) : null}
       </div>
+      <TopMetrics sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} />
       <PersistentKpiStrip data={kpiStrip} devMode={devMode && isAdmin} sqlCtx={sqlCtx} />
       <Tabs tabs={tabs} defaultActive="t1" panels={panels} />
     </div>

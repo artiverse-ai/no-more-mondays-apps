@@ -85,6 +85,47 @@
 }
 
 /* ============================================================================
+ * §3b Top Metrics strip — 4 headline numbers at the very top of every report
+ * ============================================================================ */
+.topMetricsStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 16px 32px;
+  background: linear-gradient(180deg, #fafbfc 0%, #f3f5f8 100%);
+  border-bottom: 1px solid var(--border);
+}
+.topMetricCard {
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.topMetricLbl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.topMetricVal {
+  font: 700 30px/1.05 var(--font-display);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.topMetricSub {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ============================================================================
  * §4 Persistent KPI strip
  * ============================================================================ */
 .kpiStrip {

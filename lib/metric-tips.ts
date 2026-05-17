@@ -15,9 +15,8 @@ export const TIP = {
   // --- Persistent KPI strip (§2) -----------------------------------------
   avgWebinarShowRate:
     "SUM(unique_attendees) / SUM(total_registrants)\n" +
-    "Window: prev Sun-Sat\n" +
-    "Webinars in window: Sun + Wed\n" +
-    "Averaged across the window (weighted by registrant volume).\n" +
+    "Scope: last 3 Sun/Wed webinars anchored on latest_webinar_date\n" +
+    "(weighted by registrant volume — always includes the just-happened webinar).\n" +
     "Source: mart_webinar_events",
   pctTierOneLeads:
     "tier_one_submissions / form_submissions\n" +

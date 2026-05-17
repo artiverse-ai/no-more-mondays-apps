@@ -12,6 +12,7 @@ import {
 import {
   fetchKpiStrip,
   fetchSectionA,
+  fetchSectionATab3Closer,
   fetchSectionB,
   fetchSectionC,
   fetchWebinarComparisonV2,
@@ -90,8 +91,9 @@ export default async function Page({
     setterOverall,
     setterByMode,
     bookingMode,
+    sectionATab3,
   ] = await Promise.all([
-    fetchKpiStrip(kpiStart, kpiEnd),
+    fetchKpiStrip(kpiStart, kpiEnd, latestWebinarDate),
     fetchSectionA(kpiStart, kpiEnd),
     fetchSectionC(kpiStart, kpiEnd),
     fetchWebinarComparisonV2(compDates),
@@ -104,6 +106,7 @@ export default async function Page({
     isMonday ? fetchSetterOverall(kpiStart, kpiEnd) : Promise.resolve([]),
     isMonday ? fetchSetterByMode(kpiStart, kpiEnd) : Promise.resolve([]),
     isMonday ? fetchBookingModeExtended(kpiStart, kpiEnd) : Promise.resolve([]),
+    isMonday ? fetchSectionATab3Closer(kpiStart, kpiEnd) : Promise.resolve(null),
   ]);
 
   // Section B needs the KPI strip values (Cash/Booked, Show Rate, CPL) — compute after.
@@ -154,6 +157,7 @@ export default async function Page({
   const sqlCtx = {
     kpiStart,
     kpiEnd,
+    latestWebinarDate,
     comparisonDates: compDates,
     promoStart: promoWindow.start,
     promoEnd: promoWindow.end,
@@ -195,15 +199,18 @@ export default async function Page({
     ),
   };
 
-  // Monday-only Tab 3 — Last Week's Sales.
-  if (isMonday && priorWeekFunnel) {
+  // Monday-only Tab 3 — Last Week's Sales. Money cards source from
+  // int_calls_enriched (closer-attributed), NOT from the Overview tab's
+  // Fanbasis-sourced sectionA. Same denominator basis as the funnel cards
+  // below, so Cash/AOV/ACV match the deals breakdown.
+  if (isMonday && priorWeekFunnel && sectionATab3) {
     panels.t3sales = (
       <Tab3LastWeekSales
         weekLabel={snapshot.weekLabel}
         funnelData={sectionC}
         thisWeek={sectionC}
         priorWeek={priorWeekFunnel}
-        sectionA={sectionA}
+        sectionATab3={sectionATab3}
         closerOverall={closerOverall}
         setterOverall={setterOverall}
         setterByMode={setterByMode}

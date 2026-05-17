@@ -34,6 +34,7 @@ import {
 export type SqlCtx = {
   kpiStart: string;
   kpiEnd: string;
+  latestWebinarDate: string;   // anchors the Avg Webinar Show Rate last-3 lookback
   // Tab 2 extras (Latest Webinar). Optional so Phase 1 callers can omit.
   comparisonDates?: string[];   // 3 dates in YYYY-MM-DD order (latest first)
   promoStart?: string;          // Meta campaign promo window start
@@ -114,6 +115,7 @@ export type MetricKey =
   | "priorWeekFunnel";
 
 const kpiParams = (ctx: SqlCtx) => ({ start: ctx.kpiStart, end: ctx.kpiEnd });
+const latestWebinarParams = (ctx: SqlCtx) => ({ latest: ctx.latestWebinarDate });
 
 // ============================================================================
 // Helpers exported below: METRIC_SQL, resolveSql, getResolvedSql,
@@ -128,8 +130,8 @@ const SECTION_A_BLOCKS: SqlBlock[] = [
 export const METRIC_SQL: Record<MetricKey, MetricSqlEntry> = {
   // KPI strip ---------------------------------------------------------------
   avgWebinarShowRate: {
-    blocks: [{ label: "Avg Webinar Show Rate", sql: SQL_AVG_WEBINAR_SHOW_RATE }],
-    params: kpiParams,
+    blocks: [{ label: "Avg Webinar Show Rate (last 3 webinars anchored on latest_webinar_date)", sql: SQL_AVG_WEBINAR_SHOW_RATE }],
+    params: latestWebinarParams,
   },
   pctTierOneLeads: {
     blocks: [{ label: "% Tier 1 Leads (placeholder — fields not yet in mart)", sql: SQL_PCT_TIER_ONE_LEADS }],

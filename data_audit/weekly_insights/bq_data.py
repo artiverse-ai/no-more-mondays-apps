@@ -248,10 +248,15 @@ def _rows(sql: str, params: list[bigquery.ScalarQueryParameter] | None = None) -
     return [dict(r.items()) for r in _client().query(sql, job_config=cfg).result()]
 
 
-def fetch_webinar_comparison(week_end: str, same_weekday_only: bool) -> list[dict[str, Any]]:
+def fetch_webinar_comparison(latest_webinar_date: str, same_weekday_only: bool) -> list[dict[str, Any]]:
+    """Anchored on latest_webinar_date (the just-happened webinar) so the
+    payload always includes the focus webinar of the report. Was anchored
+    on snapshot.week_end which is the prev Sat — one day BEFORE the new Sun
+    webinar — which silently dropped the latest event and prevented Claude
+    from flagging WoW deltas on it."""
     sql = f"""
       WITH latest AS (
-        SELECT MAX(webinar_date) AS d FROM {MART} WHERE webinar_date <= DATE(@end)
+        SELECT MAX(webinar_date) AS d FROM {MART} WHERE webinar_date <= DATE(@latest)
       )
       SELECT FORMAT_DATE('%F', webinar_date) AS webinar_date,
              total_registrants, meta_registrants, manychat_registrants,
@@ -266,7 +271,7 @@ def fetch_webinar_comparison(week_end: str, same_weekday_only: bool) -> list[dic
              roas_cash, roas_revenue, cac,
              reactivation_pool_size, reactivations_attended, reactivations_booked
       FROM {MART}
-      WHERE webinar_date <= DATE(@end)
+      WHERE webinar_date <= DATE(@latest)
         AND (
           NOT @same_weekday
           OR EXTRACT(DAYOFWEEK FROM webinar_date) =
@@ -276,7 +281,7 @@ def fetch_webinar_comparison(week_end: str, same_weekday_only: bool) -> list[dic
       LIMIT 3
     """
     return _rows(sql, [
-        bigquery.ScalarQueryParameter("end", "STRING", week_end),
+        bigquery.ScalarQueryParameter("latest", "STRING", latest_webinar_date),
         bigquery.ScalarQueryParameter("same_weekday", "BOOL", same_weekday_only),
     ])
 
@@ -448,6 +453,9 @@ def assemble_report_payload(slug: str) -> dict[str, Any]:
     prior_start = _shift_days(start, -7)
     prior_end = _shift_days(end, -7)
     same_weekday = snap["report_type"] == "midweek_check"
+    # Mirror the TS computeWindows logic: for weekly_recap the latest webinar
+    # is the Sunday AFTER week_end (Sat); for midweek_check it's week_end (Wed).
+    latest_webinar_date = end if same_weekday else _shift_days(end, 1)
 
     this_week_funnel = fetch_week_funnel(start, end)
     prior_week_funnel = fetch_week_funnel(prior_start, prior_end)
@@ -464,13 +472,14 @@ def assemble_report_payload(slug: str) -> dict[str, Any]:
             "prior_week_end": prior_end,
             "badge": snap["badge"],
             "latest_webinar": snap.get("latest_webinar"),
+            "latest_webinar_date": latest_webinar_date,
             "context_banner": {
                 "tag": snap.get("context_tag"),
                 "title": snap.get("context_title"),
                 "body": snap.get("context_body"),
             },
         },
-        "webinars_comparison": fetch_webinar_comparison(end, same_weekday),
+        "webinars_comparison": fetch_webinar_comparison(latest_webinar_date, same_weekday),
         "this_week_funnel": this_week_funnel,
         "prior_week_funnel": prior_week_funnel,
         "wow_deltas": compute_funnel_wow(this_week_funnel, prior_week_funnel),

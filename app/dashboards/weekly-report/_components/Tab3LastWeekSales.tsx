@@ -1,5 +1,5 @@
 import type {
-  SectionAData,
+  SectionATab3Data,
   SectionCData,
   CloserOverallExtended,
   SetterOverallRow,
@@ -25,7 +25,7 @@ export type Tab3LastWeekSalesProps = {
   funnelData: SectionCData;            // §9.1 funnel + dollar yield
   thisWeek: SectionCData;              // §9.4 WoW — this week
   priorWeek: SectionCData;             // §9.4 WoW — prior week
-  sectionA: SectionAData;              // §9.1 money cards (Cash, TCV, AOV, ACV, PIF rate, Cash Collection Rate)
+  sectionATab3: SectionATab3Data;      // §9.1 money cards — closer-attributed (int_calls_enriched)
   closerOverall: CloserOverallExtended[];  // §9.5
   setterOverall: SetterOverallRow[];   // §9.6 NEW
   setterByMode: SetterByModeRow[];     // §9.7
@@ -39,7 +39,7 @@ export function Tab3LastWeekSales(p: Tab3LastWeekSalesProps) {
   const sqlFor = (k: MetricKey) => (showSql ? getResolvedSql(k, p.sqlCtx!) : null);
   return (
     <>
-      <FunnelPlusKpis weekLabel={p.weekLabel} funnel={p.funnelData} money={p.sectionA} sqlInfo={sqlFor("funnelProspects")} />
+      <FunnelPlusKpis weekLabel={p.weekLabel} funnel={p.funnelData} money={p.sectionATab3} sqlInfo={sqlFor("funnelProspects")} />
       <WeekOverWeek thisWeek={p.thisWeek} priorWeek={p.priorWeek} sqlInfo={sqlFor("priorWeekFunnel")} />
       <CloserOverallTable rows={p.closerOverall} sqlInfo={sqlFor("closerOverall")} />
       <SetterOverallTable rows={p.setterOverall} sqlInfo={sqlFor("setterOverall")} />
@@ -54,7 +54,7 @@ type SqlInfo = import("@/lib/dev-sql").ResolvedMetricSql | null;
 // ----------------------------------------------------------------------------
 // §9.1 — Funnel + Money + Funnel Rates + Dollar Yield
 // ----------------------------------------------------------------------------
-function FunnelPlusKpis({ weekLabel, funnel, money, sqlInfo }: { weekLabel: string; funnel: SectionCData; money: SectionAData; sqlInfo?: SqlInfo }) {
+function FunnelPlusKpis({ weekLabel, funnel, money, sqlInfo }: { weekLabel: string; funnel: SectionCData; money: SectionATab3Data; sqlInfo?: SqlInfo }) {
   const pros = funnel.prospects || 1;
   const stages = [
     { label: "Prospects", value: funnel.prospects, color: "var(--blue)", bg: "rgba(59,130,246,.06)", border: "rgba(59,130,246,.3)", tip: TIP.funnelProspects },
@@ -79,14 +79,14 @@ function FunnelPlusKpis({ weekLabel, funnel, money, sqlInfo }: { weekLabel: stri
         ))}
       </div>
 
-      <div className={styles.sh} style={{ marginTop: 24 }}>Money</div>
+      <div className={styles.sh} style={{ marginTop: 24 }}>Money <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>· closer-attributed (int_calls_enriched)</span></div>
       <div className={styles.kpiGridMini}>
-        <Mini emoji="💰" label="Cash" value={fmtUsd(money.cashCollected)} change="Fanbasis (deal-week)" tip={TIP.cashCollected} />
-        <Mini emoji="💼" label="Revenue (TCV)" value={fmtUsd(money.revenueTcv)} change="" tip={TIP.revenueTcv} />
-        <Mini emoji="💵" label="AOV" value={fmtUsd(money.aov)} change="Cash / Deals" tip={TIP.aov} />
-        <Mini emoji="📦" label="ACV" value={fmtUsd(money.acv)} change="TCV / Deals" tip={TIP.acv} />
-        <Mini emoji="💸" label="PIF Rate" value={fmtPct(money.pifRate)} change="Paid-In-Full deals" tip={TIP.pifRate} />
-        <Mini emoji="📊" label="Cash Collection Rate" value={fmtPct(money.cashCollectionRate)} change="Cash / TCV" tip={TIP.cashCollectionRate} />
+        <Mini emoji="💰" label="Cash" value={fmtUsd(money.cashCollected)} change="Closer (deals closed)" tip={"SUM(cash_collected) WHERE is_deal\nWindow: date_closed in KPI window\nSource: int_calls_enriched (closer-attributed — NOT Fanbasis money-in)"} />
+        <Mini emoji="💼" label="Revenue (TCV)" value={fmtUsd(money.revenueTcv)} change="Closer (new deals)" tip={"SUM(revenue_generated) WHERE is_deal\nSource: int_calls_enriched"} />
+        <Mini emoji="💵" label="AOV" value={fmtUsd(money.aov)} change="Closer Cash / Deals" tip={"SUM(cash_collected) / COUNT deals — both from int_calls_enriched (same denominator basis)"} />
+        <Mini emoji="📦" label="ACV" value={fmtUsd(money.acv)} change="Closer TCV / Deals" tip={"SUM(revenue_generated) / COUNT deals — both from int_calls_enriched"} />
+        <Mini emoji="💸" label="PIF Rate" value={fmtPct(money.pifRate)} change="Paid-In-Full deals" tip={"COUNT(is_deal AND is_paid_in_full) / COUNT(is_deal)\nSource: int_calls_enriched"} />
+        <Mini emoji="📊" label="Cash Collection Rate" value={fmtPct(money.cashCollectionRate)} change="Cash / TCV (closer)" tip={"SUM(cash_collected) / SUM(revenue_generated) WHERE is_deal\nSource: int_calls_enriched"} />
       </div>
 
       <div className={styles.sh} style={{ marginTop: 24 }}>Funnel Rates</div>

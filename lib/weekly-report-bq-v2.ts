@@ -35,11 +35,16 @@ const EMAIL_EXCLUSION = `prospect_email_lc NOT LIKE '%@nomoremondays.io%' AND pr
 // below so the two cannot drift.
 // ============================================================================
 
-export const SQL_AVG_WEBINAR_SHOW_RATE = `SELECT
-  SAFE_DIVIDE(SUM(unique_attendees), NULLIF(SUM(total_registrants), 0)) AS avg_webinar_show_rate
-FROM ${MART_WEBINAR}
-WHERE webinar_date BETWEEN DATE(@start) AND DATE(@end)
-  AND webinar_day IN ('Sunday', 'Wednesday')`;
+export const SQL_AVG_WEBINAR_SHOW_RATE = `WITH last_three AS (
+  SELECT unique_attendees, total_registrants
+  FROM ${MART_WEBINAR}
+  WHERE webinar_date <= DATE(@latest)
+    AND webinar_day IN ('Sunday', 'Wednesday')
+  ORDER BY webinar_date DESC
+  LIMIT 3
+)
+SELECT SAFE_DIVIDE(SUM(unique_attendees), NULLIF(SUM(total_registrants), 0)) AS avg_webinar_show_rate
+FROM last_three`;
 
 export const SQL_PCT_TIER_ONE_LEADS = `SELECT
   SAFE_DIVIDE(SUM(tier_one_submissions), NULLIF(SUM(form_submissions), 0)) AS pct_tier_one_leads
@@ -95,6 +100,23 @@ FROM ${ENRICHED}
 WHERE is_deal
   AND date_closed BETWEEN DATE(@start) AND DATE(@end)
   AND ${EMAIL_EXCLUSION}`;
+
+// Tab 3 "Latest Sales Week" money — sources from int_calls_enriched
+// (closer-attributed) instead of stg_fanbasis_sales (money-in basis). The
+// Overview tab still uses Fanbasis (money that hit the bank this week);
+// Tab 3 needs the closer-attributed view (new deals booked this week,
+// regardless of when cash collects).
+export const SQL_TAB3_MONEY_CLOSER = `WITH d AS (
+  SELECT
+    COUNT(DISTINCT IF(is_deal,                   prospect_email_lc, NULL)) AS deals,
+    COUNT(DISTINCT IF(is_deal AND is_paid_in_full, prospect_email_lc, NULL)) AS pif_deals,
+    SUM(IF(is_deal, cash_collected, 0))                                   AS cash,
+    SUM(IF(is_deal, revenue_generated, 0))                                AS revenue
+  FROM ${ENRICHED}
+  WHERE date_closed BETWEEN DATE(@start) AND DATE(@end)
+    AND ${EMAIL_EXCLUSION}
+)
+SELECT * FROM d`;
 
 export const SQL_FUC_CYCLE = `SELECT
   APPROX_QUANTILES(IF(close_type='FUC', first_call_to_close_days, NULL), 2)[OFFSET(1)] AS median_first_call_to_close_fuc,
@@ -317,12 +339,15 @@ export type KpiStripData = {
   cashPerBookedCall: number | null;       // §2.5 — Sergio's DPC
 };
 
-/** §2.1 Avg Webinar Show Rate — weighted Zoom-attend rate across the week */
-export async function fetchAvgWebinarShowRate(prevSun: string, prevSat: string): Promise<number | null> {
+/** §2.1 Avg Webinar Show Rate — weighted attend rate across the LAST 3 Sun/Wed
+ * webinars anchored on the latest_webinar_date. Was a 7-day window which
+ * excluded the just-happened webinar (Monday recap's prev-Sat window ends
+ * one day before the new Sunday webinar). */
+export async function fetchAvgWebinarShowRate(latestWebinarDate: string): Promise<number | null> {
   const [rows] = await bq().query({
     query: SQL_AVG_WEBINAR_SHOW_RATE,
-    params: { start: prevSun, end: prevSat },
-    types: { start: "STRING", end: "STRING" },
+    params: { latest: latestWebinarDate },
+    types: { latest: "STRING" },
   });
   const v = (rows[0] as { avg_webinar_show_rate: number | null } | undefined)?.avg_webinar_show_rate;
   return v ?? null;
@@ -372,11 +397,13 @@ export async function fetchCashPerBookedCall(prevSun: string, prevSat: string): 
   return v ?? null;
 }
 
-/** Wrapper that fires all 5 KPI queries in parallel. */
-export async function fetchKpiStrip(prevSun: string, prevSat: string): Promise<KpiStripData> {
+/** Wrapper that fires all 5 KPI queries in parallel.
+ * @param latestWebinarDate anchors the "Avg Webinar Show Rate" last-3 lookback
+ *   so the just-happened webinar is always included. */
+export async function fetchKpiStrip(prevSun: string, prevSat: string, latestWebinarDate: string): Promise<KpiStripData> {
   const [avgWebinarShowRate, pctTierOneLeads, blendedCashRoas, cplBlended, cashPerBookedCall] =
     await Promise.all([
-      fetchAvgWebinarShowRate(prevSun, prevSat),
+      fetchAvgWebinarShowRate(latestWebinarDate),
       fetchPctTierOneLeads(prevSun, prevSat),
       fetchBlendedCashRoas(prevSun, prevSat),
       fetchCplBlended(prevSun, prevSat),
@@ -481,6 +508,42 @@ export async function fetchSectionA(prevSun: string, prevSat: string): Promise<S
     medianFirstCallToCloseFuc: fuc.median,
     avgFirstCallToCloseFuc: fuc.avg,
     nFuc: fuc.n,
+  };
+}
+
+/** Tab 3 "Latest Sales Week" money — closer-attributed from int_calls_enriched.
+ *  Distinct from fetchSectionAMoney (Fanbasis money-in). Same shape minus the
+ *  cycle/ROAS/ad-spend fields, plus a `closerCashCollectionRate = cash / revenue`.
+ *  All cards on Tab 3's Money grid pull from this. */
+export type SectionATab3Data = {
+  cashCollected: number | null;          // SUM(cash_collected) WHERE is_deal
+  revenueTcv: number | null;             // SUM(revenue_generated) WHERE is_deal
+  dealsClosed: number | null;            // distinct deal-prospects
+  aov: number | null;                    // cash / deals (apples-to-apples)
+  acv: number | null;                    // revenue / deals (apples-to-apples)
+  pifRate: number | null;                // pif_deals / deals
+  cashCollectionRate: number | null;     // cash / revenue
+};
+
+export async function fetchSectionATab3Closer(prevSun: string, prevSat: string): Promise<SectionATab3Data> {
+  const [rows] = await bq().query({
+    query: SQL_TAB3_MONEY_CLOSER,
+    params: { start: prevSun, end: prevSat },
+    types: { start: "STRING", end: "STRING" },
+  });
+  const r = (rows[0] as { deals: number | null; pif_deals: number | null; cash: number | null; revenue: number | null }) ?? {};
+  const deals = Number(r?.deals ?? 0);
+  const pif = Number(r?.pif_deals ?? 0);
+  const cash = Number(r?.cash ?? 0);
+  const revenue = Number(r?.revenue ?? 0);
+  return {
+    cashCollected: cash,
+    revenueTcv: revenue,
+    dealsClosed: deals,
+    aov: deals > 0 ? cash / deals : null,
+    acv: deals > 0 ? revenue / deals : null,
+    pifRate: deals > 0 ? pif / deals : null,
+    cashCollectionRate: revenue > 0 ? cash / revenue : null,
   };
 }
 

@@ -41,7 +41,10 @@ CLAUDE_TIMEOUT_SEC = int(os.environ.get("CLAUDE_TIMEOUT_SEC", "600"))
 # CEO-facing insights that must catch every signal.
 CLAUDE_MODEL_PRIMARY = os.environ.get("CLAUDE_MODEL", "opus")
 CLAUDE_MODEL_RETRY = os.environ.get("CLAUDE_MODEL_RETRY", "opus")
-CLAUDE_FALLBACK_MODEL = os.environ.get("CLAUDE_FALLBACK_MODEL", "opus")
+# Fallback model MUST differ from main (claude CLI hard error). Sonnet is
+# the natural step down — still high quality, used if Opus is temporarily
+# overloaded.
+CLAUDE_FALLBACK_MODEL = os.environ.get("CLAUDE_FALLBACK_MODEL", "sonnet")
 
 
 def _log(msg: str) -> None:

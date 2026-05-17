@@ -55,8 +55,32 @@ Produce **three sections** for this snapshot, all in one JSON object:
 2. **Narrative for Tab 2 — "Last Week's Sales"**: a short summary of the
    week's call funnel — the headline number, the biggest WoW move, and
    the most important thing to watch. 2-4 sentences.
-3. **Strategic Insight cards for Tab 3** — **8–12 cards**, each surfacing
-   one specific observation grounded in the data, with concrete numbers.
+3. **Strategic Insight cards for Tab 3** — **12–18 cards** covering EVERY
+   data category in the payload (see Required Coverage below). Each card
+   surfaces one specific observation grounded in the data, with concrete
+   numbers. Padding is forbidden — but skipping a category that has data
+   is also forbidden. If a category has nothing notable, write a `ctx` or
+   `win` card noting the steady-state.
+
+## Required coverage — produce at least one insight per category below
+
+Every regen MUST surface insights from each of these data domains. If you
+skip a category, the report is incomplete. Number of cards per category
+scales to what the data warrants (1-3 typical, more if signals stack).
+
+| Category | Source blocks | What to look at |
+|---|---|---|
+| **A. Top KPIs vs thresholds** | `top_kpis`, `actual_vs_target` | Avg show rate vs RED/orange/green bands. ROAS vs ≥3× target. Cost/booked vs $150 ceiling. Cash/booked DPC trend. Quote `actual_vs_target.<metric>.pct_of_target` directly when forecast covers the window. |
+| **B. Latest webinar quality** | `webinars_comparison[0]`, `webinar_wow_deltas` | Reg → Zoom attend rate, attend → pitch retention, LP opt-in rate, paid CPR, blended CPBC, ROAS cash. ALWAYS write at least one card on the latest webinar's health vs the prior one — even if numbers are flat. |
+| **C. Sales funnel WoW** | `this_week_funnel`, `prior_week_funnel`, `wow_deltas` | Prospect inflow, SQ → shows conversion, shows → CQ, CQ → deals, deal count, cash/revenue WoW. |
+| **D. Closer performance** | `closer_overall` | Per-closer show rate, close rate, cash, revenue. Spot the carrier, the laggard, the surprise. Name names. |
+| **E. Setter performance** | `setter_performance` | Per-setter (webinar vs setter-flow split). Spot the top setter, the underperformer. Name names. |
+| **F. Booking mode mix** | `booking_mode` | Webinar-flow vs setter-flow split. Quality and volume trade-off. |
+| **G. Money — two sources** | `section_a_money_fanbasis`, `section_a_money_closer` | Compare Fanbasis money-in vs closer-attributed cash. If they diverge >20%, FLAG. Otherwise contextualize the difference (installments vs new deals). Cover AOV, ACV, PIF rate, cash collection rate. |
+| **H. Forecast pace** | `actual_vs_target` | If `forecast_id` is non-null, write a `fwd` (or `flag` if pace_light=red) card framing where the week sits vs the monthly plan. Cite actual, target, pct_of_target. |
+
+Aim for 12-18 cards distributed across A-H. Cards can blend domains (e.g.,
+"Closer X carrying despite show rate softening" = D + C).
 
 ## Output format — strict JSON
 
@@ -128,16 +152,25 @@ For metrics not in either block (closer-level deltas, channel mix
 shifts), do the math yourself — but cite the raw numbers from the
 source arrays so a reader can verify.
 
-## Required flag rules — if any of these conditions are true, ship a `flag` card
+## Required flag rules — if any of these conditions are true, ship a `flag` card. NO EXCEPTIONS.
 
-1. **Webinar attend rate dropped ≥5pp** — `webinar_wow_deltas.reg_to_attend_rate.abs_delta ≤ -0.05` (i.e. -5pp or worse). Title: "Show Rate Dropped Xpp to Y% — [hypothesis]". Body cites both numbers + pct_delta. Pace concerns the next 1-2 cycles.
-2. **Show rate is in RED band** — `top_kpis.avg_webinar_show_rate < 0.20`. Even without a WoW drop, sub-20% is the action threshold.
-3. **ROAS in RED band** — `top_kpis.blended_cash_roas < 2.0`.
-4. **Cost per booked call in RED band** — `top_kpis.cost_per_booked_call > 150`.
-5. **Tracking <80% of any forecast target** — `actual_vs_target.<metric>.pct_of_target < 80`. Cite both actual and target.
-6. **Fanbasis cash vs closer cash diverge >20%** — compare `section_a_money_fanbasis.cash_money_in` against `section_a_money_closer.cash`. If diverging, that's either an installment surge (Fanbasis > closer) or a closing surge that won't collect this week (closer > Fanbasis). Worth flagging either way.
+These are not suggestions. If the data hits the threshold and you do NOT
+produce a flag card, the report is broken. Check each rule against the
+payload before writing your final output.
 
-Conversely — if any of these conditions hit `green` thresholds (show rate ≥25%, ROAS ≥3×, etc.), ship a `win` card with the same numerical specificity.
+1. **Webinar attend rate dropped ≥3pp** — `webinar_wow_deltas.reg_to_attend_rate.abs_delta ≤ -0.03`. Title: "Attend Rate Dropped Xpp to Y%". Body cites both numbers + pct_delta and proposes a hypothesis (confirmation cadence? quality? promo mix?).
+2. **Latest webinar attend rate <20%** (RED band) — `webinars_comparison[0].reg_to_attend_rate < 0.20`. Even with no WoW drop, sub-20% is the action threshold for one webinar.
+3. **Avg show rate (last 3) in RED band** — `top_kpis.avg_webinar_show_rate < 0.20`. Structural concern across cycles.
+4. **ROAS in RED band** — `top_kpis.blended_cash_roas < 2.0`.
+5. **Cost per booked call in RED band** — `top_kpis.cost_per_booked_call > 150` OR `webinars_comparison[0].blended_cpbc > 150`.
+6. **Cost per registrant in RED band** — `webinars_comparison[0].paid_cpr > 10`.
+7. **LP opt-in rate in RED band** — `webinars_comparison[0].lp_opt_in_rate < 0.175`.
+8. **Tracking <80% of any forecast target** — `actual_vs_target.<metric>.pct_of_target < 80`. Cite both actual and target.
+9. **Fanbasis cash vs closer cash diverge >20%** — compare `section_a_money_fanbasis.cash_money_in` vs `section_a_money_closer.cash`. Flag the gap and explain (installments vs new deals).
+
+Conversely — if any GREEN thresholds hit (show rate ≥25%, ROAS ≥3×, LP opt-in ≥20%, attend rate ≥25%, cost/booked ≤$100, cost/reg ≤$7), ship a `win` card with the same numerical specificity.
+
+**Verification step** — before returning your JSON, mentally walk through rules 1-9. For each rule that the data triggers, confirm a card exists. If any rule triggered but produced no card, add the card.
 
 ## Forecast-vs-target rubric (use the `actual_vs_target` block)
 

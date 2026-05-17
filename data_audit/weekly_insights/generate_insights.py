@@ -32,18 +32,15 @@ VM_PROMPT = pathlib.Path.home() / "data_audit" / "prompts" / "weekly_insights.md
 VALID_TONES = {"ctx", "win", "watch", "flag", "fix", "fwd"}
 
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "claude")
-CLAUDE_TIMEOUT_SEC = int(os.environ.get("CLAUDE_TIMEOUT_SEC", "300"))
+CLAUDE_TIMEOUT_SEC = int(os.environ.get("CLAUDE_TIMEOUT_SEC", "600"))
 
-# Hybrid model strategy. First attempt uses Haiku for speed (~1-3 min on
-# our 15K-char prompt). If validation rejects the output (too few
-# insights, malformed JSON, short body, etc.) the retry uses Sonnet, which
-# is slower (5-10 min) but more reliable on math + structured output.
-#
-# Pre-calculated WoW deltas + strict output validation cover most of
-# Haiku's failure modes upfront, so the happy path stays fast. Sonnet
-# fallback handles edge cases without us paying the latency tax every run.
-CLAUDE_MODEL_PRIMARY = os.environ.get("CLAUDE_MODEL", "haiku")
-CLAUDE_MODEL_RETRY = os.environ.get("CLAUDE_MODEL_RETRY", "sonnet")
+# Per Shahriar 2026-05-18: insights must be high-quality and cover every
+# data category in the payload. Switched primary from Haiku to Opus —
+# slower (~3-5 min) but Haiku was missing flag rules and skipping data
+# categories on the larger ~25K-char payload. Latency tax is worth it for
+# CEO-facing insights that must catch every signal.
+CLAUDE_MODEL_PRIMARY = os.environ.get("CLAUDE_MODEL", "opus")
+CLAUDE_MODEL_RETRY = os.environ.get("CLAUDE_MODEL_RETRY", "opus")
 CLAUDE_FALLBACK_MODEL = os.environ.get("CLAUDE_FALLBACK_MODEL", "opus")
 
 
@@ -216,8 +213,8 @@ def _validate_banner(b: Any, name: str) -> dict[str, str] | None:
     return out
 
 
-MIN_INSIGHTS = int(os.environ.get("MIN_INSIGHTS", "8"))
-MAX_INSIGHTS = int(os.environ.get("MAX_INSIGHTS", "15"))
+MIN_INSIGHTS = int(os.environ.get("MIN_INSIGHTS", "12"))
+MAX_INSIGHTS = int(os.environ.get("MAX_INSIGHTS", "20"))
 MIN_BODY_CHARS = int(os.environ.get("MIN_BODY_CHARS", "80"))
 
 

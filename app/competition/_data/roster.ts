@@ -27,21 +27,34 @@ export const TEAMS = {
   blue: { name: "Blue Wolves", short: "BLU", color: "#2563eb", accent: "#bfdbfe" },
 } as const;
 
+// Procedurally-generated AI-style avatar per closer via DiceBear (free,
+// no API key, returns SVG, CDN-cached by the browser). Each closer's
+// avatar is deterministic from their name — same person always gets the
+// same face, the team-color circle behind acts as the jersey background.
+//
+// Style "personas" = clean modern cartoon portraits.
+// To upgrade to true AI-generated portraits (Midjourney/DALL-E/etc.):
+//   1. Generate portrait, save as /public/competition/jerseys/<name>.png
+//   2. Change the closer's `imageUrl` below to /competition/jerseys/<name>.png
+// The CSS doesn't care about the source — PNG or SVG both work.
+const avatar = (seed: string) =>
+  `https://api.dicebear.com/9.x/personas/svg?seed=${encodeURIComponent(seed)}`;
+
 // 10 active closers split into 2 balanced teams based on L30D cash.
 // Re-balance by editing the `team:` field of any row.
 export const ROSTER: CloserProfile[] = [
   // ─── Red Hawks ──────────────────────────────────────────────
-  { closerOwner: "Ben",     team: "red", jersey: 10 },
-  { closerOwner: "Tyler",   team: "red", jersey:  7 },
-  { closerOwner: "Morgan",  team: "red", jersey:  4 },
-  { closerOwner: "Cecilia", team: "red", jersey:  5 },
-  { closerOwner: "Grace",   team: "red", jersey:  3 },
+  { closerOwner: "Ben",     team: "red", jersey: 10, imageUrl: avatar("Ben-NMM") },
+  { closerOwner: "Tyler",   team: "red", jersey:  7, imageUrl: avatar("Tyler-NMM") },
+  { closerOwner: "Morgan",  team: "red", jersey:  4, imageUrl: avatar("Morgan-NMM") },
+  { closerOwner: "Cecilia", team: "red", jersey:  5, imageUrl: avatar("Cecilia-NMM") },
+  { closerOwner: "Grace",   team: "red", jersey:  3, imageUrl: avatar("Grace-NMM") },
   // ─── Blue Wolves ────────────────────────────────────────────
-  { closerOwner: "Jordan",  team: "blue", jersey: 11 },
-  { closerOwner: "Destiny", team: "blue", jersey: 21 },
-  { closerOwner: "Johanna", team: "blue", jersey:  8 },
-  { closerOwner: "Luke",    team: "blue", jersey:  1 },
-  { closerOwner: "Derek",   team: "blue", jersey:  9 },
+  { closerOwner: "Jordan",  team: "blue", jersey: 11, imageUrl: avatar("Jordan-NMM") },
+  { closerOwner: "Destiny", team: "blue", jersey: 21, imageUrl: avatar("Destiny-NMM") },
+  { closerOwner: "Johanna", team: "blue", jersey:  8, imageUrl: avatar("Johanna-NMM") },
+  { closerOwner: "Luke",    team: "blue", jersey:  1, imageUrl: avatar("Luke-NMM") },
+  { closerOwner: "Derek",   team: "blue", jersey:  9, imageUrl: avatar("Derek-NMM") },
 ];
 
 /** Lookup map for fast roster resolution by closer_owner string. */

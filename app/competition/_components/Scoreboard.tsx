@@ -17,6 +17,8 @@ export function Scoreboard({ red, blue }: { red: TeamScore; blue: TeamScore }) {
 
 function TeamPanel({ team, align }: { team: TeamScore; align: "left" | "right" }) {
   const rightClass = align === "right" ? styles.teamScoreRight : "";
+  const pctToBonus = Math.min(100, Math.round((team.basePoints / team.bonusThreshold) * 100));
+  const pointsToGo = Math.max(0, team.bonusThreshold - team.basePoints);
   return (
     <div className={`${styles.teamScore} ${rightClass}`}>
       <div className={styles.teamName} style={{ color: team.color }}>{team.name}</div>
@@ -27,13 +29,18 @@ function TeamPanel({ team, align }: { team: TeamScore; align: "left" | "right" }
         {" · "}
         {fmtInt(team.totalDeals)} {team.totalDeals === 1 ? "deal" : "deals"}
       </div>
-      {team.bonusEarned ? (
-        <span className={styles.bonusBadge}>🏆 Bonus unlocked</span>
-      ) : (
-        <span className={styles.teamMeta} style={{ marginTop: 4 }}>
-          {fmtInt(team.bonusThreshold - team.basePoints)} pts to bonus
-        </span>
-      )}
+      {/* Bonus progress bar — fills with team color, label depends on state */}
+      <div className={styles.bonusBar} aria-label="Progress to team bonus">
+        <div
+          className={styles.bonusBarFill}
+          style={{ width: `${pctToBonus}%`, background: team.color }}
+        />
+        <div className={styles.bonusBarLabel}>
+          {team.bonusEarned
+            ? `🏆 BONUS UNLOCKED · +${fmtInt(team.bonusPoints)}`
+            : `${fmtInt(pointsToGo)} pts to ${fmtInt(team.bonusThreshold)} bonus`}
+        </div>
+      </div>
     </div>
   );
 }

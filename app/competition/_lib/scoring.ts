@@ -31,6 +31,8 @@ export type Deal = {
   prospectEmail: string;
 };
 
+export type Achievement = "mvp" | "hat-trick" | "fuc-king" | "streak";
+
 export type CloserScore = {
   profile: CloserProfile;
   basePoints: number;
@@ -38,8 +40,19 @@ export type CloserScore = {
   fucPoints: number;
   deals: number;
   fucDeals: number;
-  cashCollected: number;
-  recentDeals: Deal[];          // last 5 for the activity feed
+  cashCollected: number;            // internal only — never rendered on /competition
+  recentDeals: Deal[];               // last 5 for the activity feed
+  /** 1-based rank across ALL closers (both teams). #1 has the most points. */
+  globalRank: number;
+  /** 1-based rank within own team. */
+  teamRank: number;
+  /** Days closer had at least one deal in the period, sorted ascending. */
+  activeDays: string[];
+  /** Longest consecutive-day deal streak within the period (0 if none). */
+  longestStreak: number;
+  /** Max deals on any single day in the period. */
+  bestDay: number;
+  achievements: Achievement[];
 };
 
 export type TeamScore = {
@@ -136,6 +149,7 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
 
   // Bucket deals per closer (skip closers not on the roster)
   const perCloser = new Map<string, CloserScore>();
+  const dealsByCloserByDay = new Map<string, Map<string, number>>();
   for (const profile of ROSTER) {
     perCloser.set(profile.closerOwner, {
       profile,
@@ -146,7 +160,14 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
       fucDeals: 0,
       cashCollected: 0,
       recentDeals: [],
+      globalRank: 0,        // filled after sort
+      teamRank: 0,           // filled after sort
+      activeDays: [],
+      longestStreak: 0,
+      bestDay: 0,
+      achievements: [],
     });
+    dealsByCloserByDay.set(profile.closerOwner, new Map());
   }
 
   for (const deal of deals) {
@@ -165,16 +186,60 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     if (closer.recentDeals.length < 5) {
       closer.recentDeals.push(deal);
     }
+    // Track per-day counts for streak + bestDay
+    const dayMap = dealsByCloserByDay.get(deal.closerOwner)!;
+    dayMap.set(deal.dateClosed, (dayMap.get(deal.dateClosed) ?? 0) + 1);
   }
 
-  // Group closers into teams
+  // Compute activeDays, longestStreak, bestDay per closer
+  for (const score of perCloser.values()) {
+    const dayMap = dealsByCloserByDay.get(score.profile.closerOwner)!;
+    const days = Array.from(dayMap.keys()).sort();
+    score.activeDays = days;
+    score.bestDay = Math.max(0, ...Array.from(dayMap.values()));
+    // Longest streak of consecutive dates with at least one deal
+    let longest = 0, current = 0;
+    let prev: Date | null = null;
+    for (const d of days) {
+      const dt = new Date(d + "T00:00:00Z");
+      if (prev && (dt.getTime() - prev.getTime()) === 86400000) {
+        current += 1;
+      } else {
+        current = 1;
+      }
+      longest = Math.max(longest, current);
+      prev = dt;
+    }
+    score.longestStreak = longest;
+  }
+
+  // Group closers into teams + compute ranks
+  const allClosers = Array.from(perCloser.values()).sort((a, b) => b.basePoints - a.basePoints);
+  allClosers.forEach((c, i) => { c.globalRank = i + 1; });
+
   const redClosers: CloserScore[] = [];
   const blueClosers: CloserScore[] = [];
-  for (const score of perCloser.values()) {
+  for (const score of allClosers) {
     (score.profile.team === "red" ? redClosers : blueClosers).push(score);
   }
-  redClosers.sort((a, b) => b.basePoints - a.basePoints);
-  blueClosers.sort((a, b) => b.basePoints - a.basePoints);
+  redClosers.forEach((c, i) => { c.teamRank = i + 1; });
+  blueClosers.forEach((c, i) => { c.teamRank = i + 1; });
+
+  // Achievement detection (single pass over all closers)
+  // - mvp: globalRank === 1 AND has at least 1 deal (no "MVP" if board is empty)
+  // - fuc-king: most fucDeals (single winner; ties → no award to keep meaning)
+  // - hat-trick: bestDay >= 3 (closed 3+ deals in one day during period)
+  // - streak: longestStreak >= 3 (3+ consecutive days with deals)
+  const maxFuc = Math.max(0, ...allClosers.map((c) => c.fucDeals));
+  const fucKingCount = maxFuc > 0 ? allClosers.filter((c) => c.fucDeals === maxFuc).length : 0;
+  for (const c of allClosers) {
+    const ach: Achievement[] = [];
+    if (c.globalRank === 1 && c.deals > 0) ach.push("mvp");
+    if (maxFuc > 0 && fucKingCount === 1 && c.fucDeals === maxFuc) ach.push("fuc-king");
+    if (c.bestDay >= 3) ach.push("hat-trick");
+    if (c.longestStreak >= 3) ach.push("streak");
+    c.achievements = ach;
+  }
 
   const buildTeam = (team: Team, closers: CloserScore[]): TeamScore => {
     const basePoints = closers.reduce((s, c) => s + c.basePoints, 0);

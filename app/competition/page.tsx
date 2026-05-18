@@ -2,7 +2,10 @@ import { fetchLeaderboard, type Period } from "./_lib/scoring";
 import { TEAMS } from "./_data/roster";
 import { Scoreboard } from "./_components/Scoreboard";
 import { PeriodTabs } from "./_components/PeriodTabs";
-import { CloserCard } from "./_components/CloserCard";
+import { Leaderboard } from "./_components/Leaderboard";
+import { MvpHero } from "./_components/MvpHero";
+import { Countdown } from "./_components/Countdown";
+import { RelativeTime } from "./_components/RelativeTime";
 import { AutoRefresh } from "./_components/AutoRefresh";
 import styles from "./_components/competition.module.css";
 
@@ -20,6 +23,12 @@ function parsePeriod(p: string | undefined): Period {
   return p === "today" || p === "week" ? p : "month";
 }
 
+const PERIOD_LABEL: Record<Period, string> = {
+  today: "Today's",
+  week: "This Week's",
+  month: "This Month's",
+};
+
 export default async function CompetitionPage({
   searchParams,
 }: {
@@ -28,6 +37,11 @@ export default async function CompetitionPage({
   const params = await searchParams;
   const period = parsePeriod(params.period);
   const board = await fetchLeaderboard(period);
+
+  // Combined leaderboard — all closers across both teams, sorted by points
+  const allClosers = [...board.teams.red.closers, ...board.teams.blue.closers]
+    .sort((a, b) => a.globalRank - b.globalRank);
+  const mvp = allClosers[0] ?? null;
 
   return (
     <main className={styles.shell}>
@@ -40,32 +54,18 @@ export default async function CompetitionPage({
       </div>
 
       <PeriodTabs active={period} />
+      <div className={styles.countdownRow}>
+        <Countdown period={period} />
+      </div>
 
       <Scoreboard red={board.teams.red} blue={board.teams.blue} />
 
-      <div className={styles.rosters}>
-        <div className={styles.rosterColumn}>
-          <div className={styles.rosterHeader} style={{ color: TEAMS.red.color }}>
-            <span>{TEAMS.red.name}</span>
-            <span style={{ fontSize: 10, color: "#94a3b8" }}>{board.teams.red.closers.length} closers</span>
-          </div>
-          {board.teams.red.closers.map((c) => (
-            <CloserCard key={c.profile.closerOwner} score={c} />
-          ))}
-        </div>
-        <div className={styles.rosterColumn}>
-          <div className={styles.rosterHeader} style={{ color: TEAMS.blue.color }}>
-            <span>{TEAMS.blue.name}</span>
-            <span style={{ fontSize: 10, color: "#94a3b8" }}>{board.teams.blue.closers.length} closers</span>
-          </div>
-          {board.teams.blue.closers.map((c) => (
-            <CloserCard key={c.profile.closerOwner} score={c} />
-          ))}
-        </div>
-      </div>
+      <MvpHero mvp={mvp} periodLabel={PERIOD_LABEL[period]} />
+
+      <Leaderboard closers={allClosers} />
 
       <section className={styles.activity}>
-        <div className={styles.activityTitle}>Recent Deals · {board.allDealsCount} this {period}</div>
+        <div className={styles.activityTitle}>🔥 Recent Deals · {board.allDealsCount} this {period}</div>
         {board.recentActivity.length === 0 ? (
           <div className={styles.empty}>No deals closed in this window yet. Get on the board.</div>
         ) : (
@@ -73,11 +73,13 @@ export default async function CompetitionPage({
             <div key={i} className={styles.activityRow}>
               <span className={styles.activityDot} style={{ background: TEAMS[d.profile.team].color }} />
               <span className={styles.activityName}>#{d.profile.jersey} {d.profile.closerOwner}</span>
-              <span style={{ color: "#94a3b8", fontSize: 12 }}>
+              <span style={{ color: "#6b7280", fontSize: 12 }}>
                 closed a {d.closeType === "FUC" ? "follow-up" : "deal"}
               </span>
               {d.closeType === "FUC" && <span className={styles.activityFuc}>FUC 2×</span>}
-              <span style={{ color: "#64748b", fontSize: 11 }}>{d.dateClosed}</span>
+              <span style={{ color: "#94a3b8", fontSize: 11 }}>
+                <RelativeTime dateIso={d.dateClosed} fallback={d.dateClosed} />
+              </span>
               <span className={styles.activityPts}>+{d.points} pts</span>
             </div>
           ))

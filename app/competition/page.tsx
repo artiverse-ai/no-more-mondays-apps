@@ -84,9 +84,14 @@ export default async function CompetitionPage({
         )}
       </section>
 
-      <div style={{ maxWidth: 1280, margin: "24px auto 0", padding: "0 4px", fontSize: 11, color: "#94a3b8", textAlign: "center", letterSpacing: 0.5 }}>
-        Every $10 closed = 1 pt · Follow-up closes count 2× · Team bonus unlocks at the threshold ·
-        Live window: {board.windowStart} → {board.windowEnd}
+      <div className={styles.rulesFooter}>
+        <strong>Scoring:</strong> Every $10 closed = 1 pt &nbsp;·&nbsp;
+        <strong>Follow-up closes count 2×</strong> &nbsp;·&nbsp;
+        Team bonus unlocks at the threshold
+        <br />
+        <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 500, letterSpacing: 0.5 }}>
+          Live window: {board.windowStart} → {board.windowEnd}
+        </span>
       </div>
     </main>
   );

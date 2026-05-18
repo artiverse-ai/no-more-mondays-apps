@@ -184,7 +184,7 @@ export function proposeFromRunDate(runDate: Date): ProposedSnapshot {
  */
 export function enumerateMonThuRange(
   now: Date = new Date(),
-  weeksBack = 52,
+  weeksBack = 156,    // 3 years back — covers all of NMM history; pre-data weeks just show "missing data" tooltip and stay non-creatable
   futureCount = 2,
 ): ProposedSnapshot[] {
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));

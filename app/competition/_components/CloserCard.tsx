@@ -3,11 +3,11 @@ import { TEAMS } from "../_data/roster";
 import styles from "./competition.module.css";
 
 const fmtInt = (n: number) => Math.round(n).toLocaleString();
-const fmtUsd = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
+// IMPORTANT: closers see this dashboard. Never render cash amounts here —
+// only points + deal counts. Cash totals stay on internal-only dashboards.
 export function CloserCard({ score }: { score: CloserScore }) {
-  const { profile, basePoints, deals, fucDeals, cashCollected } = score;
+  const { profile, basePoints, deals, fucDeals } = score;
   const teamColor = TEAMS[profile.team].color;
   const displayName = profile.displayName ?? profile.closerOwner;
   const initial = displayName.slice(0, 2).toUpperCase();
@@ -29,8 +29,7 @@ export function CloserCard({ score }: { score: CloserScore }) {
         <div className={styles.closerName}>{displayName}</div>
         <div className={styles.closerSub}>
           {fmtInt(deals)} {deals === 1 ? "deal" : "deals"}
-          {fucDeals > 0 && <> · {fmtInt(fucDeals)} FUC</>}
-          {cashCollected > 0 && <> · {fmtUsd(cashCollected)} cash</>}
+          {fucDeals > 0 && <> · {fmtInt(fucDeals)} FUC 2×</>}
         </div>
       </div>
       <div>

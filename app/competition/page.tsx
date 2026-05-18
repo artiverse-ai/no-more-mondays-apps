@@ -11,8 +11,8 @@ export const revalidate = 0;
 
 export const metadata = { title: "NMM Closer Competition · Live" };
 
-const fmtUsd = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+// IMPORTANT: closers see this dashboard. Render ONLY points + deal
+// counts. Cash amounts never appear on /competition.
 
 function parsePeriod(p: string | undefined): Period {
   return p === "week" || p === "month" ? p : "today";
@@ -31,7 +31,8 @@ export default async function CompetitionPage({
     <main className={styles.shell}>
       <div className={styles.headerBar}>
         <div className={styles.title}>
-          🏆 NMM Closer <span className={styles.titleAccent}>Competition</span>
+          <span className={styles.bolt}>⚡</span>
+          NMM CLOSER <span className={styles.titleAccent}>BEAST MODE</span>
         </div>
         <AutoRefresh fetchedAt={board.fetchedAt} intervalSec={30} />
       </div>
@@ -70,8 +71,10 @@ export default async function CompetitionPage({
             <div key={i} className={styles.activityRow}>
               <span className={styles.activityDot} style={{ background: TEAMS[d.profile.team].color }} />
               <span className={styles.activityName}>#{d.profile.jersey} {d.profile.closerOwner}</span>
-              <span style={{ color: "#94a3b8", fontSize: 12 }}>closed {fmtUsd(d.cashCollected)}</span>
-              {d.closeType === "FUC" && <span className={styles.activityFuc}>FUC 2x</span>}
+              <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                closed a {d.closeType === "FUC" ? "follow-up" : "deal"}
+              </span>
+              {d.closeType === "FUC" && <span className={styles.activityFuc}>FUC 2×</span>}
               <span style={{ color: "#64748b", fontSize: 11 }}>{d.dateClosed}</span>
               <span className={styles.activityPts}>+{d.points} pts</span>
             </div>
@@ -79,9 +82,9 @@ export default async function CompetitionPage({
         )}
       </section>
 
-      <div style={{ maxWidth: 1200, margin: "20px auto 0", padding: "0 4px", fontSize: 11, color: "#475569", textAlign: "center" }}>
-        Scoring: $10 cash = 1pt · FUC deals = 2pts/$10 · Bonus when team hits threshold ·
-        Window: {board.windowStart} → {board.windowEnd}
+      <div style={{ maxWidth: 1280, margin: "24px auto 0", padding: "0 4px", fontSize: 11, color: "#94a3b8", textAlign: "center", letterSpacing: 0.5 }}>
+        Every $10 closed = 1 pt · Follow-up closes count 2× · Team bonus unlocks at the threshold ·
+        Live window: {board.windowStart} → {board.windowEnd}
       </div>
     </main>
   );

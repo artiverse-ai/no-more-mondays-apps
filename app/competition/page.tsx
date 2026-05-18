@@ -15,7 +15,9 @@ export const metadata = { title: "NMM Closer Competition · Live" };
 // counts. Cash amounts never appear on /competition.
 
 function parsePeriod(p: string | undefined): Period {
-  return p === "week" || p === "month" ? p : "today";
+  // Default to "month" — closers + management want the season view first;
+  // they can drill into "week" or "today" from the tabs.
+  return p === "today" || p === "week" ? p : "month";
 }
 
 export default async function CompetitionPage({

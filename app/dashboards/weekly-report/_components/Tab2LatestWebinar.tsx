@@ -181,22 +181,22 @@ export function Tab2LatestWebinar({
               />
               <DataRow
                 label="ROAS (Cash)"
-                values={webinars.map((w, i) => (i === 0 ? naCell() : fmtX(w.roasCash)))}
-                tip={TIP.roasCash + "\nLatest webinar's ROAS is always N/A — cash and deals from this event are still accumulating (1-12 weeks for full collection)."}
+                values={webinars.map((w, i) => (i === 0 ? "" : fmtX(w.roasCash)))}
+                tip={TIP.roasCash + "\nLatest webinar column is blank — cash and deals are still accumulating (1-12 weeks for full collection)."}
                 trafficKey="roas"
                 rawValues={webinars.map((w, i) => (i === 0 ? null : w.roasCash))}
               />
               <DataRow
                 label="ROAS (Revenue/TCV)"
-                values={webinars.map((w, i) => (i === 0 ? naCell() : fmtX(w.roasRevenue)))}
-                tip={"Latest webinar's ROAS is always N/A — deals from this event are still closing (1-4 weeks). Prior webinars are mature and comparable."}
+                values={webinars.map((w, i) => (i === 0 ? "" : fmtX(w.roasRevenue)))}
+                tip={"Latest webinar column is blank — deals are still closing (1-4 weeks). Prior webinars are mature and comparable."}
                 trafficKey="roas"
                 rawValues={webinars.map((w, i) => (i === 0 ? null : w.roasRevenue))}
               />
               <DataRow
                 label="CAC"
-                values={webinars.map((w, i) => (i === 0 ? naCell() : fmtUsd2(w.cac)))}
-                tip={"CAC = ad_spend / deals_closed. Latest webinar's deals are still accumulating, so always N/A on the latest column."}
+                values={webinars.map((w, i) => (i === 0 ? "" : fmtUsd2(w.cac)))}
+                tip={"CAC = ad_spend / deals_closed. Latest webinar's deals are still accumulating — column blank until mature."}
               />
             </tbody>
           </table>

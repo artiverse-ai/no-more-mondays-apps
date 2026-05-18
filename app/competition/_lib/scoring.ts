@@ -17,9 +17,24 @@ import {
 } from "../_data/roster";
 
 const ENRICHED = "`no-more-mondays-analytics.dbt_tuddin.int_calls_enriched`";
+const CLOSERS = "`no-more-mondays-analytics.nmm_calendar.closers`";
 const EMAIL_EXCLUSION =
   "prospect_email_lc NOT LIKE '%@nomoremondays.io%' " +
   "AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')";
+
+/** Fetch the set of currently-active closer first names from the admin
+ *  closers table (email prefix → first name, capitalized). Anyone not in
+ *  this set is excluded from the leaderboard. */
+async function fetchActiveCloserNames(): Promise<Set<string>> {
+  const [rows] = await bq().query({
+    query: `
+      SELECT INITCAP(REGEXP_EXTRACT(email, r'^([^@]+)@')) AS name
+      FROM ${CLOSERS}
+      WHERE is_active = TRUE
+    `,
+  });
+  return new Set((rows as Array<{ name: string }>).map((r) => r.name));
+}
 
 export type Period = "today" | "week" | "month";
 
@@ -116,28 +131,35 @@ export function pointsForDeal(cashCollected: number, closeType: "OCC" | "FUC" | 
   return Math.floor(base * multiplier);
 }
 
-/** Fetch raw deals for the window, then aggregate into TeamScore[] and an
- *  activity feed. Returns a fully-rendered Leaderboard. */
+const DEALS_SQL = `
+  SELECT
+    closer_owner                                AS closer_owner,
+    IFNULL(cash_collected, 0)                   AS cash_collected,
+    IFNULL(close_type, 'UNKNOWN')               AS close_type,
+    FORMAT_DATE('%F', date_closed)              AS date_closed,
+    prospect_email_lc                           AS prospect_email
+  FROM ${ENRICHED}
+  WHERE is_deal
+    AND date_closed BETWEEN DATE(@start) AND DATE(@end)
+    AND closer_owner IS NOT NULL
+    AND ${EMAIL_EXCLUSION}
+  ORDER BY date_closed DESC, cash_collected DESC
+`;
+
+/** Fetch raw deals for the window + active-closer set in parallel, then
+ *  aggregate into TeamScore[] and an activity feed. Inactive closers
+ *  (closers.is_active=false) are excluded entirely. */
 export async function fetchLeaderboard(period: Period, now: Date = new Date()): Promise<Leaderboard> {
   const { start, end } = periodWindow(period, now);
-  const [rows] = await bq().query({
-    query: `
-      SELECT
-        closer_owner                                AS closer_owner,
-        IFNULL(cash_collected, 0)                   AS cash_collected,
-        IFNULL(close_type, 'UNKNOWN')               AS close_type,
-        FORMAT_DATE('%F', date_closed)              AS date_closed,
-        prospect_email_lc                           AS prospect_email
-      FROM ${ENRICHED}
-      WHERE is_deal
-        AND date_closed BETWEEN DATE(@start) AND DATE(@end)
-        AND closer_owner IS NOT NULL
-        AND ${EMAIL_EXCLUSION}
-      ORDER BY date_closed DESC, cash_collected DESC
-    `,
-    params: { start, end },
-    types: { start: "STRING", end: "STRING" },
-  });
+  const [activeNames, dealRowsRaw] = await Promise.all([
+    fetchActiveCloserNames(),
+    bq().query({
+      query: DEALS_SQL,
+      params: { start, end },
+      types: { start: "STRING", end: "STRING" },
+    }),
+  ]);
+  const rows = dealRowsRaw[0];
 
   const deals: Deal[] = (rows as Array<Record<string, unknown>>).map((r) => ({
     closerOwner: String(r.closer_owner ?? ""),
@@ -147,10 +169,12 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     prospectEmail: String(r.prospect_email ?? ""),
   }));
 
-  // Bucket deals per closer (skip closers not on the roster)
+  // Filter roster to active closers only (closers.is_active=true) — anyone
+  // retired / inactive disappears from the board, no jersey assigned.
+  const activeRoster = ROSTER.filter((p) => activeNames.has(p.closerOwner));
   const perCloser = new Map<string, CloserScore>();
   const dealsByCloserByDay = new Map<string, Map<string, number>>();
-  for (const profile of ROSTER) {
+  for (const profile of activeRoster) {
     perCloser.set(profile.closerOwner, {
       profile,
       basePoints: 0,
@@ -160,8 +184,8 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
       fucDeals: 0,
       cashCollected: 0,
       recentDeals: [],
-      globalRank: 0,        // filled after sort
-      teamRank: 0,           // filled after sort
+      globalRank: 0,
+      teamRank: 0,
       activeDays: [],
       longestStreak: 0,
       bestDay: 0,

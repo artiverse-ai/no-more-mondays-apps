@@ -42,20 +42,25 @@ export type ForecastResolveOpts = {
   channel?: "all" | "webinar" | "setter" | "workshop";
 };
 
-/** Pick the freshest forecast whose period brackets the entire window. */
+/** Pick the freshest forecast whose period brackets the entire window.
+ *
+ * NOTE on param binding: BQ client's DATE-typed string params silently
+ * mis-bind under @google-cloud/bigquery — they produce zero matches even
+ * when data covers the window. Workaround used everywhere in this repo:
+ * pass params as STRING and cast with DATE(@x) inside the SQL. */
 async function pickForecastId(start: string, end: string): Promise<string | null> {
   await ensureForecastTargetsTable();
   const [rows] = await bq().query({
     query: `
       SELECT forecast_id
       FROM ${FORECAST_TABLE}
-      WHERE period_start <= @start AND period_end >= @end
+      WHERE period_start <= DATE(@start) AND period_end >= DATE(@end)
       GROUP BY forecast_id
       ORDER BY MAX(created_at) DESC
       LIMIT 1
     `,
     params: { start, end },
-    types: { start: "DATE", end: "DATE" },
+    types: { start: "STRING", end: "STRING" },
   });
   return rows[0]?.forecast_id ?? null;
 }
@@ -83,9 +88,9 @@ export async function getForecastForWindow(
           ${channelFilter}
       )
       SELECT
-        SUM(IF(metric_type = 'volume' AND target_date BETWEEN @start AND @end, metric_value, NULL)) AS volume,
+        SUM(IF(metric_type = 'volume' AND target_date BETWEEN DATE(@start) AND DATE(@end), metric_value, NULL)) AS volume,
         MAX(IF(metric_type = 'rate', metric_value, NULL)) AS rate,
-        COUNT(DISTINCT IF(metric_type = 'volume' AND target_date BETWEEN @start AND @end, target_date, NULL)) AS days_with_target
+        COUNT(DISTINCT IF(metric_type = 'volume' AND target_date BETWEEN DATE(@start) AND DATE(@end), target_date, NULL)) AS days_with_target
       FROM window_rows
     `,
     params: {
@@ -98,8 +103,8 @@ export async function getForecastForWindow(
     types: {
       forecastId: "STRING",
       metric: "STRING",
-      start: "DATE",
-      end: "DATE",
+      start: "STRING",
+      end: "STRING",
       ...(opts.channel && opts.channel !== "all" ? { channel: "STRING" } : {}),
     },
   });
@@ -163,7 +168,7 @@ export async function getForecastBundleForWindow(
         FROM ${FORECAST_TABLE}
         WHERE forecast_id = @forecastId
           AND metric_type = 'volume'
-          AND target_date BETWEEN @start AND @end
+          AND target_date BETWEEN DATE(@start) AND DATE(@end)
       )
       SELECT
         ad_spend, cash, revenue, deals_closed, calls_booked, calls_held,
@@ -173,7 +178,7 @@ export async function getForecastBundleForWindow(
       FROM v
     `,
     params: { forecastId, start, end },
-    types: { forecastId: "STRING", start: "DATE", end: "DATE" },
+    types: { forecastId: "STRING", start: "STRING", end: "STRING" },
   });
   const r = rows[0] ?? {};
   const num = (v: unknown): number | null => (v == null ? null : Number(v));

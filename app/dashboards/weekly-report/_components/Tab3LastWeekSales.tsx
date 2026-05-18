@@ -192,8 +192,9 @@ function CloserOverallTable({ rows, sqlInfo }: { rows: CloserOverallExtended[]; 
       qualifiedShows: acc.qualifiedShows + r.qualifiedShows,
       deals: acc.deals + r.deals,
       cash: acc.cash + r.cash,
+      revenue: acc.revenue + r.revenue,
     }),
-    { prospects: 0, prospectsDd: 0, setterDq: 0, closerDq: 0, prospectsSq: 0, shows: 0, qualifiedShows: 0, deals: 0, cash: 0 },
+    { prospects: 0, prospectsDd: 0, setterDq: 0, closerDq: 0, prospectsSq: 0, shows: 0, qualifiedShows: 0, deals: 0, cash: 0, revenue: 0 },
   );
   return (
     <section className={styles.section}>
@@ -217,6 +218,7 @@ function CloserOverallTable({ rows, sqlInfo }: { rows: CloserOverallExtended[]; 
               <th data-tip={TIP.tbl_closeCqPct}>Close% CQ</th>
               <th data-tip={TIP.tbl_deals}>Deals</th>
               <th data-tip={TIP.tbl_cash}>Cash</th>
+              <th data-tip={"SUM(revenue_generated) WHERE is_deal — Total Contract Value (full deal price). Reconciles with Overview Revenue (TCV) total."}>Contract Value</th>
             </tr>
           </thead>
           <tbody>
@@ -237,9 +239,10 @@ function CloserOverallTable({ rows, sqlInfo }: { rows: CloserOverallExtended[]; 
                 <td>{fmtPct(r.closeRateCq)}</td>
                 <td>{fmtInt(r.deals)}</td>
                 <td>{fmtUsd(r.cash)}</td>
+                <td>{fmtUsd(r.revenue)}</td>
               </tr>
             ))}
-            <tr className={styles.divRow}><td colSpan={15}>Week Total</td></tr>
+            <tr className={styles.divRow}><td colSpan={16}>Week Total</td></tr>
             <tr>
               <td><strong>All Closers</strong></td>
               <td>{fmtInt(totals.prospects)}</td>
@@ -256,6 +259,7 @@ function CloserOverallTable({ rows, sqlInfo }: { rows: CloserOverallExtended[]; 
               <td>{fmtPct(totals.qualifiedShows > 0 ? totals.deals / totals.qualifiedShows : null)}</td>
               <td>{fmtInt(totals.deals)}</td>
               <td>{fmtUsd(totals.cash)}</td>
+              <td>{fmtUsd(totals.revenue)}</td>
             </tr>
           </tbody>
         </table>

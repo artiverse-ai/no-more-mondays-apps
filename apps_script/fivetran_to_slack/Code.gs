@@ -31,6 +31,39 @@ const SENDERS = [
   { from: "noreply@dbt-cloud.com",       label: "dbt Cloud" },
 ];
 
+// ─── Project filter ───────────────────────────────────────────
+// Fivetran/dbt emails include the workspace/account name. If your
+// Gmail receives notifications from multiple Fivetran/dbt accounts,
+// only forward the ones that match THESE strings (case-insensitive).
+// Match is "body contains any of these" — keep a broad list of names
+// that uniquely identify the NMM account.
+//
+// Leave empty ([]) to forward emails from ALL accounts (NOT recommended
+// if you're in multiple Fivetran orgs).
+const ACCOUNT_MATCHERS = [
+  "No_More_Mondays",       // Fivetran account name (per dashboard)
+  "no-more-mondays",       // BQ project name (often appears in dbt errors)
+  "nomoremondays",         // Slug form
+  "nmm",                   // Short form sometimes used in subject
+];
+
+// ─── Slack users to @-mention on alerts ──────────────────────
+// Use Slack MEMBER IDs (not display names). To find one:
+//   Slack → click a user's avatar → "View full profile" → "⋮" menu
+//   → "Copy member ID". Looks like "U01ABC23DEF".
+//   (Display names like @taziem look right in text but DON'T trigger
+//    notifications via webhook — only member-ID syntax does.)
+//
+// Set to [] to disable mentions entirely.
+const MENTION_USER_IDS = [
+  "U0B39GWBQ78",       // Shahriar
+  "U09BYUF1NAE",       // Taziem
+];
+
+// Only mention on these severities (saves noise on success/info emails).
+// Options: "red", "orange", "green", "info".
+const MENTION_ON_SEVERITIES = ["red", "orange"];
+
 const ALERT_LABEL = "alerts-sent-to-slack"; // gmail label applied after forwarding
 
 function forwardAlertsToSlack() {
@@ -52,6 +85,10 @@ function forwardAlertsToSlack() {
     for (const thread of threads) {
       for (const msg of thread.getMessages()) {
         if (msg.getFrom().toLowerCase().indexOf(sender.from.toLowerCase()) === -1) continue;
+        if (!matchesAccount(msg)) {
+          console.log(`Skipping (not NMM account): ${msg.getSubject()}`);
+          continue;
+        }
         try {
           postToSlack(webhook, msg, sender.label);
           forwarded++;
@@ -65,6 +102,14 @@ function forwardAlertsToSlack() {
     }
   }
   console.log(`Forwarded ${forwarded} alert(s) to Slack.`);
+}
+
+/** Returns true if the email looks like it's from the NMM account. If
+ *  ACCOUNT_MATCHERS is empty, returns true (forward everything). */
+function matchesAccount(msg) {
+  if (ACCOUNT_MATCHERS.length === 0) return true;
+  const haystack = (msg.getSubject() + " " + (msg.getPlainBody() || "")).toLowerCase();
+  return ACCOUNT_MATCHERS.some((m) => haystack.indexOf(m.toLowerCase()) !== -1);
 }
 
 function postToSlack(webhook, msg, sourceLabel) {
@@ -82,13 +127,30 @@ function postToSlack(webhook, msg, sourceLabel) {
   // Severity emoji from subject keywords
   const lower = subject.toLowerCase();
   let emoji = "📩";
-  if (lower.match(/error|fail|stalled|broken/)) emoji = "🔴";
-  else if (lower.match(/warning|warn|stale|slow/)) emoji = "🟠";
-  else if (lower.match(/success|recovered|resolved|ok\b/)) emoji = "✅";
+  let severity = "info";
+  if (lower.match(/error|fail|stalled|broken/))      { emoji = "🔴"; severity = "red"; }
+  else if (lower.match(/warning|warn|stale|slow/))   { emoji = "🟠"; severity = "orange"; }
+  else if (lower.match(/success|recovered|resolved|ok\b/)) { emoji = "✅"; severity = "green"; }
+
+  // Build the @-mention prefix only on the severities we care about.
+  // Slack mention syntax in webhooks: <@U01ABC23DEF>.
+  const shouldMention =
+    MENTION_USER_IDS.length > 0 && MENTION_ON_SEVERITIES.indexOf(severity) !== -1;
+  const mentionPrefix = shouldMention
+    ? MENTION_USER_IDS.map((id) => `<@${id}>`).join(" ") + " "
+    : "";
 
   const payload = {
-    text: `${emoji} ${sourceLabel}: ${subject}`,
+    text: `${mentionPrefix}${emoji} ${sourceLabel}: ${subject}`,
     blocks: [
+      // Mention block lives ABOVE the header so it shows up clearly at
+      // the top of the message + triggers the notification bell.
+      ...(shouldMention
+        ? [{
+            type: "section",
+            text: { type: "mrkdwn", text: mentionPrefix.trim() + " — heads up 👇" },
+          }]
+        : []),
       {
         type: "header",
         text: { type: "plain_text", text: `${emoji} ${sourceLabel}: ${truncate(subject, 140)}` },

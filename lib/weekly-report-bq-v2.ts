@@ -288,6 +288,7 @@ export const SQL_SETTER_BY_MODE = `WITH ghl_lead AS (
     COUNT(DISTINCT IF(c.is_close_rate_eligible, c.prospect_email_lc, NULL))        AS qualified_shows,
     COUNT(DISTINCT IF(c.is_deal, c.prospect_email_lc, NULL))                       AS deals,
     SUM(IF(c.is_deal, c.cash_collected, 0))                                         AS cash,
+    SUM(IF(c.is_deal, c.revenue_generated, 0))                                      AS revenue,
     APPROX_QUANTILES(
       DATE_DIFF(DATE(c.calendly_created_ts, 'America/New_York'),
                 l.lead_created_date, DAY), 2

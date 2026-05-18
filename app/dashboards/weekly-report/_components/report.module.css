@@ -671,6 +671,32 @@
   .twoCol { grid-template-columns: 1fr; }
 }
 
+/* TopMetrics — 4 cards in a 2x2 grid on tablet, more compact on phone */
+@media (max-width: 900px) {
+  .topMetricsStrip {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .topMetricCard { padding: 12px 14px; }
+  .topMetricVal { font-size: 24px; }
+}
+@media (max-width: 480px) {
+  .topMetricsStrip {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .topMetricCard { padding: 10px 12px; border-radius: 10px; }
+  .topMetricLbl { font-size: 9.5px; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .topMetricVal {
+    font-size: 20px;
+    white-space: normal;        /* allow wrap on tiny screens so "$3,026" never overflows */
+    word-break: break-word;
+  }
+  .topMetricSub { font-size: 9.5px; }
+  .topMetricChip { font-size: 9.5px; padding: 2px 6px; margin-top: 4px; }
+}
+
 @media (max-width: 768px) {
   .hdr { padding: 10px 14px; }
   .hdr h1 { font-size: 14px; }

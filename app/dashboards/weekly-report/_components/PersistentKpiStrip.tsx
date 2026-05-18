@@ -6,6 +6,7 @@ import {
   trafficLightColor,
   type ThresholdKey,
 } from "@/lib/metric-thresholds";
+import { fmtDateRange, fmtShortDate } from "@/lib/window-labels";
 import { SqlInfoButton } from "./SqlInfoButton";
 import styles from "./report.module.css";
 
@@ -27,6 +28,13 @@ export function PersistentKpiStrip({
   devMode?: boolean;
   sqlCtx?: SqlCtx;
 }) {
+  // Per-card window labels — each metric's time scope shown directly below
+  // its threshold so the user always knows which date range produced the
+  // number. Sales/Marketing/Last-3 windows differ across cards.
+  const salesWeek = sqlCtx ? fmtDateRange(sqlCtx.kpiStart, sqlCtx.kpiEnd) : "—";
+  const marketingWeek = sqlCtx ? fmtDateRange(sqlCtx.mwStart, sqlCtx.mwEnd) : "—";
+  const lastThree = sqlCtx ? `through ${fmtShortDate(sqlCtx.latestWebinarDate)}` : "—";
+
   // Each card: value renders as the canonical metric formatting; N/A
   // values fall back to .kpiValueNa per spec §22.
   const card = (
@@ -35,6 +43,7 @@ export function PersistentKpiStrip({
     value: string,
     isNa: boolean,
     meta: string,
+    scope: string,
     tooltip: string,
     metricKey: MetricKey,
     trafficKey?: ThresholdKey,
@@ -46,6 +55,7 @@ export function PersistentKpiStrip({
       value={value}
       isNa={isNa}
       meta={meta}
+      scope={scope}
       tooltip={tooltip}
       sqlInfo={devMode && sqlCtx ? getResolvedSql(metricKey, sqlCtx) : null}
       trafficKey={trafficKey}
@@ -55,14 +65,14 @@ export function PersistentKpiStrip({
 
   return (
     <div className={styles.kpiStrip}>
-      {card("webinar", "Avg Webinar Show Rate", fmtPct(data.avgWebinarShowRate), data.avgWebinarShowRate == null, "≥25% green · 20–25% orange · <20% red", TIP.avgWebinarShowRate, "avgWebinarShowRate", "webinarShowUpRate", data.avgWebinarShowRate)}
-      {card("webinar", "% Tier 1 Leads", fmtPct(data.pctTierOneLeads), data.pctTierOneLeads == null, "Awaiting mart fields", TIP.pctTierOneLeads, "pctTierOneLeads")}
+      {card("webinar", "Avg Webinar Show Rate", fmtPct(data.avgWebinarShowRate), data.avgWebinarShowRate == null, "≥25% green · 20–25% orange · <20% red", `Last 3 webinars · ${lastThree}`, TIP.avgWebinarShowRate, "avgWebinarShowRate", "webinarShowUpRate", data.avgWebinarShowRate)}
+      {card("webinar", "% Tier 1 Leads", fmtPct(data.pctTierOneLeads), data.pctTierOneLeads == null, "Awaiting mart fields", `Marketing wk · ${marketingWeek}`, TIP.pctTierOneLeads, "pctTierOneLeads")}
 
       <div className={styles.kpiDivider} aria-hidden="true" />
 
-      {card("company", "Blended Cash ROAS", fmtX(data.blendedCashRoas), data.blendedCashRoas == null, "≥3× green · 2–3× orange · <2× red", TIP.blendedCashRoas, "blendedCashRoas", "roas", data.blendedCashRoas)}
-      {card("company", "CPL Blended", fmtUsd(data.cplBlended), data.cplBlended == null, "Target <$7", TIP.cplBlended, "cplBlended")}
-      {card("company", "Cash / Booked Call (DPC)", fmtUsd(data.cashPerBookedCall), data.cashPerBookedCall == null, "Sergio's KPI", TIP.cashPerBookedCall, "cashPerBookedCall")}
+      {card("company", "Blended Cash ROAS", fmtX(data.blendedCashRoas), data.blendedCashRoas == null, "≥3× green · 2–3× orange · <2× red", `Sales wk · ${salesWeek}`, TIP.blendedCashRoas, "blendedCashRoas", "roas", data.blendedCashRoas)}
+      {card("company", "CPL Blended", fmtUsd(data.cplBlended), data.cplBlended == null, "Target <$7", `Sales wk · ${salesWeek}`, TIP.cplBlended, "cplBlended")}
+      {card("company", "Cash / Booked Call (DPC)", fmtUsd(data.cashPerBookedCall), data.cashPerBookedCall == null, "Sergio's KPI", `Sales wk · ${salesWeek}`, TIP.cashPerBookedCall, "cashPerBookedCall")}
     </div>
   );
 }
@@ -73,6 +83,7 @@ function Card({
   value,
   isNa,
   meta,
+  scope,
   tooltip,
   sqlInfo,
   trafficKey,
@@ -83,6 +94,7 @@ function Card({
   value: string;
   isNa: boolean;
   meta: string;
+  scope: string;
   tooltip: string;
   sqlInfo?: import("@/lib/dev-sql").ResolvedMetricSql | null;
   trafficKey?: ThresholdKey;
@@ -101,6 +113,7 @@ function Card({
       </div>
       <div className={`${styles.kpiValue} ${isNa ? styles.kpiValueNa : ""}`} style={color ? { color } : undefined}>{value}</div>
       <div className={styles.kpiMeta}>{meta}</div>
+      <div className={styles.kpiScope}>{scope}</div>
     </div>
   );
 }

@@ -112,7 +112,7 @@ export default async function Page({
     isMonday ? fetchSetterOverall(kpiStart, kpiEnd) : Promise.resolve([]),
     isMonday ? fetchSetterByMode(kpiStart, kpiEnd) : Promise.resolve([]),
     isMonday ? fetchBookingModeExtended(kpiStart, kpiEnd) : Promise.resolve([]),
-    isMonday ? fetchSectionATab3Closer(kpiStart, kpiEnd) : Promise.resolve(null),
+    fetchSectionATab3Closer(kpiStart, kpiEnd),   // both report types — needed for AOV everywhere (Fanbasis AOV is meaningless)
   ]);
 
   // Section B needs the KPI strip values (Cash/Booked, Show Rate, CPL) — compute after.
@@ -176,7 +176,7 @@ export default async function Page({
   const sqlFilename = `nmm-weekly-${slug}-${kpiStart}_${kpiEnd}.sql`;
 
   const panels: Record<string, React.ReactNode> = {
-    t1: <Tab1Overview weekLabel={weekLabel} sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} devMode={devMode && isAdmin} sqlCtx={sqlCtx} />,
+    t1: <Tab1Overview weekLabel={weekLabel} sectionA={sectionA} sectionATab3={sectionATab3} sectionB={sectionB} sectionC={sectionC} devMode={devMode && isAdmin} sqlCtx={sqlCtx} />,
     t2: (
       <Tab2LatestWebinar
         webinars={webinars}
@@ -288,7 +288,15 @@ export default async function Page({
           </span>
         ) : null}
       </div>
-      <TopMetrics sectionA={sectionA} sectionB={sectionB} sectionC={sectionC} forecast={forecast} />
+      <TopMetrics
+        sectionA={sectionA}
+        sectionATab3={sectionATab3}
+        sectionB={sectionB}
+        sectionC={sectionC}
+        forecast={forecast}
+        kpiStart={kpiStart}
+        kpiEnd={kpiEnd}
+      />
       <PersistentKpiStrip data={kpiStrip} devMode={devMode && isAdmin} sqlCtx={sqlCtx} />
       <Tabs tabs={tabs} defaultActive="t1" panels={panels} />
     </div>

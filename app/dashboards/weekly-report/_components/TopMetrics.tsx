@@ -1,5 +1,11 @@
-import type { SectionAData, SectionBData, SectionCData } from "@/lib/weekly-report-bq-v2";
+import type {
+  SectionAData,
+  SectionATab3Data,
+  SectionBData,
+  SectionCData,
+} from "@/lib/weekly-report-bq-v2";
 import { paceLight } from "@/lib/forecast";
+import { salesWeekLabel } from "@/lib/window-labels";
 import styles from "./report.module.css";
 
 const fmtInt = (n: number | null) => (n == null ? "—" : Math.round(n).toLocaleString());
@@ -24,17 +30,22 @@ export type ForecastBundle = {
 } | null;
 
 // Headline strip — the 4 metrics the CEO checks first on every report.
-// Pulled from the same Section A/B/C data the deeper tabs render, so the
-// numbers always match. When a forecast covers the window, each card also
-// renders a pace chip vs target.
+// All 4 cards are scoped to the SALES WEEK (Sun-Sat ET). A header bar above
+// the cards spells out the exact date range so the CEO never has to guess.
+// AOV uses CLOSER-attributed cash (int_calls_enriched), not Fanbasis money-in.
+// Fanbasis AOV (Fanbasis cash / mart deals) mixes denominators and is
+// meaningless — per Shahriar 2026-05-18.
 export type TopMetricsProps = {
   sectionA: SectionAData;
+  sectionATab3: SectionATab3Data;       // closer-attributed money — authoritative for AOV
   sectionB: SectionBData;
   sectionC: SectionCData;
   forecast?: ForecastBundle;
+  kpiStart: string;                      // sales-week start (Sun) for the header label
+  kpiEnd: string;                        // sales-week end (Sat)
 };
 
-export function TopMetrics({ sectionA, sectionB, sectionC, forecast }: TopMetricsProps) {
+export function TopMetrics({ sectionA, sectionATab3, sectionB, sectionC, forecast, kpiStart, kpiEnd }: TopMetricsProps) {
   // Volumes use pct of target. Rates compare the absolute delta and color
   // green if actual ≥ target, orange if within 90%, red below.
   const callsBookedActual = sectionB.totalCallsBooked;
@@ -44,7 +55,12 @@ export function TopMetrics({ sectionA, sectionB, sectionC, forecast }: TopMetric
   // apples-to-apples. SectionC.closeRate (deals / qualified_shows, CQ basis)
   // is a stricter ratio without a CSV-side equivalent target.
   const closeRateActual = sectionC.closeRateShows;
-  const aovActual = sectionA.aov;
+  // Closer-attributed AOV (int_calls_enriched cash / deals — same source,
+  // same denominator basis). Tracks "what closers booked this week".
+  const aovActual = sectionATab3.aov;
+  // Mark unused so TS doesn't complain (kept in props for future Fanbasis
+  // comparison cards / debugging).
+  void sectionA;
 
   const callsChip = forecast?.calls_booked != null
     ? buildVolumeChip(callsBookedActual, forecast.calls_booked, (v) => fmtInt(v))
@@ -60,40 +76,46 @@ export function TopMetrics({ sectionA, sectionB, sectionC, forecast }: TopMetric
     : null;
 
   return (
-    <section className={styles.topMetricsStrip}>
-      <TopCard
-        emoji="📞"
-        label="Calls Booked"
-        value={fmtInt(callsBookedActual)}
-        sub={
-          sectionB.totalCallsBookedActive != null
-            ? `Active: ${fmtInt(sectionB.totalCallsBookedActive)}`
-            : "stg_calendly · dedup by email"
-        }
-        chip={callsChip}
-      />
-      <TopCard
-        emoji="📈"
-        label="Show Rate"
-        value={fmtPct(showRateActual)}
-        sub="Shows / Pros (SQ)"
-        chip={showRateChip}
-      />
-      <TopCard
-        emoji="🎯"
-        label="Close Rate"
-        value={fmtPct(closeRateActual)}
-        sub="Deals / Shows"
-        chip={closeRateChip}
-      />
-      <TopCard
-        emoji="💵"
-        label="AOV"
-        value={fmtUsd(aovActual)}
-        sub="Fanbasis cash / Deals"
-        chip={aovChip}
-      />
-    </section>
+    <>
+      <div className={styles.topMetricsScope}>
+        <span aria-hidden>📅</span>
+        <span>{salesWeekLabel(kpiStart, kpiEnd)}</span>
+      </div>
+      <section className={styles.topMetricsStrip}>
+        <TopCard
+          emoji="📞"
+          label="Calls Booked"
+          value={fmtInt(callsBookedActual)}
+          sub={
+            sectionB.totalCallsBookedActive != null
+              ? `Active: ${fmtInt(sectionB.totalCallsBookedActive)}`
+              : "stg_calendly · dedup by email"
+          }
+          chip={callsChip}
+        />
+        <TopCard
+          emoji="📈"
+          label="Show Rate"
+          value={fmtPct(showRateActual)}
+          sub="Shows / Pros (SQ)"
+          chip={showRateChip}
+        />
+        <TopCard
+          emoji="🎯"
+          label="Close Rate"
+          value={fmtPct(closeRateActual)}
+          sub="Deals / Shows"
+          chip={closeRateChip}
+        />
+        <TopCard
+          emoji="💵"
+          label="AOV"
+          value={fmtUsd(aovActual)}
+          sub="Closer cash / Deals"
+          chip={aovChip}
+        />
+      </section>
+    </>
   );
 }
 

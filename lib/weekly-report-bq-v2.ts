@@ -218,6 +218,7 @@ export const SQL_CLOSER_OVERALL = `SELECT
   COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS qualified_shows,
   COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
   SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+  SUM(IF(is_deal, revenue_generated, 0))                                          AS revenue,
   SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
               COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
   SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
@@ -247,6 +248,7 @@ export const SQL_SETTER_OVERALL = `SELECT
   COUNT(DISTINCT IF(is_close_rate_eligible,   prospect_email_lc, NULL))          AS qualified_shows,
   COUNT(DISTINCT IF(is_deal,                  prospect_email_lc, NULL))          AS deals,
   SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+  SUM(IF(is_deal, revenue_generated, 0))                                          AS revenue,
   SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
               COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
   SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
@@ -325,6 +327,7 @@ export const SQL_BOOKING_MODE = `SELECT
   COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL))            AS qualified_shows,
   COUNT(DISTINCT IF(is_deal, prospect_email_lc, NULL))                           AS deals,
   SUM(IF(is_deal, cash_collected, 0))                                             AS cash,
+  SUM(IF(is_deal, revenue_generated, 0))                                          AS revenue,
   SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Setter DQ', prospect_email_lc, NULL)),
               COUNT(DISTINCT IF(is_dispositioned, prospect_email_lc, NULL)))      AS setter_dq_rate,
   SAFE_DIVIDE(COUNT(DISTINCT IF(call_outcome='Closer DQ', prospect_email_lc, NULL)),
@@ -1057,6 +1060,7 @@ export type CloserOverallExtended = {
   closeRateCq: number | null;
   deals: number;
   cash: number;
+  revenue: number;            // SUM(revenue_generated) WHERE is_deal — full TCV (differs from cash on payment plans)
 };
 
 export async function fetchCloserOverallExtended(prevSun: string, prevSat: string): Promise<CloserOverallExtended[]> {
@@ -1082,6 +1086,7 @@ export async function fetchCloserOverallExtended(prevSun: string, prevSat: strin
     closeRateCq: nNull(r.close_rate_cq),
     deals: num(r.deals),
     cash: num(r.cash),
+    revenue: num(r.revenue),
   }));
   } catch (err) {
     console.error("[weekly-report-bq-v2] fetchCloserOverallExtended failed:", err);
@@ -1119,6 +1124,7 @@ export async function fetchSetterOverall(prevSun: string, prevSat: string): Prom
     closeRateCq: nNull(r.close_rate_cq),
     deals: num(r.deals),
     cash: num(r.cash),
+    revenue: num(r.revenue),
   }));
   } catch (err) {
     console.error("[weekly-report-bq-v2] fetchSetterOverall failed:", err);
@@ -1149,6 +1155,7 @@ export type SetterByModeRow = {
   closeRateCq: number | null;
   deals: number;
   cash: number;
+  revenue: number;
   medianTimeToBookDays: number | null;
 };
 
@@ -1179,6 +1186,7 @@ export async function fetchSetterByMode(prevSun: string, prevSat: string): Promi
     closeRateCq: nNull(r.close_rate_cq),
     deals: num(r.deals),
     cash: num(r.cash),
+    revenue: num(r.revenue),
     medianTimeToBookDays: nNull(r.median_time_to_book_days),
   }));
   } catch (err) {
@@ -1217,6 +1225,7 @@ export async function fetchBookingModeExtended(prevSun: string, prevSat: string)
     closeRateCq: nNull(r.close_rate_cq),
     deals: num(r.deals),
     cash: num(r.cash),
+    revenue: num(r.revenue),
   }));
   } catch (err) {
     console.error("[weekly-report-bq-v2] fetchBookingModeExtended failed:", err);

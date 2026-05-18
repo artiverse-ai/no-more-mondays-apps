@@ -1,4 +1,4 @@
-import type { SectionAData, SectionBData, SectionCData } from "@/lib/weekly-report-bq-v2";
+import type { SectionAData, SectionATab3Data, SectionBData, SectionCData } from "@/lib/weekly-report-bq-v2";
 import { getResolvedSql, type MetricKey, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
 import {
@@ -22,18 +22,19 @@ const fmtDays = (n: number | null, digits = 1) => (n == null ? "—" : `${n.toFi
 export type Tab1OverviewProps = {
   weekLabel: string;
   sectionA: SectionAData;
+  sectionATab3: SectionATab3Data;   // closer-attributed money — authoritative for AOV + side-by-side "Closer Cash" card
   sectionB: SectionBData;
   sectionC: SectionCData;
   devMode?: boolean;
   sqlCtx?: SqlCtx;
 };
 
-export function Tab1Overview({ weekLabel, sectionA, sectionB, sectionC, devMode = false, sqlCtx }: Tab1OverviewProps) {
+export function Tab1Overview({ weekLabel, sectionA, sectionATab3, sectionB, sectionC, devMode = false, sqlCtx }: Tab1OverviewProps) {
   const showSql = devMode && sqlCtx;
   const sqlFor = (k: MetricKey) => (showSql ? getResolvedSql(k, sqlCtx) : null);
   return (
     <>
-      <SectionA data={sectionA} weekLabel={weekLabel} sqlFor={sqlFor} />
+      <SectionA data={sectionA} sectionATab3={sectionATab3} weekLabel={weekLabel} sqlFor={sqlFor} />
       <SectionB data={sectionB} sqlFor={sqlFor} />
       <SectionC data={sectionC} sqlFor={sqlFor} />
       <SectionD />
@@ -46,7 +47,7 @@ type SqlForFn = (k: MetricKey) => import("@/lib/dev-sql").ResolvedMetricSql | nu
 // ============================================================================
 // SECTION A — Overall Company Performance (10 money cards + 4 cycle cards)
 // ============================================================================
-function SectionA({ data, weekLabel, sqlFor }: { data: SectionAData; weekLabel: string; sqlFor: SqlForFn }) {
+function SectionA({ data, sectionATab3, weekLabel, sqlFor }: { data: SectionAData; sectionATab3: SectionATab3Data; weekLabel: string; sqlFor: SqlForFn }) {
   return (
     <section className={styles.section}>
       <div className={styles.sh}>Section A · Overall Company Performance</div>
@@ -55,15 +56,58 @@ function SectionA({ data, weekLabel, sqlFor }: { data: SectionAData; weekLabel: 
       </p>
       <div className={styles.kpiGridMini}>
         <MiniCard emoji="💰" label="Cash Collected" value={fmtUsd(data.cashCollected)} change="Fanbasis + Whop · money-in" tip={TIP.cashCollected} sqlInfo={sqlFor("cashCollected")} />
-        <MiniCard emoji="💼" label="Revenue (TCV)" value={fmtUsd(data.revenueTcv)} change="Total Contract Value" tip={TIP.revenueTcv} sqlInfo={sqlFor("revenueTcv")} />
+        <MiniCard
+          emoji="🤝"
+          label="Closer Cash"
+          value={fmtUsd(sectionATab3.cashCollected)}
+          change="Deals closed this week"
+          tip={"SUM(cash_collected) WHERE is_deal\nWindow: date_closed in sales week (Sun-Sat ET)\nSource: int_calls_enriched (closer-attributed — NEW deals booked, not Fanbasis money-in)"}
+        />
+        <MiniCard
+          emoji="💼"
+          label="Revenue (TCV)"
+          value={fmtUsd(sectionATab3.revenueTcv)}
+          change="Total Contract Value · Closer"
+          tip={"SUM(revenue_generated) WHERE is_deal from int_calls_enriched.\nWindow: date_closed in sales week.\nReconciles exactly with mart_high_level_daily.total_revenue_contracted (same upstream column)."}
+        />
         <MiniCard emoji="📈" label="ROAS (Cash)" value={fmtX(data.roasCash)} change={target("4×")} tip={TIP.roasCash} sqlInfo={sqlFor("roasCash")} trafficKey="roas" rawValue={data.roasCash} />
         <MiniCard emoji="📈" label="ROAS (TCV)" value={fmtX(data.roasTcv)} change="TCV / Ad Spend" tip={TIP.roasTcv} sqlInfo={sqlFor("roasTcv")} trafficKey="roas" rawValue={data.roasTcv} />
         <MiniCard emoji="📣" label="Ad Spend (Blended)" value={fmtUsd(data.adSpendBlended)} change="All Meta campaigns" tip={TIP.adSpendBlended} sqlInfo={sqlFor("adSpendBlended")} />
-        <MiniCard emoji="🤝" label="Deals Closed" value={fmtInt(data.dealsClosed)} change="" tip={TIP.dealsClosed} sqlInfo={sqlFor("dealsClosed")} />
-        <MiniCard emoji="💵" label="AOV" value={fmtUsd(data.aov)} change="Fanbasis cash / deals" tip={TIP.aov} sqlInfo={sqlFor("aov")} />
-        <MiniCard emoji="📦" label="ACV" value={fmtUsd(data.acv)} change="TCV / deals" tip={TIP.acv} sqlInfo={sqlFor("acv")} />
-        <MiniCard emoji="💸" label="PIF Rate" value={fmtPct(data.pifRate)} change="Paid-In-Full deals" tip={TIP.pifRate} sqlInfo={sqlFor("pifRate")} />
-        <MiniCard emoji="📊" label="Cash Collection Rate" value={fmtPct(data.cashCollectionRate)} change="Cash / TCV" tip={TIP.cashCollectionRate} sqlInfo={sqlFor("cashCollectionRate")} />
+        <MiniCard
+          emoji="🤝"
+          label="Deals Closed"
+          value={fmtInt(sectionATab3.dealsClosed)}
+          change="Closer-attributed"
+          tip={"COUNT(DISTINCT prospect WHERE is_deal) from int_calls_enriched, date_closed in sales week.\nSame source as Closer Cash + AOV — all deal-derived metrics use the closer source for consistency."}
+        />
+        <MiniCard
+          emoji="💵"
+          label="AOV"
+          value={fmtUsd(sectionATab3.aov)}
+          change="Closer cash / deals"
+          tip={"SUM(cash_collected) / COUNT deals — both from int_calls_enriched (same denominator basis).\nWindow: date_closed in sales week.\nFanbasis-cash / mart-deals would mix sources and is meaningless — never use that."}
+        />
+        <MiniCard
+          emoji="📦"
+          label="ACV"
+          value={fmtUsd(sectionATab3.acv)}
+          change="Closer TCV / deals"
+          tip={"SUM(revenue_generated) / COUNT deals — both from int_calls_enriched.\nWindow: date_closed in sales week."}
+        />
+        <MiniCard
+          emoji="💸"
+          label="PIF Rate"
+          value={fmtPct(sectionATab3.pifRate)}
+          change="Closer · Paid-In-Full deals"
+          tip={"COUNT(is_deal AND is_paid_in_full) / COUNT(is_deal) from int_calls_enriched."}
+        />
+        <MiniCard
+          emoji="📊"
+          label="Cash Collection Rate"
+          value={fmtPct(sectionATab3.cashCollectionRate)}
+          change="Closer cash / TCV"
+          tip={"SUM(cash_collected) / SUM(revenue_generated) WHERE is_deal — both from int_calls_enriched.\nWindow: date_closed in sales week."}
+        />
       </div>
 
       <div className={styles.sh} style={{ marginTop: 24 }}>
@@ -223,8 +267,8 @@ function SectionC({ data, sqlFor }: { data: SectionCData; sqlFor: SqlForFn }) {
 
       <div className={styles.sh} style={{ marginTop: 8 }}>Prospect Efficiency (D'd → Downstream)</div>
       <div className={styles.kpiGridMini}>
-        <MiniCard emoji="⚙" label="D'd → CQ" value={fmtPct(data.ddToCq)} change="Shows (CQ) / Pros (D'd)" tip={TIP.ddToCq} sqlInfo={sqlFor("ddToCq")} />
-        <MiniCard emoji="⚙" label="D'd → Close" value={fmtPct(data.ddToClose)} change="Deals / Pros (D'd)" tip={TIP.ddToClose} sqlInfo={sqlFor("ddToClose")} />
+        <MiniCard emoji="⚙" label="Prospect to Qualified Show Efficiency" value={fmtPct(data.ddToCq)} change="Shows (CQ) / Pros (D'd)" tip={TIP.ddToCq} sqlInfo={sqlFor("ddToCq")} />
+        <MiniCard emoji="⚙" label="Prospect to Close Efficiency" value={fmtPct(data.ddToClose)} change="Deals / Pros (D'd)" tip={TIP.ddToClose} sqlInfo={sqlFor("ddToClose")} />
         <MiniCard emoji="💰" label="$ (CC) / Pros (D'd)" value={fmtUsd2(data.dollarsCcPerPdd)} change="Cash / Pros (D'd)" tip={TIP.dollarsCcPerPdd} sqlInfo={sqlFor("dollarsCcPerPdd")} />
         <MiniCard emoji="💰" label="$ (CC) / Shows (SQ)" value={fmtUsd2(data.dollarsCcPerShowsSq)} change="Cash / Shows (SQ)" tip={TIP.dollarsCcPerShowsSq} sqlInfo={sqlFor("dollarsCcPerShowsSq")} />
         <MiniCard emoji="📦" label="$ (TCV) / Pros (D'd)" value={fmtUsd2(data.dollarsTcvPerPdd)} change="TCV / Pros (D'd)" tip={TIP.dollarsTcvPerPdd} sqlInfo={sqlFor("dollarsTcvPerPdd")} />

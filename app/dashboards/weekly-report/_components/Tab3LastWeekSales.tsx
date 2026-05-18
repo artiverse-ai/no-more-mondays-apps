@@ -290,6 +290,7 @@ function SetterOverallTable({ rows, sqlInfo }: { rows: SetterOverallRow[]; sqlIn
               <th data-tip={TIP.tbl_closeCqPct}>Close% CQ</th>
               <th data-tip={TIP.tbl_deals}>Deals</th>
               <th data-tip={TIP.tbl_cash}>Cash</th>
+              <th data-tip={"SUM(revenue_generated) WHERE is_deal — Total Contract Value (full deal price). Same number as Tab 1 Revenue (TCV), broken out per setter. Differs from Cash on payment-plan deals."}>Contract Value</th>
             </tr>
           </thead>
           <tbody>
@@ -310,6 +311,7 @@ function SetterOverallTable({ rows, sqlInfo }: { rows: SetterOverallRow[]; sqlIn
                 <td>{fmtPct(r.closeRateCq)}</td>
                 <td>{fmtInt(r.deals)}</td>
                 <td>{fmtUsd(r.cash)}</td>
+                <td>{fmtUsd(r.revenue)}</td>
               </tr>
             ))}
           </tbody>
@@ -351,6 +353,7 @@ function SetterByModeTable({ rows, sqlInfo }: { rows: SetterByModeRow[]; sqlInfo
               <th data-tip={TIP.tbl_ttb}>TTB (d)</th>
               <th data-tip={TIP.tbl_deals}>Deals</th>
               <th data-tip={TIP.tbl_cash}>Cash</th>
+              <th data-tip={"SUM(revenue_generated) WHERE is_deal — Total Contract Value"}>Contract Value</th>
               <th data-tip={TIP.tbl_bonus}>Bonus</th>
             </tr>
           </thead>
@@ -386,6 +389,7 @@ function SetterByModeTable({ rows, sqlInfo }: { rows: SetterByModeRow[]; sqlInfo
                   <td>{fmtDays(r.medianTimeToBookDays, 1)}</td>
                   <td>{fmtInt(r.deals)}</td>
                   <td>{fmtUsd(r.cash)}</td>
+                  <td>{fmtUsd(r.revenue)}</td>
                   {idx === 0 ? (
                     <td rowSpan={setterRows.length} className={bonus.tone === "up" ? styles.up : bonus.tone === "dn" ? styles.dn : styles.amb}>
                       {bonus.label}
@@ -430,6 +434,7 @@ function BookingModeTable({ rows, sqlInfo }: { rows: BookingModeExtended[]; sqlI
               <th data-tip={TIP.tbl_closeCqPct}>Close% CQ</th>
               <th data-tip={TIP.tbl_deals}>Deals</th>
               <th data-tip={TIP.tbl_cash}>Cash</th>
+              <th data-tip={"SUM(revenue_generated) WHERE is_deal — Total Contract Value"}>Contract Value</th>
             </tr>
           </thead>
           <tbody>
@@ -450,6 +455,7 @@ function BookingModeTable({ rows, sqlInfo }: { rows: BookingModeExtended[]; sqlI
                 <td>{fmtPct(r.closeRateCq)}</td>
                 <td>{fmtInt(r.deals)}</td>
                 <td>{fmtUsd(r.cash)}</td>
+                <td>{fmtUsd(r.revenue)}</td>
               </tr>
             ))}
           </tbody>

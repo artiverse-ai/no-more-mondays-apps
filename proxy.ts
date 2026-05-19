@@ -1,5 +1,6 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware, clerkClient, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server";
+import { isEmailAllowed } from "@/lib/access-check";
 
 // Public-by-design routes — bypass Clerk auth even when the gate is on.
 // The closer SOP is consumed by every closer in onboarding (who almost
@@ -10,9 +11,14 @@ import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server
 // accounts. Includes /competition/poster.png and other static assets
 // served from /public/competition/ which would otherwise hit the auth
 // gate by virtue of their URL prefix.
+//
+// /access-denied is reachable from inside the gate (we redirect there
+// when a signed-in user isn't on the allowlist), so it has to be open
+// or the redirect would loop.
 const isPublic = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/access-denied",
   "/sops/closer-calendar-management(.*)",
   "/competition(.*)",
 ]);
@@ -23,6 +29,29 @@ const handler = clerkMiddleware(async (auth, req) => {
   // routes we want the visitor sent to the sign-in page instead.
   const { userId, redirectToSignIn } = await auth();
   if (!userId) return redirectToSignIn();
+
+  // Defense-in-depth allowlist check. Clerk dev mode does NOT block
+  // sign-ups for emails outside the allowlist, so a signed-in user
+  // might still be unauthorized. Fetch their email and verify.
+  try {
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const email = user.primaryEmailAddress?.emailAddress ?? "";
+    const allowed = await isEmailAllowed(email);
+    if (!allowed) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/access-denied";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  } catch {
+    // If Clerk API fails, fail closed — bounce to access-denied. Safer
+    // than letting them through on an API hiccup.
+    const url = req.nextUrl.clone();
+    url.pathname = "/access-denied";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
 });
 
 export default function proxy(req: NextRequest, event: NextFetchEvent) {

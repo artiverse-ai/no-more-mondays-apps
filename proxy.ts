@@ -4,10 +4,17 @@ import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server
 // Public-by-design routes — bypass Clerk auth even when the gate is on.
 // The closer SOP is consumed by every closer in onboarding (who almost
 // certainly won't be signed up for the app), so it stays open.
+//
+// /competition is also public — closers see the live leaderboard
+// (Beast/Games dashboard) and most don't have nomoremondays.io clerk
+// accounts. Includes /competition/poster.png and other static assets
+// served from /public/competition/ which would otherwise hit the auth
+// gate by virtue of their URL prefix.
 const isPublic = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/sops/closer-calendar-management(.*)",
+  "/competition(.*)",
 ]);
 
 const handler = clerkMiddleware(async (auth, req) => {

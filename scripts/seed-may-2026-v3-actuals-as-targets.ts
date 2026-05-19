@@ -16,7 +16,7 @@ import { BigQuery } from "@google-cloud/bigquery";
 import { buildMay2026Rows } from "../lib/forecast-seeds/may-2026";
 import type { ForecastTargetRow } from "../lib/forecast-targets-table";
 
-const FORECAST_ID = "may-2026-v3";
+const FORECAST_ID = "may-2026-v5";   // v5 = past actuals + future projections + CSV operating rate goals
 const PERIOD_START = "2026-05-01";
 const PERIOD_END = "2026-05-31";
 const PAST_END = "2026-05-16";
@@ -113,12 +113,15 @@ async function main() {
   }
   console.log(`   → ${pastRows.length} past rows built`);
 
-  // ─── 2) FUTURE: reuse projections from buildMay2026Rows (filtered to >= FUTURE_START)
-  const allBuilt = buildMay2026Rows("v3-actuals-script");
+  // ─── 2) FUTURE projections + ALL rate constants (incl. blended targets)
+  //         from buildMay2026Rows. Past per-day rows are filtered out
+  //         because we already built them as actuals in step 1 above.
+  //         monthly_total rows are kept too (harmless — bundle ignores them).
+  const allBuilt = buildMay2026Rows("v5-actuals-script");
   const futureRows = allBuilt
     .filter((r) => r.target_date == null || r.target_date >= FUTURE_START)
     .map((r) => ({ ...r, forecast_id: FORECAST_ID }));
-  console.log(`📈 ${futureRows.length} future rows (projections + period rates)`);
+  console.log(`📈 ${futureRows.length} future + rate-constant + monthly-total rows`);
 
   // ─── 3) Insert all rows as v3
   const allRows = [...pastRows, ...futureRows];

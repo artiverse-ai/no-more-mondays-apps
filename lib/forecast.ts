@@ -119,21 +119,20 @@ export async function getForecastForWindow(
 
 /** Convenience: pull all common metrics for a window in a single round-trip.
  *
- * TARGET STRATEGY (changed 2026-05-19 — was derived-from-volume-sums):
+ * TARGET STRATEGY (refined 2026-05-19 per Shahriar):
  *
- * Rates (Show Rate, Close Rate, AOV) → period-constant from the CSV
- * projection model, channel='blended'. The chip target is the OPERATING
- * GOAL the team is striving for, not a derived value that always matches
- * actuals. From the May 2026 Projection Model "Variables" block:
- *   show_rate = 47%   (Weekly Webinar)
- *   close_rate = 39%  (Weekly Webinar)
- *   aov_cash = $3,019 (Weekly Webinar)
+ * Volumes → per-day SUM from forecast_targets. For past dates (May 1-16),
+ * the per-day rows are seeded as ACTUALS, so target = actual = chip 100%.
+ * For future dates (May 17-31), per-day rows are CSV projections (per-event
+ * webinars + setter daily + ad spend daily). Mixed windows sum both.
  *
- * Volumes (Calls Booked, Cash, Deals, Revenue, Ad Spend) → month-paced
- * proration. For a window of N days, the target is the monthly_total ×
- * N / 31. This makes the target meaningful for past windows (where
- * "actual = actual" framing would always read 100%) and stays accurate
- * for future windows.
+ * Rates (Show, Close, AOV) → period-constant operating goals from CSV
+ * "Variables" block, channel='blended'. These are the standards every
+ * window should hit:
+ *   show_rate  = 47%   (Weekly Webinar)
+ *   close_rate = 39%   (Weekly Webinar)
+ *   aov_cash   = $3,019 (Weekly Webinar AOV Cash)
+ * Window-agnostic because rates aren't summable across days.
  */
 export async function getForecastBundleForWindow(
   start: string,
@@ -164,21 +163,22 @@ export async function getForecastBundleForWindow(
   const [rows] = await bq().query({
     query: `
       WITH
-      days AS (
-        SELECT DATE_DIFF(DATE(@end), DATE(@start), DAY) + 1 AS n
-      ),
-      monthly AS (
+      v AS (
+        -- Per-day forecast SUM — actuals for past days, projections for future
         SELECT
-          MAX(IF(metric_key='calls_booked', metric_value, NULL)) AS calls_booked,
-          MAX(IF(metric_key='calls_held',   metric_value, NULL)) AS calls_held,
-          MAX(IF(metric_key='deals_closed', metric_value, NULL)) AS deals_closed,
-          MAX(IF(metric_key='cash',         metric_value, NULL)) AS cash,
-          MAX(IF(metric_key='revenue',      metric_value, NULL)) AS revenue,
-          MAX(IF(metric_key='ad_spend',     metric_value, NULL)) AS ad_spend
+          SUM(IF(metric_key='ad_spend',     metric_value, NULL)) AS ad_spend,
+          SUM(IF(metric_key='cash',         metric_value, NULL)) AS cash,
+          SUM(IF(metric_key='revenue',      metric_value, NULL)) AS revenue,
+          SUM(IF(metric_key='deals_closed', metric_value, NULL)) AS deals_closed,
+          SUM(IF(metric_key='calls_booked', metric_value, NULL)) AS calls_booked,
+          SUM(IF(metric_key='calls_held',   metric_value, NULL)) AS calls_held
         FROM ${FORECAST_TABLE}
-        WHERE forecast_id = @forecastId AND metric_type = 'monthly_total'
+        WHERE forecast_id = @forecastId
+          AND metric_type = 'volume'
+          AND target_date BETWEEN DATE(@start) AND DATE(@end)
       ),
       rates AS (
+        -- Period-constant operating goals (Show / Close / AOV)
         SELECT
           MAX(IF(metric_key='show_rate'  AND channel='blended', metric_value, NULL)) AS show_rate,
           MAX(IF(metric_key='close_rate' AND channel='blended', metric_value, NULL)) AS close_rate,
@@ -187,16 +187,9 @@ export async function getForecastBundleForWindow(
         WHERE forecast_id = @forecastId AND metric_type = 'rate'
       )
       SELECT
-        -- Volume targets = monthly_total × days_in_window / 31
-        ROUND(monthly.calls_booked * days.n / 31)    AS calls_booked,
-        ROUND(monthly.calls_held   * days.n / 31, 1) AS calls_held,
-        ROUND(monthly.deals_closed * days.n / 31, 1) AS deals_closed,
-        ROUND(monthly.cash         * days.n / 31)    AS cash,
-        ROUND(monthly.revenue      * days.n / 31)    AS revenue,
-        ROUND(monthly.ad_spend     * days.n / 31)    AS ad_spend,
-        -- Rate targets = period-constant from CSV (channel='blended')
+        v.ad_spend, v.cash, v.revenue, v.deals_closed, v.calls_booked, v.calls_held,
         rates.show_rate, rates.close_rate, rates.aov_cash
-      FROM days, monthly, rates
+      FROM v, rates
     `,
     params: { forecastId, start, end },
     types: { forecastId: "STRING", start: "STRING", end: "STRING" },

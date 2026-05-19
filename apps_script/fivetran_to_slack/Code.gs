@@ -124,13 +124,20 @@ function postToSlack(webhook, msg, sourceLabel) {
     .trim();
   const body = bodyRaw.length > 2500 ? bodyRaw.slice(0, 2500) + "\n…(truncated)" : bodyRaw;
 
-  // Severity emoji from subject keywords
+  // Severity from subject keywords. CHECK ORDER MATTERS — "Error
+  // Resolved - X" emails contain BOTH "error" and "resolved". Must
+  // match the resolution keywords FIRST so recovery emails come in
+  // green, not red.
   const lower = subject.toLowerCase();
   let emoji = "📩";
   let severity = "info";
-  if (lower.match(/error|fail|stalled|broken/))      { emoji = "🔴"; severity = "red"; }
-  else if (lower.match(/warning|warn|stale|slow/))   { emoji = "🟠"; severity = "orange"; }
-  else if (lower.match(/success|recovered|resolved|ok\b/)) { emoji = "✅"; severity = "green"; }
+  if (lower.match(/resolved|recovered|succeeded|successful|completed successfully|back to normal/)) {
+    emoji = "✅"; severity = "green";
+  } else if (lower.match(/error|fail|stalled|broken|failure/)) {
+    emoji = "🔴"; severity = "red";
+  } else if (lower.match(/warning|warn|stale|slow|degraded/)) {
+    emoji = "🟠"; severity = "orange";
+  }
 
   // Build the @-mention prefix only on the severities we care about.
   // Slack mention syntax in webhooks: <@U01ABC23DEF>.

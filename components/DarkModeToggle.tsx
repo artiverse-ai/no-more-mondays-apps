@@ -15,9 +15,9 @@ import { setTheme, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 const NEXT: Record<Theme, Theme> = {
-  system: "light",
   light: "dark",
   dark: "system",
+  system: "light",
 };
 
 const LABEL: Record<Theme, string> = {

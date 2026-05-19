@@ -3,14 +3,14 @@
 // Cookie-backed so the server can render the right `dark` class on
 // <html> on first paint (no flash). Three states:
 //
-//   "system" (default) — follow the OS prefers-color-scheme preference.
-//                        Resolved client-side via matchMedia and an
-//                        inline pre-paint script in app/layout.tsx.
-//   "light"            — force light, regardless of OS preference.
-//   "dark"             — force dark.
+//   "light" (default) — force light, regardless of OS preference.
+//   "system"          — follow the OS prefers-color-scheme preference.
+//                       Resolved client-side via matchMedia and an
+//                       inline pre-paint script in app/layout.tsx.
+//   "dark"            — force dark.
 //
-// The toggle (components/DarkModeToggle.tsx) cycles
-// system → light → dark → system.
+// Default is "light" so first-time visitors land in day mode even if
+// their OS is set to dark. The toggle lets them switch.
 
 "use server";
 
@@ -25,10 +25,11 @@ export async function getTheme(): Promise<Theme> {
   try {
     const jar = await cookies();
     const v = jar.get(COOKIE)?.value;
-    return v === "light" || v === "dark" ? v : "system";
+    if (v === "light" || v === "dark" || v === "system") return v;
+    return "light";
   } catch {
-    // Outside request context (static gen). Default to system.
-    return "system";
+    // Outside request context (static gen). Default to light.
+    return "light";
   }
 }
 

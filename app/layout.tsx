@@ -69,7 +69,7 @@ export const metadata: Metadata = {
 // <html> BEFORE the browser paints, eliminating the dark-mode FOUC on
 // system-pref users + dark cookie users. Mirrors `applyThemeClass()` in
 // components/DarkModeToggle.tsx.
-const THEME_INIT_SCRIPT = `(function(){try{var m=document.cookie.match(/nmm-theme=([^;]+)/);var t=m?m[1]:"system";var dark=t==="dark"||(t==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);var c=document.documentElement.classList;if(dark){c.add("dark");}else{c.remove("dark");}}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{var m=document.cookie.match(/nmm-theme=([^;]+)/);var t=m?m[1]:"light";var dark=t==="dark"||(t==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);var c=document.documentElement.classList;if(dark){c.add("dark");}else{c.remove("dark");}}catch(e){}})();`;
 
 export default async function RootLayout({
   children,

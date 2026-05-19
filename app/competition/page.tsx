@@ -10,8 +10,10 @@ import { HeroStrip } from "./_components/HeroStrip";
 import { SplashIntro } from "./_components/SplashIntro";
 import styles from "./_components/competition.module.css";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// Cache for 30s so tab clicks feel instant. The leaderboard is live
+// but 30s freshness is fine — closers won't notice the lag, and it
+// prevents every period-switch from hitting BigQuery.
+export const revalidate = 30;
 
 export const metadata = { title: "The No More Mondays Games · Live" };
 
@@ -34,6 +36,9 @@ export default async function CompetitionPage({
   const params = await searchParams;
   const period = parsePeriod(params.period);
   const board = await fetchLeaderboard(period);
+  // How many closers actually scored — caps the podium size and tells
+  // the Field where to start.
+  const podiumSize = Math.min(3, board.closers.filter((c) => c.basePoints > 0).length);
 
   return (
     <main className={styles.shell}>
@@ -46,19 +51,24 @@ export default async function CompetitionPage({
         </div>
       </div>
 
-      <div className={styles.heroRow}>
-        <HeroStrip />
-        <div className={styles.heroContentCol}>
-          <PeriodTabs active={period} />
-          <div className={styles.countdownRow}>
-            <Countdown period={period} />
+      {/* key={period} forces React to remount the whole board on
+          period change so the CSS flip animations re-run for every
+          avatar (poster, podium, field). */}
+      <div key={period}>
+        <div className={styles.heroRow}>
+          <HeroStrip />
+          <div className={styles.heroContentCol}>
+            <PeriodTabs active={period} />
+            <div className={styles.countdownRow}>
+              <Countdown period={period} />
+            </div>
+            <Scoreboard team={board.team} />
+            <Podium closers={board.closers} />
           </div>
-          <Scoreboard team={board.team} />
-          <Podium closers={board.closers} />
         </div>
-      </div>
 
-      <Leaderboard closers={board.closers} />
+        <Leaderboard closers={board.closers} podiumSize={podiumSize} />
+      </div>
 
       <section className={styles.activity}>
         <div className={styles.activityTitle}>🔥 Recent Deals · {board.allDealsCount} this {period}</div>

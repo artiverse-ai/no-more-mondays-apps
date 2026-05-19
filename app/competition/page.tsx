@@ -6,7 +6,8 @@ import { Leaderboard } from "./_components/Leaderboard";
 import { MvpHero } from "./_components/MvpHero";
 import { Countdown } from "./_components/Countdown";
 import { RelativeTime } from "./_components/RelativeTime";
-import { AutoRefresh } from "./_components/AutoRefresh";
+import { HeroStrip } from "./_components/HeroStrip";
+import { SplashIntro } from "./_components/SplashIntro";
 import styles from "./_components/competition.module.css";
 
 export const dynamic = "force-dynamic";
@@ -43,14 +44,8 @@ export default async function CompetitionPage({
 
   return (
     <main className={styles.shell}>
-      <div className={styles.headerBar}>
-        <div className={styles.title}>
-          <span className={styles.bolt}>⚡</span>
-          THE NO MORE MONDAYS{" "}
-          <span className={styles.titleAccent}>GAMES</span>
-        </div>
-        <AutoRefresh fetchedAt={board.fetchedAt} intervalSec={30} />
-      </div>
+      <SplashIntro />
+      <HeroStrip fetchedAt={board.fetchedAt} />
 
       <PeriodTabs active={period} />
       <div className={styles.countdownRow}>

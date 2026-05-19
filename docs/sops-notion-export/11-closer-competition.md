@@ -1,213 +1,124 @@
-**Audience:** Closers · Setters · Sales Leadership · Admins
+**Audience:** Closers · Sales Leadership · Admins
 
-The NMM Closer Competition is a live, public scoreboard that ranks every active closer 1-N by points earned from closing deals. Teams (Red Hawks vs Blue Wolves) layer team competition on top of the individual race. Updates every 30 seconds as deals close. Closers see this dashboard — cash amounts are intentionally hidden, only points + deal counts appear.
+The Closer Competition is a live scoreboard that ranks every active closer 1–N by points earned from closing deals. Teams (Red Hawks vs Blue Wolves) sit on top of the individual race for extra spice — every closer is racing themselves to #1, AND racing their team to the bonus threshold. The page updates every 30 seconds as deals close. Closers see this page, so cash amounts are hidden — only points, deal counts, ranks, and badges show.
 
 **Live URL:** `https://no-more-mondays-apps.vercel.app/competition`
 
-## 01 — How points work
+## 01 — How points are earned
 
-> **Why:** A simple, fair formula every closer can do in their head. Bigger deal = more points. Hustling a follow-up to close = double credit.
+> **Why:** A simple formula a closer can do in their head. Bigger deal = more points. Hustling a follow-up to close = double credit.
 
-**The two rules:**
+- **OCC (One-Call Close):** every $10 of cash collected = **1 point**. A $4,997 PIF earns 499 pts.
+- **FUC (Follow-Up Close):** every $10 of cash collected = **2 points**. Same $4,997 deal closed on a follow-up earns 998 pts.
+- The deal's OCC vs FUC classification comes from `int_calls_enriched.close_type` (set automatically by the dbt model based on whether you closed on the first booked call or a follow-up).
+- A $0 deal (refund / partial cancel) earns 0 points — no penalty, no credit.
 
-| Deal type | Formula | Example |
-|---|---|---|
-| **OCC** (One-Call Close — closed on first call) | `$10 cash collected = 1 point` | $4,997 deal → 499 pts |
-| **FUC** (Follow-Up Close — closed on a follow-up call after the first call didn't close) | `$10 cash collected = 2 points` | $4,997 deal → 998 pts (2×) |
-
-**Why FUC counts double:** Following up takes more effort, retains a prospect who would otherwise have leaked out of the funnel, and proves the closer's persistence. The 2× multiplier rewards that work directly.
-
-Source of "OCC vs FUC" classification: `int_calls_enriched.close_type` (populated by the dbt model based on whether the deal closed on the first booked call or a follow-up call).
-
-**Cash → points formula in code:**
-
-```
-basePoints = Math.floor(cash_collected / 10) × (closeType === "FUC" ? 2 : 1)
-```
-
-Points are floored (integer only). $4,997 OCC = 499 pts. $4,999 OCC = 499 pts (the extra $2 doesn't get a point until you hit the next $10).
+> 💡 **Why FUC counts double:** following up takes real work and retains a prospect who would otherwise leak out of the funnel. The 2× multiplier rewards persistence directly.
 
 ## 02 — Periods (Today / This Week / This Month)
 
-> **Why:** Closers + leadership want different time horizons. Today = "how am I doing right now". Week = "am I on pace". Month = "am I winning the season".
+> **Why:** Closers want different time horizons. Today = "how am I doing right now". Week = "am I on pace". Month = "am I winning the season". The page defaults to **This Month** because that's the season view.
 
-| Period | Window | Bonus threshold | Bonus value |
-|---|---|---|---|
-| **Today** | Single day in ET | 200 base pts | +20 team pts |
-| **This Week** | Sales week Sun-Sat ET (current) | 1,000 base pts | +100 team pts |
-| **This Month** | Calendar month-to-date ET | 4,000 base pts | +500 team pts |
+- **Today** — single calendar day in ET. Bonus threshold 200 pts → +20 team bonus.
+- **This Week** — current sales week, Sunday–Saturday ET. Bonus 1,000 pts → +100.
+- **This Month** — current calendar month-to-date ET. Bonus 4,000 pts → +500.
 
-The page **defaults to This Month** when you load `/competition` — that's the "season view". Click the tabs to drill into Today or This Week.
+A live countdown sits below the period tabs (`⏱ 12d 23h left in month`). Updates every second.
 
-A live **countdown timer** below the tabs shows time remaining in the selected period: `⏱ 12d 23h left in month`. Updates every second.
+## 03 — Teams + jersey numbers
 
-## 03 — Teams
+> **Why:** Individual ranking is the actual goal. Teams add team-vs-team competition on top so even closer #5 still has stakes in the day.
 
-> **Why:** Individual ranking is the primary goal. Teams add extra spice — even if you're #6 individually, you can still help your team win the bonus.
+Two teams, balanced by historical L30D cash so neither starts with a talent edge:
 
-Two teams, balanced by historical L30D cash so neither side starts with a massive talent advantage:
-
-| Team | Color | Jersey numbers |
+| Team | Color | Jerseys |
 |---|---|---|
-| **Red Hawks** 🦅 | Red `#dc2626` | #10 Ben · #7 Tyler · #4 Morgan · #5 Cecilia |
-| **Blue Wolves** 🐺 | Blue `#0099ff` | #11 Jordan · #21 Destiny · #8 Johanna · #9 Derek |
+| **Red Hawks** 🦅 | red | #10 Ben · #7 Tyler · #4 Morgan · #5 Cecilia |
+| **Blue Wolves** 🐺 | blue | #11 Jordan · #21 Destiny · #8 Johanna · #9 Derek |
 
-Each closer has a permanent **jersey number** (orange badge on the avatar circle). Jersey numbers are fixed — they don't change between periods.
+Jersey numbers are permanent — they don't shuffle between periods. They show as orange badges on every closer's avatar circle.
 
-**Reassigning teams or changing jersey numbers** requires editing `app/competition/_data/roster.ts` and shipping. Not a closer-facing change.
+Reassigning teams or changing jersey numbers requires an engineering change to `app/competition/_data/roster.ts`. Ask the data team.
 
-## 04 — Team bonus
+## 04 — Team bonus + progress bar
 
-> **Why:** Forces collaboration. If your team is 100 pts away from the bonus and you have one more call today, that one deal matters double — to you AND to the team total.
+> **Why:** Forces collaboration. If your team is 100 pts away from the bonus and you have one more call today, that deal helps you AND tips the team over the line.
 
-When a team's **base points** for the period cross the threshold (see §02), the team earns **bonus points** that get added to their total. The scoreboard shows a **progress bar** filling with the team color so closers always know how close to bonus they are.
+- The team scoreboard at the top shows a **progress bar** filling in team color: `850 pts to 1,000 bonus` while accumulating, `🏆 BONUS UNLOCKED · +100` once crossed.
+- Bonus is **one-time per period** — once unlocked, the team can't earn it again by crossing higher thresholds within the same period.
+- Bonus points get added to the team total displayed in the big number — so a team at 850 + 100 bonus shows as 950.
 
-States:
-- **Bar partially filled:** `850 pts to 1000 bonus` — keep pushing
-- **Bar full + "🏆 BONUS UNLOCKED · +100":** earned, locked in for the period
+## 05 — Individual achievements (badges)
 
-A team can only earn the bonus once per period (you can't double-dip by crossing 200 today, then again at 400, etc. — it's a one-time unlock per period).
+> **Why:** Beyond raw points, recognize specific patterns of excellence. Closers see chips on each other's cards and naturally chase the rare ones.
 
-## 05 — Individual achievements (badges on cards)
+Four auto-detected achievements per period. Each shows as a gold chip below your deal count on your card; hover the chip to see the rule.
 
-> **Why:** Beyond pure points, recognize specific patterns of excellence. Closers see chips on each other's cards and naturally compete for the rare ones.
+- **👑 MVP** — you're #1 on the overall leaderboard AND have at least 1 deal. Recalculated every refresh, so the crown can move during the day.
+- **💎 FUC King** — you have the most FUC deals in the period. Ties **skip the award** (so it stays meaningful — if you and someone else tie, nobody gets it that period).
+- **🎩 Hat Trick** — you closed 3+ deals on a single day during the period. Multiple closers can hold this.
+- **🔥 Streak** — you closed at least one deal on 3+ consecutive days. Resets the moment you miss a day.
 
-Four achievements, auto-detected from the deal data for the current period:
+Badges scope to the **selected period** — your "Hat Trick" on the Month view means 3+ deals in a single day this month; on the Week view it has to be within Sun–Sat.
 
-| Badge | Icon | Rule | How to earn |
-|---|---|---|---|
-| **MVP** | 👑 | Top of the overall leaderboard with at least 1 deal | Be #1 across both teams. Recalculated every refresh. |
-| **FUC King** | 💎 | Most FUC deals in the period — ties skip the award | Close more follow-ups than anyone else. If you and someone else tie at the top, **nobody** gets it (keeps the badge meaningful). |
-| **Hat Trick** | 🎩 | 3+ deals closed in a single day | Have any single day with 3+ closes. Multiple closers can hold this. |
-| **Streak** | 🔥 | 3+ consecutive days with at least one deal | String together 3+ days with deals back-to-back. Resets when you miss a day. |
-
-Badges show as gold/orange chips below the deal count on each closer card. Hover to see the rule.
-
-**Period-scoped:** Achievements reset when you switch periods. "Hat Trick" on the Month view means 3+ deals in a single day during this month; on the Week view, it has to fall within this Sun-Sat.
-
-## 06 — Ranking visualization
+## 06 — Reading the leaderboard
 
 > **Why:** A closer should know exactly where they stand in 3 seconds.
 
-Each closer card carries a **rank badge** on the left:
-- 🥇 (gold medal) — rank #1
-- 🥈 (silver medal) — rank #2
-- 🥉 (bronze medal) — rank #3
-- **#4, #5, #6…** — capsule badge for everyone else, navy on cream
+- Cards sort by points DESC across both teams (single column, not split by team).
+- **🥇 🥈 🥉** medals on rank 1 / 2 / 3. Capsule `#N` badge for rank 4 onward.
+- Left border of each card is the team color → tells you who's on which team at a glance.
+- The current overall #1 also gets a **🏆 MVP hero pill** above the leaderboard with a floating crown.
 
-Cards are sorted by base points DESC across both teams. Team affiliation shown via the team-color left border + the jersey number badge color.
+## 07 — Recent Deals feed
 
-The current #1 also appears in a **🏆 MVP hero pill** above the leaderboard with their jersey, name, team, and points.
+> **Why:** The social heartbeat of the page — closers feel the live action and see when teammates score.
 
-## 07 — Live updates
+The bottom section shows the most recent 10 deals across both teams, newest first:
 
-The dashboard re-fetches data every **30 seconds** automatically — no refresh needed. The pulsing red "🔴 LIVE · 12s" badge in the top-right shows when data was last fetched.
+- Team-color dot + jersey + closer name
+- "closed a deal" / "closed a follow-up"
+- Gold **FUC 2×** chip if it was a follow-up
+- Relative timestamp ("today", "yesterday", "3 days ago") — updates client-side every 30 seconds
+- Points earned in big gold on the right (`+599 pts`)
 
-Behind the scenes:
-- Server component fetches from BigQuery
-- Client-side `AutoRefresh` calls `router.refresh()` every 30s
-- BigQuery returns the latest data
-- Page re-renders seamlessly
+## 08 — What's hidden + why
 
-There's no manual refresh button — the page is always within 30 seconds of current.
+> **Why:** Closers shouldn't compare each other's earnings or see the full financial pipeline. Points + counts are enough for competition. Cash stays in leadership-only dashboards.
 
-## 08 — Active roster filter
+Never appears on `/competition`:
 
-> **Why:** Only people actively closing should be on the leaderboard. Retired closers shouldn't haunt the rankings forever.
+- Dollar amounts (no AOV, no cash collected per deal, no team revenue)
+- Conversion rates (show rate, close rate, attendance rate)
+- Forecast targets
+- Per-closer historical trends across periods
 
-The roster is filtered every refresh against `nmm_calendar.closers` where `is_active = true`. To take someone off the leaderboard:
-- Flip their row to `is_active = false` in the closers table
-- Next refresh (≤30s), they disappear
+If you need any of that, those numbers live on `/dashboards/weekly-report/[slug]` (leadership-only).
 
-To add someone:
-- They need a row in `nmm_calendar.closers` with `is_active = true`
-- AND a row in `app/competition/_data/roster.ts` with their team + jersey number
-- Both required — the BQ table controls eligibility, the roster file controls display
+## 09 — Who appears on the board
 
-Today's active roster: 8 closers (Ben, Tyler, Morgan, Cecilia, Jordan, Destiny, Johanna, Derek). Luke is inactive (excluded). Grace isn't in the closers table (excluded).
+> **Why:** Only people actively closing should be ranked. Retired closers shouldn't haunt the standings.
 
-## 09 — Activity feed
+- The roster is filtered every refresh against `nmm_calendar.closers` where `is_active = true`.
+- To take someone off the leaderboard: flip their `is_active` to `false` in that table → they disappear within 30 seconds. No deploy needed.
+- To add someone: they need a row in `closers` with `is_active = true` AND a row in the engineering-side roster file (`app/competition/_data/roster.ts`) with a team + jersey number. Both required.
 
-The "🔥 Recent Deals" section at the bottom shows the most recent 10 deals across both teams in chronological order (newest first). Each row:
+Today's active roster: Ben, Tyler, Morgan, Cecilia (Red) · Jordan, Destiny, Johanna, Derek (Blue). Luke is `is_active=false`; Grace isn't in the `closers` table — both excluded.
 
-- Team-color dot (red or blue)
-- Jersey number + closer name
-- "closed a deal" or "closed a follow-up"
-- **FUC 2× chip** (gold) if it was a follow-up
-- Relative time ("today", "yesterday", "3 days ago") — updates client-side every 30s
-- **+N pts** in big gold (the points that deal earned)
+## 10 — FAQ
 
-This is the social feed — closers can see when teammates closed and feel the live action.
+> **Why:** Common closer questions, in one place.
 
-## 10 — What you DON'T see
+- **My deal closed but it's not showing.** Check that `is_deal = TRUE` on the row in `int_calls_enriched` and that your name is in the `closers` table with `is_active=true`. There's also a ~few-hours delay before the dbt model refreshes — fresh deals can take up to that long to appear.
+- **Why are my points different on Today vs Week vs Month?** Different windows count different deals. A deal closed last Tuesday doesn't show in Today, does show in Week (if Tuesday was Sun–Sat) and Month.
+- **What happens if two closers tie on points?** Tied closers list alphabetically. We can change this if it bothers anyone — ask leadership.
+- **My jersey image is just my initials. When do I get a real portrait?** When leadership ships AI-generated portraits. Until then everyone has clean initial-circles in their team color.
+- **Can someone outside NMM see this page?** Currently yes — there's no auth wall on `/competition`. If leadership wants it locked to nomoremondays.io emails, that's a 5-minute add — ask the data team.
 
-> **Why:** Closers shouldn't be comparing each other's earnings or seeing the entire pipeline financials. Points + counts are enough for competition. Cash stays in internal-only dashboards.
+## 11 — Where the rules live (engineers)
 
-Hidden from `/competition`:
-- 💵 Any dollar amount (no AOV, no cash collected per deal, no team revenue total)
-- 🎯 Conversion rates (show rate, close rate, etc.)
-- 📅 Forecast targets (only on the internal weekly report dashboards)
-- 📊 Per-closer historical trends (compete on this period, not on lifetime)
+> **Why:** Every rule above is one file edit. No DB schema changes needed for normal tweaks.
 
-Internal dashboards at `/dashboards/weekly-report/[slug]` still show everything financial for leadership eyes.
-
-## 11 — Refresh rules / edge cases
-
-| Situation | Behavior |
-|---|---|
-| Closer has 0 deals in the period | Still appears on the leaderboard at the bottom with 0 pts and "0 deals". Empty cards keep visible so they know to get started. |
-| Two closers tied on points | Tie-break is alphabetical by `closer_owner`. We could change this — flag if it bothers anyone. |
-| Deal closed across midnight ET | Counted in the day the `date_closed` BQ column says. dbt classifies in ET. |
-| Cash collected updated after a deal initially booked (payment-plan top-up) | Recalculated on every refresh. If a $1,000 deposit turns into $4,997 PIF a week later, points retroactively bump. |
-| Closer leaves NMM mid-period | When marked `is_active=false`, they disappear from the board. Their deals are no longer counted in team totals. |
-| Bonus thresholds set wrong | Edit `BONUS_THRESHOLDS` in `app/competition/_data/roster.ts` — applies on next refresh. |
-| New deal type added (e.g. "PIF", "Partial") that isn't OCC or FUC | Defaults to OCC scoring (1× multiplier). Adjust `pointsForDeal()` in `_lib/scoring.ts`. |
-
-## 12 — How to change the rules
-
-All competition logic lives in **two files** so it's easy to audit:
-
-- **`app/competition/_data/roster.ts`** — teams, jersey numbers, bonus thresholds, team colors, team names
-- **`app/competition/_lib/scoring.ts`** — point formula, period boundaries, achievement detection
-
-Each constant in those files has a comment explaining the rule. Ship a small PR to change anything. No BQ schema changes needed for rule tweaks.
-
-## 13 — FAQ
-
-**Q: My deal closed but it's not showing — what's wrong?**
-A: Check `int_calls_enriched` in BigQuery — that's the source. If `is_deal = TRUE` for your deal but you don't see points, it might be the freshness lag (dbt model refreshes every few hours). If your name doesn't appear at all, check that you're in the `closers` table with `is_active = true`.
-
-**Q: I closed a $0 deal (refund, partial). Do I lose points?**
-A: No — points are based on `cash_collected`. A $0 deal contributes 0 points, neither adds nor removes from your total.
-
-**Q: Can I see last month's standings?**
-A: Not in v1 — only current periods. If leadership wants historical archives ("April champions"), we can add a `/competition/archive/[period]` route. Ask.
-
-**Q: Why are my points different between Today, Week, and Month?**
-A: The window changes what deals get counted. A deal from May 5 doesn't count in Today (May 19), counts in Month (May 5 is in May), might count in Week depending on which Sun-Sat the deal fell into.
-
-**Q: My jersey image is just my initials. When will I have a real portrait?**
-A: Custom AI-generated portraits will be added when leadership provides them. Drop the image into `/public/competition/jerseys/<name>.png` and the card auto-swaps. Until then everyone has clean initial-circles in their team color.
-
-**Q: Can someone outside the company see this?**
-A: Currently yes — `/competition` is publicly viewable. There's no auth wall. If you want it locked to NMM domain emails only, that's a 5-minute addition — let leadership decide.
-
-## 14 — For engineers — source files
-
-| Concern | File |
-|---|---|
-| Teams, jerseys, bonus thresholds | `app/competition/_data/roster.ts` |
-| Scoring formula, period windows, achievement detection, BQ queries | `app/competition/_lib/scoring.ts` |
-| Page layout, MVP hero, leaderboard, activity feed | `app/competition/page.tsx` |
-| Closer card render (rank badge + jersey avatar + achievements) | `app/competition/_components/CloserCard.tsx` |
-| Team scoreboard (Red vs Blue + bonus progress bars) | `app/competition/_components/Scoreboard.tsx` |
-| MVP hero pill | `app/competition/_components/MvpHero.tsx` |
-| Period tabs (Today/Week/Month) | `app/competition/_components/PeriodTabs.tsx` |
-| Live countdown timer | `app/competition/_components/Countdown.tsx` |
-| Relative timestamps in activity feed | `app/competition/_components/RelativeTime.tsx` |
-| Auto-refresh every 30s | `app/competition/_components/AutoRefresh.tsx` |
-| All Beast Games × NMM theme styling | `app/competition/_components/competition.module.css` |
-
-Source-of-truth BQ tables:
-- `dbt_tuddin.int_calls_enriched` — deals, `closer_owner`, `cash_collected`, `close_type`, `date_closed`
-- `nmm_calendar.closers` — active roster (`email`, `is_active`)
+- `app/competition/_data/roster.ts` — teams, jersey numbers, bonus thresholds, team colors, team names
+- `app/competition/_lib/scoring.ts` — point formula, period boundaries, achievement detection
+- Source data: `dbt_tuddin.int_calls_enriched` (deals) + `nmm_calendar.closers` (active roster)

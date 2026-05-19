@@ -39,6 +39,13 @@ export default async function CompetitionPage({
     <main className={styles.shell}>
       <SplashIntro />
 
+      <div className={styles.topBar}>
+        <div className={styles.heroMotivation} aria-hidden="true">
+          <span className={styles.heroMotivationDot} />
+          EVERY CALL COUNTS
+        </div>
+      </div>
+
       <div className={styles.heroRow}>
         <HeroStrip />
         <div className={styles.heroContentCol}>

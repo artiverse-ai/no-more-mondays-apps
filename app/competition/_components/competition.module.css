@@ -92,7 +92,7 @@
 .heroContentCol {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .heroStrip {
@@ -175,13 +175,19 @@
   margin-top: 8px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
-/* Motivational chip floating on top-right of the poster — keeps closers
- * pumped while they're checking the board. */
+/* Top bar above the hero row — hosts the motivational chip on the right
+ * so it doesn't overlap the poster artwork. */
+.topBar {
+  max-width: 1280px;
+  margin: 0 auto 12px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* Motivational chip — keeps closers pumped while they're checking the
+ * board. Lives in .topBar (NOT inside the poster). */
 .heroMotivation {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -303,8 +309,8 @@
 .periodTab {
   flex: 1;
   text-align: center;
-  padding: 12px 22px;
-  font-size: 13px;
+  padding: 9px 18px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
@@ -334,11 +340,11 @@
 .countdown {
   width: 100%;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 1.8px;
+  letter-spacing: 1.6px;
   text-transform: uppercase;
-  padding: 11px 16px;
+  padding: 8px 14px;
   background: linear-gradient(180deg, rgba(255, 122, 26, 0.18), rgba(255, 122, 26, 0.06));
   border: 1px solid rgba(255, 122, 26, 0.4);
   border-radius: 999px;
@@ -359,8 +365,8 @@
     linear-gradient(180deg, rgba(255, 122, 26, 0.06) 0%, transparent 100%),
     rgba(11, 29, 61, 0.75);
   border: 1px solid rgba(255, 122, 26, 0.3);
-  border-radius: 18px;
-  padding: 22px 28px;
+  border-radius: 16px;
+  padding: 14px 22px 16px;
   box-shadow:
     0 10px 30px rgba(0, 0, 0, 0.5),
     0 0 40px rgba(255, 122, 26, 0.08);
@@ -394,7 +400,7 @@
   font-weight: 600;
 }
 .teamPoints {
-  font-size: 72px;
+  font-size: 58px;
   font-weight: 900;
   line-height: 0.95;
   font-variant-numeric: tabular-nums;
@@ -415,8 +421,8 @@
 .bonusBar {
   position: relative;
   width: 100%;
-  height: 32px;
-  margin-top: 6px;
+  height: 26px;
+  margin-top: 4px;
   background: rgba(5, 15, 32, 0.6);
   border-radius: 999px;
   overflow: hidden;
@@ -567,16 +573,16 @@
 .podium {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 18px 20px;
-  border-radius: 18px;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
   background: rgba(11, 29, 61, 0.72);
   border: 1px solid rgba(255, 122, 26, 0.22);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
 }
 .podiumHeader {
-  font-size: 12px;
-  letter-spacing: 2.6px;
+  font-size: 11px;
+  letter-spacing: 2.2px;
   text-transform: uppercase;
   font-weight: 900;
   color: #ff7a1a;
@@ -587,15 +593,15 @@
 .podiumRows {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
 }
 .podiumRow {
   display: grid;
-  grid-template-columns: 38px 60px 1fr auto;
-  gap: 14px;
+  grid-template-columns: 30px 48px 1fr auto;
+  gap: 12px;
   align-items: center;
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 8px 12px;
+  border-radius: 12px;
   background: rgba(5, 15, 32, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.08);
   position: relative;
@@ -634,12 +640,12 @@
   box-shadow: 0 0 18px rgba(205, 127, 50, 0.15);
 }
 .podiumMedal {
-  font-size: 28px;
+  font-size: 22px;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
   text-align: center;
 }
 .podiumGold .podiumMedal {
-  font-size: 34px;
+  font-size: 26px;
   animation: podiumWobble 3s ease-in-out infinite;
   transform-origin: 50% 80%;
 }
@@ -649,14 +655,14 @@
   75%      { transform: rotate(7deg)  scale(1.05); }
 }
 .podiumAvatar {
-  width: 60px;
-  height: 60px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: linear-gradient(135deg, #ff7a1a, #e25c00);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 900;
   color: #fff;
   position: relative;
@@ -667,8 +673,8 @@
 .podiumGold .podiumAvatar {
   border-color: #ffcc33;
   box-shadow: 0 0 18px rgba(255, 204, 51, 0.55);
-  width: 66px;
-  height: 66px;
+  width: 54px;
+  height: 54px;
 }
 .podiumSilver .podiumAvatar { border-color: #cbd5e1; }
 .podiumBronze .podiumAvatar { border-color: #cd7f32; }
@@ -693,7 +699,7 @@
   gap: 3px;
 }
 .podiumName {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
   color: #f5e9d6;
   letter-spacing: 0.3px;
@@ -701,9 +707,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.podiumGold .podiumName { font-size: 18px; }
+.podiumGold .podiumName { font-size: 16px; }
 .podiumSub {
-  font-size: 11px;
+  font-size: 10px;
   color: #94a3b8;
   letter-spacing: 0.4px;
 }
@@ -713,7 +719,7 @@
   align-items: flex-end;
 }
 .podiumPointsVal {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 900;
   color: #ff7a1a;
   letter-spacing: -0.5px;
@@ -722,7 +728,7 @@
   line-height: 1;
 }
 .podiumGold .podiumPointsVal {
-  font-size: 32px;
+  font-size: 26px;
   color: #ffd84d;
   text-shadow: 0 0 18px rgba(255, 204, 51, 0.7);
 }
@@ -735,11 +741,11 @@
   text-shadow: 0 0 10px rgba(205, 127, 50, 0.5);
 }
 .podiumPointsLbl {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   color: #64748b;
-  letter-spacing: 1.5px;
-  margin-top: 4px;
+  letter-spacing: 1.4px;
+  margin-top: 2px;
 }
 
 /* ─── Leaderboard ────────────────────────────────────────────────── */
@@ -1037,9 +1043,8 @@
     margin: 0 auto;
     border-radius: 16px;
   }
+  .topBar { margin: 0 auto 8px; }
   .heroMotivation {
-    top: 10px;
-    right: 12px;
     padding: 5px 10px;
     font-size: 9px;
     letter-spacing: 1.2px;

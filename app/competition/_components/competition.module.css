@@ -1,24 +1,33 @@
-/* Closer Competition — "Beast Games × No More Mondays" theme.
+/* The No More Mondays Games — dark navy + cinematic orange theme.
+ * Matches Marek's game poster (May 2026 V1).
  *
- * NMM palette:   cream #efeeea, navy #193852, orange #ff7700, green #36a379
- * Beast Games:   electric yellow #ffe600, bold scoreboard type, prize chrome
- *
- * Foundation = NMM cream + navy (matches nomoremondays.io). Energy =
- * Beast Games scoreboard chrome — huge chunky type, sharp scoring,
- * gold prize accents on bonus states. Light theme, high contrast. */
+ * Palette:
+ *   #050f20  deep navy base
+ *   #0b1d3d  panel navy (cards / scoreboard background)
+ *   #1b3260  border navy (subtle dividers)
+ *   #ff7a1a  poster orange (primary accent, jersey numbers, points)
+ *   #ffae66  orange glow
+ *   #00aaff  electric cyan (stadium lights, score highlights)
+ *   #f5e9d6  cream text
+ */
 
 .shell {
   min-height: 100vh;
   background:
-    /* Warm radial highlights — subtle, on-brand */
-    radial-gradient(900px 500px at 15% 0%, rgba(255, 119, 0, 0.06), transparent 50%),
-    radial-gradient(900px 500px at 85% 0%, rgba(0, 153, 255, 0.05), transparent 50%),
-    /* NMM cream base */
-    linear-gradient(180deg, #fffefa 0%, #efeeea 100%);
-  color: #193852;
+    /* Stadium glow — top */
+    radial-gradient(900px 500px at 50% -10%, rgba(255, 122, 26, 0.15), transparent 55%),
+    /* Side spotlights */
+    radial-gradient(800px 600px at 10% 20%, rgba(0, 170, 255, 0.10), transparent 50%),
+    radial-gradient(800px 600px at 90% 20%, rgba(0, 170, 255, 0.10), transparent 50%),
+    /* Bottom glow */
+    radial-gradient(1000px 400px at 50% 100%, rgba(255, 122, 26, 0.08), transparent 50%),
+    /* Base navy */
+    linear-gradient(180deg, #050f20 0%, #0b1d3d 50%, #050f20 100%);
+  color: #f5e9d6;
   font-family: var(--font-sans, ui-sans-serif);
-  padding: 14px 16px 60px;
+  padding: 18px 16px 60px;
   position: relative;
+  overflow-x: hidden;
 }
 
 /* ─── Header ─────────────────────────────────────────────────────── */
@@ -28,30 +37,32 @@
   justify-content: space-between;
   gap: 12px;
   max-width: 1280px;
-  margin: 0 auto 12px;
+  margin: 0 auto 16px;
   padding: 4px 4px;
 }
 .title {
   font-size: 22px;
   font-weight: 900;
-  letter-spacing: 1.2px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   line-height: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #193852;
+  color: #f5e9d6;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .titleAccent {
-  color: #ff7700;
+  color: #ff7a1a;
   font-style: italic;
   transform: skewX(-6deg);
   display: inline-block;
-  text-shadow: 0 2px 0 rgba(25, 56, 82, 0.1);
+  text-shadow: 0 0 18px rgba(255, 122, 26, 0.7), 0 2px 0 rgba(0, 0, 0, 0.5);
 }
 .bolt {
   font-size: 22px;
   display: inline-block;
+  filter: drop-shadow(0 0 10px rgba(255, 122, 26, 0.7));
   animation: boltPulse 2s ease-in-out infinite;
 }
 @keyframes boltPulse {
@@ -69,10 +80,9 @@
   text-transform: uppercase;
   padding: 6px 12px;
   border-radius: 999px;
-  background: #ff7700;
+  background: linear-gradient(90deg, #ff7a1a, #e25c00);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(255, 119, 0, 0.35);
-  border: none;
+  box-shadow: 0 4px 14px rgba(255, 122, 26, 0.4);
 }
 .liveDot {
   width: 8px;
@@ -95,11 +105,12 @@
 }
 .periodTabs {
   display: inline-flex;
-  background: #fffefa;
-  border: 2px solid rgba(25, 56, 82, 0.12);
+  background: rgba(11, 29, 61, 0.6);
+  border: 1px solid rgba(255, 122, 26, 0.3);
   border-radius: 14px;
   padding: 4px;
-  box-shadow: 0 4px 14px rgba(25, 56, 82, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
 }
 .periodTab {
   padding: 10px 22px;
@@ -107,7 +118,7 @@
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #6b7280;
+  color: #94a3b8;
   background: transparent;
   border: none;
   border-radius: 10px;
@@ -115,28 +126,51 @@
   transition: all 200ms ease;
   text-decoration: none;
 }
-.periodTab:hover:not(.periodTabActive) { color: #193852; background: rgba(25, 56, 82, 0.04); }
+.periodTab:hover:not(.periodTabActive) { color: #ff7a1a; background: rgba(255, 122, 26, 0.08); }
 .periodTabActive {
-  background: linear-gradient(180deg, #193852 0%, #0d2138 100%);
+  background: linear-gradient(180deg, #ff7a1a 0%, #e25c00 100%);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(25, 56, 82, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 14px rgba(255, 122, 26, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
 }
 
-/* ─── Scoreboard (compact) ───────────────────────────────────────── */
-.scoreboard {
+/* ─── Countdown timer ────────────────────────────────────────────── */
+.countdownRow {
+  display: flex;
+  justify-content: center;
   max-width: 1280px;
   margin: 0 auto 18px;
+}
+.countdown {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  background: rgba(255, 122, 26, 0.12);
+  border: 1px solid rgba(255, 122, 26, 0.35);
+  border-radius: 999px;
+  color: #ffae66;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Scoreboard — single team, big number ───────────────────────── */
+.scoreboard {
+  max-width: 1280px;
+  margin: 0 auto 20px;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 16px;
-  align-items: stretch;
-  background: #fffefa;
-  border: 1px solid rgba(25, 56, 82, 0.15);
-  border-radius: 16px;
-  padding: 16px 22px;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  text-align: center;
+  background:
+    linear-gradient(180deg, rgba(255, 122, 26, 0.06) 0%, transparent 100%),
+    rgba(11, 29, 61, 0.75);
+  border: 1px solid rgba(255, 122, 26, 0.3);
+  border-radius: 18px;
+  padding: 22px 28px;
   box-shadow:
-    0 6px 20px rgba(25, 56, 82, 0.06),
-    0 2px 6px rgba(25, 56, 82, 0.03);
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(255, 122, 26, 0.08);
   position: relative;
   overflow: hidden;
 }
@@ -145,53 +179,63 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #dc2626 0%, #ff7700 50%, #0099ff 100%);
+  background: linear-gradient(90deg, transparent, #ff7a1a 30%, #00aaff 70%, transparent);
 }
-
-.teamScore {
+.teamLabel {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  position: relative;
-  padding: 4px 2px;
+  align-items: center;
+  gap: 2px;
 }
-.teamScoreRight { align-items: flex-end; text-align: right; }
-.teamName {
+.teamLabelMain {
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 2.5px;
   text-transform: uppercase;
+  color: #ff7a1a;
+  text-shadow: 0 0 10px rgba(255, 122, 26, 0.4);
+}
+.teamLabelSub {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
 }
 .teamPoints {
-  font-size: 48px;
+  font-size: 72px;
   font-weight: 900;
   line-height: 0.95;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -1.5px;
+  letter-spacing: -2px;
+  color: #f5e9d6;
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(255, 122, 26, 0.35);
 }
-.teamMeta {
+.teamPointsLabel {
   font-size: 11px;
-  color: #6b7280;
+  color: #cbd5e1;
   font-weight: 700;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
 }
-/* Bonus progress bar — fills with team color, label depends on state */
+
+/* Bonus progress bar */
 .bonusBar {
   position: relative;
   width: 100%;
-  height: 28px;
-  margin-top: 8px;
-  background: rgba(25, 56, 82, 0.08);
+  height: 32px;
+  margin-top: 6px;
+  background: rgba(5, 15, 32, 0.6);
   border-radius: 999px;
   overflow: hidden;
-  border: 1px solid rgba(25, 56, 82, 0.10);
+  border: 1px solid rgba(255, 122, 26, 0.25);
 }
 .bonusBarFill {
   position: absolute;
   inset: 0;
   width: 0;
   transition: width 600ms cubic-bezier(0.16, 1, 0.3, 1);
-  opacity: 0.85;
+  background: linear-gradient(90deg, #ff7a1a 0%, #ffae66 100%);
+  box-shadow: 0 0 16px rgba(255, 122, 26, 0.4);
 }
 .bonusBarLabel {
   position: absolute;
@@ -199,48 +243,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
-  color: #193852;
-  letter-spacing: 1px;
+  color: #f5e9d6;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   z-index: 1;
 }
-.vs {
-  font-size: 32px;
-  font-weight: 900;
-  font-style: italic;
-  color: #ff7700;
-  letter-spacing: 0;
-  padding: 0 6px;
-  display: flex;
-  align-items: center;
-  transform: skewX(-8deg);
-  text-shadow: 1px 1px 0 rgba(25, 56, 82, 0.1);
-}
 
-/* ─── Countdown timer ────────────────────────────────────────────── */
-.countdownRow {
-  display: flex;
-  justify-content: center;
-  max-width: 1280px;
-  margin: 0 auto 16px;
-}
-.countdown {
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  padding: 6px 14px;
-  background: rgba(255, 119, 0, 0.10);
-  border: 1px solid rgba(255, 119, 0, 0.30);
-  border-radius: 999px;
-  color: #ff7700;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ─── MVP hero (compact pill) ────────────────────────────────────── */
+/* ─── MVP hero ───────────────────────────────────────────────────── */
 .mvpHero {
   max-width: 1280px;
   margin: 0 auto 18px;
@@ -250,11 +262,11 @@
   align-items: center;
   padding: 12px 18px;
   background:
-    linear-gradient(135deg, rgba(255, 230, 0, 0.18) 0%, rgba(255, 119, 0, 0.08) 100%),
-    #fffefa;
-  border: 1px solid #ff7700;
+    linear-gradient(135deg, rgba(255, 122, 26, 0.18) 0%, rgba(255, 122, 26, 0.04) 100%),
+    rgba(11, 29, 61, 0.7);
+  border: 1px solid #ff7a1a;
   border-radius: 14px;
-  box-shadow: 0 4px 16px rgba(255, 119, 0, 0.12);
+  box-shadow: 0 4px 20px rgba(255, 122, 26, 0.25);
   position: relative;
   overflow: hidden;
 }
@@ -263,14 +275,14 @@
   position: absolute;
   top: -30px;
   right: -30px;
-  width: 120px;
-  height: 120px;
-  background: radial-gradient(circle, rgba(255, 230, 0, 0.4), transparent 60%);
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(255, 174, 102, 0.4), transparent 60%);
   pointer-events: none;
 }
 .mvpCrown {
   font-size: 28px;
-  filter: drop-shadow(0 2px 4px rgba(255, 119, 0, 0.4));
+  filter: drop-shadow(0 2px 6px rgba(255, 122, 26, 0.6));
   animation: crownFloat 3s ease-in-out infinite;
 }
 @keyframes crownFloat {
@@ -281,8 +293,7 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--team-color) 70%, white), var(--team-color) 60%, color-mix(in srgb, var(--team-color) 60%, black));
+  background: linear-gradient(135deg, #ff7a1a 0%, #e25c00 70%, #0b1d3d 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -290,9 +301,9 @@
   font-weight: 900;
   color: #fff;
   position: relative;
-  border: 2px solid #fffefa;
-  box-shadow: 0 3px 10px rgba(25, 56, 82, 0.20), 0 0 0 2px var(--team-color);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  border: 2px solid #ff7a1a;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.6), 0 0 0 2px rgba(255, 122, 26, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -301,17 +312,17 @@
   position: absolute;
   bottom: -3px;
   right: -3px;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: #ff7700;
-  border: 2px solid #fffefa;
-  font-size: 10px;
+  background: #f5e9d6;
+  border: 2px solid #ff7a1a;
+  font-size: 11px;
   font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #0b1d3d;
   text-shadow: none;
 }
 .mvpInfo {
@@ -326,20 +337,14 @@
   font-weight: 900;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: #ff7700;
+  color: #ff7a1a;
 }
 .mvpName {
   font-size: 18px;
   font-weight: 900;
-  color: #193852;
+  color: #f5e9d6;
   letter-spacing: -0.2px;
   line-height: 1;
-}
-.mvpTeam {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
 }
 .mvpScore {
   text-align: right;
@@ -350,24 +355,25 @@
   gap: 6px;
 }
 .mvpScoreVal {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 900;
-  color: #ff7700;
+  color: #ff7a1a;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   letter-spacing: -1px;
+  text-shadow: 0 0 16px rgba(255, 122, 26, 0.5);
 }
 .mvpScoreLbl {
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 1.5px;
-  color: #6b7280;
+  color: #cbd5e1;
 }
 
-/* ─── Leaderboard (overall ranking) ──────────────────────────────── */
+/* ─── Leaderboard ────────────────────────────────────────────────── */
 .leaderboard {
   max-width: 1280px;
-  margin: 0 auto 32px;
+  margin: 0 auto 24px;
 }
 .leaderboardHeader {
   display: flex;
@@ -378,12 +384,12 @@
   font-size: 18px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: #193852;
+  color: #f5e9d6;
 }
 .leaderboardHeaderSub {
   font-size: 12px;
   font-weight: 700;
-  color: #6b7280;
+  color: #94a3b8;
   letter-spacing: 1px;
 }
 .leaderboardList {
@@ -392,19 +398,26 @@
   gap: 10px;
 }
 
-/* ─── Closer card (with rank badge column) ───────────────────────── */
+/* ─── Closer card ────────────────────────────────────────────────── */
 .closerCard {
   display: grid;
   grid-template-columns: 56px 72px 1fr auto;
   gap: 14px;
   align-items: center;
   padding: 14px 16px;
-  background: #fffefa;
-  border: 1px solid rgba(25, 56, 82, 0.10);
-  border-left: 5px solid var(--team-color);
+  background:
+    linear-gradient(180deg, rgba(255, 122, 26, 0.03) 0%, transparent 100%),
+    rgba(11, 29, 61, 0.65);
+  border: 1px solid rgba(255, 122, 26, 0.15);
+  border-left: 4px solid #ff7a1a;
   border-radius: 14px;
-  transition: transform 180ms ease, box-shadow 180ms ease;
-  box-shadow: 0 2px 6px rgba(25, 56, 82, 0.05);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.closerCard:hover {
+  transform: translateY(-2px);
+  border-color: #ff7a1a;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), 0 0 18px rgba(255, 122, 26, 0.2);
 }
 .rankBadge {
   display: flex;
@@ -415,16 +428,16 @@
 }
 .rankMedal {
   font-size: 38px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
 }
 .rankNum {
   font-size: 20px;
   font-weight: 900;
-  color: #193852;
+  color: #ff7a1a;
   font-variant-numeric: tabular-nums;
   letter-spacing: -1px;
-  background: linear-gradient(180deg, #efeeea 0%, #dbdad7 100%);
-  border: 2px solid rgba(25, 56, 82, 0.15);
+  background: rgba(5, 15, 32, 0.7);
+  border: 2px solid rgba(255, 122, 26, 0.4);
   border-radius: 50%;
   width: 44px;
   height: 44px;
@@ -432,8 +445,76 @@
   align-items: center;
   justify-content: center;
 }
-.closerInfo {
-  min-width: 0;
+.jerseyImage {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff7a1a 0%, #e25c00 60%, #1b3260 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 900;
+  color: #fff;
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 3px solid #0b1d3d;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.5),
+    0 0 0 2px rgba(255, 122, 26, 0.4);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+.jerseyImage img { width: 100%; height: 100%; object-fit: cover; }
+.jerseyNumber {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f5e9d6;
+  border: 3px solid #0b1d3d;
+  font-size: 12px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0b1d3d;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  text-shadow: none;
+}
+.closerInfo { min-width: 0; }
+.closerName {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: #f5e9d6;
+}
+.closerSub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 3px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.closerPoints {
+  font-size: 32px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #ff7a1a;
+  line-height: 1;
+  letter-spacing: -1px;
+  text-shadow: 0 0 14px rgba(255, 122, 26, 0.45);
+}
+.closerPointsLabel {
+  font-size: 9px;
+  color: #94a3b8;
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  margin-top: 2px;
 }
 .achievementRow {
   display: flex;
@@ -449,105 +530,33 @@
   font-weight: 800;
   padding: 3px 8px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #ffe600, #ff7700);
-  color: #422006;
+  background: linear-gradient(90deg, #ff7a1a, #ffae66);
+  color: #0b1d3d;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(255, 119, 0, 0.25);
+  box-shadow: 0 2px 6px rgba(255, 122, 26, 0.35);
   cursor: help;
-}
-.closerCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(25, 56, 82, 0.12), 0 0 0 2px var(--team-color);
-}
-.jerseyImage {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--team-color) 70%, white), var(--team-color) 60%, color-mix(in srgb, var(--team-color) 60%, black));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  font-weight: 900;
-  color: #fff;
-  position: relative;
-  flex-shrink: 0;
-  overflow: hidden;
-  border: 3px solid #fffefa;
-  box-shadow:
-    0 4px 12px rgba(25, 56, 82, 0.20),
-    0 0 0 2px var(--team-color);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-.jerseyImage img { width: 100%; height: 100%; object-fit: cover; }
-.jerseyNumber {
-  position: absolute;
-  bottom: -4px;
-  right: -4px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #ff7700;
-  border: 3px solid #fffefa;
-  font-size: 12px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-  text-shadow: none;
-}
-.closerName {
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  color: #193852;
-}
-.closerSub {
-  font-size: 12px;
-  color: #4b5563;
-  margin-top: 3px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-}
-.closerPoints {
-  font-size: 32px;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-  color: var(--team-color);
-  line-height: 1;
-  letter-spacing: -1px;
-}
-.closerPointsLabel {
-  font-size: 9px;
-  color: #6b7280;
-  text-align: right;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  font-weight: 700;
-  margin-top: 2px;
 }
 
 /* ─── Activity feed ──────────────────────────────────────────────── */
 .activity {
   max-width: 1280px;
   margin: 0 auto;
-  background: #fffefa;
-  border: 2px solid rgba(25, 56, 82, 0.10);
+  background:
+    linear-gradient(180deg, rgba(255, 122, 26, 0.04) 0%, transparent 100%),
+    rgba(11, 29, 61, 0.65);
+  border: 1px solid rgba(255, 122, 26, 0.18);
   border-radius: 18px;
-  padding: 20px 24px;
-  box-shadow: 0 4px 14px rgba(25, 56, 82, 0.06);
+  padding: 18px 22px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 .activityTitle {
   font-size: 13px;
   font-weight: 900;
   letter-spacing: 2.5px;
   text-transform: uppercase;
-  color: #193852;
+  color: #ff7a1a;
   margin-bottom: 14px;
   display: flex;
   align-items: center;
@@ -558,9 +567,9 @@
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(25, 56, 82, 0.08);
+  border-bottom: 1px solid rgba(255, 122, 26, 0.10);
   font-size: 13px;
-  color: #4b5563;
+  color: #cbd5e1;
 }
 .activityRow:last-child { border-bottom: none; }
 .activityDot {
@@ -568,81 +577,83 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  background: #ff7a1a;
+  box-shadow: 0 0 8px rgba(255, 122, 26, 0.7);
 }
 .activityName {
   font-weight: 800;
-  color: #193852;
+  color: #f5e9d6;
   letter-spacing: 0.3px;
 }
+.activityMeta { color: #94a3b8; font-size: 12px; }
+.activityDate { color: #64748b; font-size: 11px; }
 .activityPts {
   margin-left: auto;
   font-weight: 900;
   font-size: 16px;
   font-variant-numeric: tabular-nums;
-  color: #ff7700;
+  color: #ff7a1a;
+  text-shadow: 0 0 10px rgba(255, 122, 26, 0.4);
 }
 .activityFuc {
   font-size: 9px;
   padding: 3px 8px;
   border-radius: 6px;
-  background: linear-gradient(90deg, #ffe600, #ff7700);
-  color: #422006;
+  background: linear-gradient(90deg, #ff7a1a, #ffae66);
+  color: #0b1d3d;
   font-weight: 900;
   letter-spacing: 1px;
-  box-shadow: 0 2px 6px rgba(255, 119, 0, 0.3);
+  box-shadow: 0 2px 6px rgba(255, 122, 26, 0.35);
 }
 
 .empty {
   padding: 40px;
   text-align: center;
-  color: #6b7280;
+  color: #94a3b8;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.3px;
 }
 
-/* Rules footer — readable on cream */
+/* Rules footer */
 .rulesFooter {
   max-width: 1280px;
-  margin: 28px auto 0;
+  margin: 24px auto 0;
   padding: 14px 20px;
-  background: rgba(25, 56, 82, 0.05);
-  border: 1px dashed rgba(25, 56, 82, 0.2);
+  background: rgba(11, 29, 61, 0.6);
+  border: 1px dashed rgba(255, 122, 26, 0.3);
   border-radius: 12px;
   font-size: 13px;
-  color: #193852;
+  color: #cbd5e1;
   text-align: center;
   font-weight: 600;
   letter-spacing: 0.3px;
   line-height: 1.6;
 }
 .rulesFooter strong {
-  color: #ff7700;
+  color: #ff7a1a;
   font-weight: 900;
+}
+.rulesFooterSub {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 /* ─── Mobile ─────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
-  .title { font-size: 20px; letter-spacing: 1px; }
-  .bolt { font-size: 22px; }
-  .scoreboard {
-    grid-template-columns: 1fr;
-    text-align: center;
-    padding: 20px 18px;
-    gap: 10px;
-  }
-  .teamScoreRight { align-items: center; text-align: center; }
-  .teamScore { align-items: center; }
-  .teamPoints { font-size: 36px; letter-spacing: -1px; }
-  .vs { font-size: 22px; padding: 4px 0; }
-  .mvpHero { padding: 10px 14px; gap: 10px; grid-template-columns: auto auto 1fr auto; }
+  .title { font-size: 16px; letter-spacing: 1px; }
+  .bolt { font-size: 18px; }
+  .scoreboard { padding: 18px 16px; }
+  .teamPoints { font-size: 52px; letter-spacing: -1.5px; }
+  .mvpHero { padding: 10px 14px; gap: 10px; }
   .mvpCrown { font-size: 22px; }
   .mvpAvatar { width: 40px; height: 40px; font-size: 16px; }
   .mvpName { font-size: 16px; }
-  .mvpScoreVal { font-size: 22px; }
+  .mvpScoreVal { font-size: 26px; }
   .mvpInfo { gap: 6px; }
-  .mvpLabel { display: none; }   /* save room — orange border + crown imply MVP */
-  /* Closer card: 4 cols → 3 cols (jersey overlaps rank visually) */
+  .mvpLabel { display: none; }
   .closerCard { grid-template-columns: 40px 52px 1fr auto; padding: 12px 12px; gap: 10px; }
   .rankBadge { width: 40px; height: 52px; }
   .rankMedal { font-size: 28px; }

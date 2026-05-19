@@ -1,5 +1,5 @@
 import { fetchLeaderboard, type Period } from "./_lib/scoring";
-import { TEAMS } from "./_data/roster";
+import { TEAM } from "./_data/roster";
 import { Scoreboard } from "./_components/Scoreboard";
 import { PeriodTabs } from "./_components/PeriodTabs";
 import { Leaderboard } from "./_components/Leaderboard";
@@ -12,14 +12,16 @@ import styles from "./_components/competition.module.css";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata = { title: "NMM Closer Competition · Live" };
+export const metadata = { title: "The No More Mondays Games · Live" };
 
 // IMPORTANT: closers see this dashboard. Render ONLY points + deal
 // counts. Cash amounts never appear on /competition.
+//
+// Single team layout per Ben 2026-05-19 — everyone races individually
+// for rank, contributes to one team pot, bonus unlocks when team
+// crosses the period threshold. No Red/Blue split.
 
 function parsePeriod(p: string | undefined): Period {
-  // Default to "month" — closers + management want the season view first;
-  // they can drill into "week" or "today" from the tabs.
   return p === "today" || p === "week" ? p : "month";
 }
 
@@ -37,18 +39,15 @@ export default async function CompetitionPage({
   const params = await searchParams;
   const period = parsePeriod(params.period);
   const board = await fetchLeaderboard(period);
-
-  // Combined leaderboard — all closers across both teams, sorted by points
-  const allClosers = [...board.teams.red.closers, ...board.teams.blue.closers]
-    .sort((a, b) => a.globalRank - b.globalRank);
-  const mvp = allClosers[0] ?? null;
+  const mvp = board.closers[0] ?? null;
 
   return (
     <main className={styles.shell}>
       <div className={styles.headerBar}>
         <div className={styles.title}>
           <span className={styles.bolt}>⚡</span>
-          NMM CLOSER <span className={styles.titleAccent}>BEAST MODE</span>
+          THE NO MORE MONDAYS{" "}
+          <span className={styles.titleAccent}>GAMES</span>
         </div>
         <AutoRefresh fetchedAt={board.fetchedAt} intervalSec={30} />
       </div>
@@ -58,11 +57,11 @@ export default async function CompetitionPage({
         <Countdown period={period} />
       </div>
 
-      <Scoreboard red={board.teams.red} blue={board.teams.blue} />
+      <Scoreboard team={board.team} />
 
       <MvpHero mvp={mvp} periodLabel={PERIOD_LABEL[period]} />
 
-      <Leaderboard closers={allClosers} />
+      <Leaderboard closers={board.closers} />
 
       <section className={styles.activity}>
         <div className={styles.activityTitle}>🔥 Recent Deals · {board.allDealsCount} this {period}</div>
@@ -71,13 +70,13 @@ export default async function CompetitionPage({
         ) : (
           board.recentActivity.map((d, i) => (
             <div key={i} className={styles.activityRow}>
-              <span className={styles.activityDot} style={{ background: TEAMS[d.profile.team].color }} />
+              <span className={styles.activityDot} />
               <span className={styles.activityName}>#{d.profile.jersey} {d.profile.closerOwner}</span>
-              <span style={{ color: "#6b7280", fontSize: 12 }}>
+              <span className={styles.activityMeta}>
                 closed a {d.closeType === "FUC" ? "follow-up" : "deal"}
               </span>
               {d.closeType === "FUC" && <span className={styles.activityFuc}>FUC 2×</span>}
-              <span style={{ color: "#94a3b8", fontSize: 11 }}>
+              <span className={styles.activityDate}>
                 <RelativeTime dateIso={d.dateClosed} fallback={d.dateClosed} />
               </span>
               <span className={styles.activityPts}>+{d.points} pts</span>
@@ -89,10 +88,10 @@ export default async function CompetitionPage({
       <div className={styles.rulesFooter}>
         <strong>Scoring:</strong> Every $10 closed = 1 pt &nbsp;·&nbsp;
         <strong>Follow-up closes count 2×</strong> &nbsp;·&nbsp;
-        Team bonus unlocks at the threshold
+        Team bonus unlocks at {board.team.bonusThreshold.toLocaleString()} pts ({period})
         <br />
-        <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 500, letterSpacing: 0.5 }}>
-          Live window: {board.windowStart} → {board.windowEnd}
+        <span className={styles.rulesFooterSub}>
+          Window: {board.windowStart} → {board.windowEnd} · Team: {TEAM.name}
         </span>
       </div>
     </main>

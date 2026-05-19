@@ -1,12 +1,10 @@
 import type { Achievement, CloserScore } from "../_lib/scoring";
-import { TEAMS } from "../_data/roster";
 import styles from "./competition.module.css";
 
 const fmtInt = (n: number) => Math.round(n).toLocaleString();
 
-// IMPORTANT: closers see this dashboard. Never render cash amounts here —
-// only points + deal counts + achievements + rank. Cash stays on internal-
-// only dashboards.
+// IMPORTANT: closers see this dashboard. Never render cash amounts —
+// only points + deal counts + achievements + rank.
 
 const ACHIEVEMENT_META: Record<Achievement, { icon: string; label: string; tip: string }> = {
   "mvp":       { icon: "👑", label: "MVP",       tip: "Top scorer overall this period" },
@@ -18,19 +16,15 @@ const ACHIEVEMENT_META: Record<Achievement, { icon: string; label: string; tip: 
 const RANK_MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 export function CloserCard({ score }: { score: CloserScore }) {
-  const { profile, basePoints, deals, fucDeals, globalRank, achievements } = score;
-  const teamColor = TEAMS[profile.team].color;
+  const { profile, basePoints, deals, fucDeals, rank, achievements } = score;
   const displayName = profile.displayName ?? profile.closerOwner;
   const initial = displayName.slice(0, 2).toUpperCase();
-  const medal = RANK_MEDAL[globalRank];
+  const medal = RANK_MEDAL[rank];
 
   return (
-    <div
-      className={styles.closerCard}
-      style={{ ["--team-color" as string]: teamColor }}
-    >
+    <div className={styles.closerCard}>
       <div className={styles.rankBadge}>
-        {medal ? <span className={styles.rankMedal}>{medal}</span> : <span className={styles.rankNum}>#{globalRank}</span>}
+        {medal ? <span className={styles.rankMedal}>{medal}</span> : <span className={styles.rankNum}>#{rank}</span>}
       </div>
       <div className={styles.jerseyImage}>
         {profile.imageUrl ? (

@@ -1,19 +1,22 @@
-// Competition scoring engine — pulls deals from int_calls_enriched and
-// converts them to points per the user's spec:
-//   • $10 cash collected = 1 point (OCC = One-Call Close)
-//   • $10 cash collected = 2 points (FUC = Follow-Up Close — "harder" deal,
-//     closer had to retain the prospect through a follow-up)
-// Plus per-team bonus when daily/weekly/monthly total crosses a threshold
-// (configured in roster.ts → BONUS_THRESHOLDS).
+// Competition scoring engine — pulls deals from int_calls_enriched,
+// converts to points, ranks the closers, and aggregates a single
+// team total for the bonus unlock.
+//
+// Scoring rules (per user spec):
+//   • $10 cash collected = 1 point  (OCC = One-Call Close)
+//   • $10 cash collected = 2 points (FUC = Follow-Up Close)
+// Bonus rule: when the team's combined base points cross the period
+// threshold (configured in roster.ts → BONUS_THRESHOLDS), every closer
+// shares the bonus pot. Single team — no Red/Blue split (Ben's call
+// 2026-05-19: "Once the whole team gets to a number it unlocks points").
 
 import { bq } from "@/lib/bq";
 import {
   ROSTER,
   ROSTER_BY_NAME,
-  TEAMS,
+  TEAM,
   BONUS_THRESHOLDS,
   type CloserProfile,
-  type Team,
 } from "../_data/roster";
 
 const ENRICHED = "`no-more-mondays-analytics.dbt_tuddin.int_calls_enriched`";
@@ -55,15 +58,13 @@ export type CloserScore = {
   fucPoints: number;
   deals: number;
   fucDeals: number;
-  cashCollected: number;            // internal only — never rendered on /competition
-  recentDeals: Deal[];               // last 5 for the activity feed
-  /** 1-based rank across ALL closers (both teams). #1 has the most points. */
-  globalRank: number;
-  /** 1-based rank within own team. */
-  teamRank: number;
+  cashCollected: number;             // internal only — never rendered on /competition
+  recentDeals: Deal[];                // last 5 for the activity feed
+  /** 1-based rank across the unified team. #1 has the most points. */
+  rank: number;
   /** Days closer had at least one deal in the period, sorted ascending. */
   activeDays: string[];
-  /** Longest consecutive-day deal streak within the period (0 if none). */
+  /** Longest consecutive-day deal streak within the period. */
   longestStreak: number;
   /** Max deals on any single day in the period. */
   bestDay: number;
@@ -71,18 +72,15 @@ export type CloserScore = {
 };
 
 export type TeamScore = {
-  team: Team;
   name: string;
   short: string;
-  color: string;
   basePoints: number;
   bonusPoints: number;
   totalPoints: number;
   bonusEarned: boolean;
   bonusThreshold: number;
-  closers: CloserScore[];        // sorted by basePoints DESC
   totalDeals: number;
-  totalCash: number;
+  totalCash: number;                  // internal only — not rendered
 };
 
 export type Leaderboard = {
@@ -90,19 +88,16 @@ export type Leaderboard = {
   windowStart: string;
   windowEnd: string;
   fetchedAt: string;
-  teams: { red: TeamScore; blue: TeamScore };
+  team: TeamScore;
+  closers: CloserScore[];             // sorted by basePoints DESC
   allDealsCount: number;
-  /** Recent activity feed across both teams, newest first, max 10. */
+  /** Recent activity feed, newest first, max 10. */
   recentActivity: Array<Deal & { profile: CloserProfile; points: number }>;
 };
 
 /** Convert a period string + "now" timestamp to a [start, end] DATE window
- *  in ET-bucketed YYYY-MM-DD form. Today = single day; week = current
- *  Sun-Sat ET (sales week); month = current month-to-date. */
+ *  in ET-bucketed YYYY-MM-DD form. */
 export function periodWindow(period: Period, now: Date = new Date()): { start: string; end: string } {
-  // Use UTC dates throughout — the BQ DATE columns are ET-bucketed upstream
-  // so a UTC-derived "today" works correctly enough for v1. Sub-millisecond
-  // edge cases at midnight ET are acceptable for the competition feed.
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -124,7 +119,7 @@ export function periodWindow(period: Period, now: Date = new Date()): { start: s
   return { start: iso(monthStart), end: iso(monthEnd) };
 }
 
-/** Points = cash / 10, doubled for FUC. */
+/** Points = floor(cash / 10), doubled for FUC. */
 export function pointsForDeal(cashCollected: number, closeType: "OCC" | "FUC" | "UNKNOWN"): number {
   const base = cashCollected / 10;
   const multiplier = closeType === "FUC" ? 2 : 1;
@@ -147,8 +142,8 @@ const DEALS_SQL = `
 `;
 
 /** Fetch raw deals for the window + active-closer set in parallel, then
- *  aggregate into TeamScore[] and an activity feed. Inactive closers
- *  (closers.is_active=false) are excluded entirely. */
+ *  aggregate into a single TeamScore + ranked CloserScore[]. Inactive
+ *  closers (closers.is_active=false) are excluded entirely. */
 export async function fetchLeaderboard(period: Period, now: Date = new Date()): Promise<Leaderboard> {
   const { start, end } = periodWindow(period, now);
   const [activeNames, dealRowsRaw] = await Promise.all([
@@ -169,8 +164,7 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     prospectEmail: String(r.prospect_email ?? ""),
   }));
 
-  // Filter roster to active closers only (closers.is_active=true) — anyone
-  // retired / inactive disappears from the board, no jersey assigned.
+  // Filter roster to active closers only (closers.is_active=true)
   const activeRoster = ROSTER.filter((p) => activeNames.has(p.closerOwner));
   const perCloser = new Map<string, CloserScore>();
   const dealsByCloserByDay = new Map<string, Map<string, number>>();
@@ -184,8 +178,7 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
       fucDeals: 0,
       cashCollected: 0,
       recentDeals: [],
-      globalRank: 0,
-      teamRank: 0,
+      rank: 0,
       activeDays: [],
       longestStreak: 0,
       bestDay: 0,
@@ -196,7 +189,7 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
 
   for (const deal of deals) {
     const closer = perCloser.get(deal.closerOwner);
-    if (!closer) continue;  // closer not rostered — skip silently
+    if (!closer) continue;
     const pts = pointsForDeal(deal.cashCollected, deal.closeType);
     closer.basePoints += pts;
     closer.cashCollected += deal.cashCollected;
@@ -210,7 +203,6 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     if (closer.recentDeals.length < 5) {
       closer.recentDeals.push(deal);
     }
-    // Track per-day counts for streak + bestDay
     const dayMap = dealsByCloserByDay.get(deal.closerOwner)!;
     dayMap.set(deal.dateClosed, (dayMap.get(deal.dateClosed) ?? 0) + 1);
   }
@@ -221,7 +213,6 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     const days = Array.from(dayMap.keys()).sort();
     score.activeDays = days;
     score.bestDay = Math.max(0, ...Array.from(dayMap.values()));
-    // Longest streak of consecutive dates with at least one deal
     let longest = 0, current = 0;
     let prev: Date | null = null;
     for (const d of days) {
@@ -237,57 +228,40 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     score.longestStreak = longest;
   }
 
-  // Group closers into teams + compute ranks
-  const allClosers = Array.from(perCloser.values()).sort((a, b) => b.basePoints - a.basePoints);
-  allClosers.forEach((c, i) => { c.globalRank = i + 1; });
+  // Single ranked list (no team split)
+  const closers = Array.from(perCloser.values()).sort((a, b) => b.basePoints - a.basePoints);
+  closers.forEach((c, i) => { c.rank = i + 1; });
 
-  const redClosers: CloserScore[] = [];
-  const blueClosers: CloserScore[] = [];
-  for (const score of allClosers) {
-    (score.profile.team === "red" ? redClosers : blueClosers).push(score);
-  }
-  redClosers.forEach((c, i) => { c.teamRank = i + 1; });
-  blueClosers.forEach((c, i) => { c.teamRank = i + 1; });
-
-  // Achievement detection (single pass over all closers)
-  // - mvp: globalRank === 1 AND has at least 1 deal (no "MVP" if board is empty)
-  // - fuc-king: most fucDeals (single winner; ties → no award to keep meaning)
-  // - hat-trick: bestDay >= 3 (closed 3+ deals in one day during period)
-  // - streak: longestStreak >= 3 (3+ consecutive days with deals)
-  const maxFuc = Math.max(0, ...allClosers.map((c) => c.fucDeals));
-  const fucKingCount = maxFuc > 0 ? allClosers.filter((c) => c.fucDeals === maxFuc).length : 0;
-  for (const c of allClosers) {
+  // Achievement detection
+  const maxFuc = Math.max(0, ...closers.map((c) => c.fucDeals));
+  const fucKingCount = maxFuc > 0 ? closers.filter((c) => c.fucDeals === maxFuc).length : 0;
+  for (const c of closers) {
     const ach: Achievement[] = [];
-    if (c.globalRank === 1 && c.deals > 0) ach.push("mvp");
+    if (c.rank === 1 && c.deals > 0) ach.push("mvp");
     if (maxFuc > 0 && fucKingCount === 1 && c.fucDeals === maxFuc) ach.push("fuc-king");
     if (c.bestDay >= 3) ach.push("hat-trick");
     if (c.longestStreak >= 3) ach.push("streak");
     c.achievements = ach;
   }
 
-  const buildTeam = (team: Team, closers: CloserScore[]): TeamScore => {
-    const basePoints = closers.reduce((s, c) => s + c.basePoints, 0);
-    const meta = TEAMS[team];
-    const threshold = BONUS_THRESHOLDS[period].threshold;
-    const bonusValue = BONUS_THRESHOLDS[period].bonus;
-    const bonusEarned = basePoints >= threshold;
-    return {
-      team,
-      name: meta.name,
-      short: meta.short,
-      color: meta.color,
-      basePoints,
-      bonusPoints: bonusEarned ? bonusValue : 0,
-      totalPoints: basePoints + (bonusEarned ? bonusValue : 0),
-      bonusEarned,
-      bonusThreshold: threshold,
-      closers,
-      totalDeals: closers.reduce((s, c) => s + c.deals, 0),
-      totalCash: closers.reduce((s, c) => s + c.cashCollected, 0),
-    };
+  // Single team aggregate
+  const basePoints = closers.reduce((s, c) => s + c.basePoints, 0);
+  const threshold = BONUS_THRESHOLDS[period].threshold;
+  const bonusValue = BONUS_THRESHOLDS[period].bonus;
+  const bonusEarned = basePoints >= threshold;
+  const team: TeamScore = {
+    name: TEAM.name,
+    short: TEAM.short,
+    basePoints,
+    bonusPoints: bonusEarned ? bonusValue : 0,
+    totalPoints: basePoints + (bonusEarned ? bonusValue : 0),
+    bonusEarned,
+    bonusThreshold: threshold,
+    totalDeals: closers.reduce((s, c) => s + c.deals, 0),
+    totalCash: closers.reduce((s, c) => s + c.cashCollected, 0),
   };
 
-  // Recent activity feed (newest 10 deals across both teams)
+  // Recent activity feed (newest 10 deals)
   const recentActivity = deals
     .map((d) => {
       const profile = ROSTER_BY_NAME.get(d.closerOwner);
@@ -302,7 +276,8 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     windowStart: start,
     windowEnd: end,
     fetchedAt: new Date().toISOString(),
-    teams: { red: buildTeam("red", redClosers), blue: buildTeam("blue", blueClosers) },
+    team,
+    closers,
     allDealsCount: deals.length,
     recentActivity,
   };

@@ -45,16 +45,18 @@ export default async function CompetitionPage({
   return (
     <main className={styles.shell}>
       <SplashIntro />
-      <HeroStrip fetchedAt={board.fetchedAt} />
 
-      <PeriodTabs active={period} />
-      <div className={styles.countdownRow}>
-        <Countdown period={period} />
+      <div className={styles.heroRow}>
+        <HeroStrip fetchedAt={board.fetchedAt} />
+        <div className={styles.heroContentCol}>
+          <PeriodTabs active={period} />
+          <div className={styles.countdownRow}>
+            <Countdown period={period} />
+          </div>
+          <Scoreboard team={board.team} />
+          <MvpHero mvp={mvp} periodLabel={PERIOD_LABEL[period]} />
+        </div>
       </div>
-
-      <Scoreboard team={board.team} />
-
-      <MvpHero mvp={mvp} periodLabel={PERIOD_LABEL[period]} />
 
       <Leaderboard closers={board.closers} />
 

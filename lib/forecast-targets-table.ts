@@ -49,7 +49,7 @@ export function ensureForecastTargetsTable(): Promise<void> {
 export type ForecastTargetRow = {
   forecast_id: string;
   metric_key: string;
-  metric_type: "volume" | "rate";
+  metric_type: "volume" | "rate" | "monthly_total";
   channel: string | null;
   event_label: string | null;
   target_date: string | null;     // YYYY-MM-DD

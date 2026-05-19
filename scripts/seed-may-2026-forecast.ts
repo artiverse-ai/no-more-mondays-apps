@@ -58,27 +58,32 @@ const isFuture = (r: typeof rows[number]) => r.target_date != null && r.target_d
 const isPast = (r: typeof rows[number]) => r.target_date != null && r.target_date < "2026-05-17";
 const inMemoryChecks: Check[] = [
   // ── Future half (May 17-31) — original CSV "Projected" numbers ─────
-  { label: "[5/17-31] Webinar funnel ad spend",      expected: 28755, actual: sum((r) => isFuture(r) && r.metric_key === "ad_spend" && r.channel === "webinar") },
-  { label: "[5/17-31] Setter funnel ad spend",       expected:  8435, actual: sum((r) => isFuture(r) && r.metric_key === "ad_spend" && r.channel === "setter") },
-  { label: "[5/17-31] TOTAL ad spend",               expected: 37190, actual: sum((r) => isFuture(r) && r.metric_key === "ad_spend") },
-  { label: "[5/17-31] Webinar+workshop booked",      expected:   305, actual: sum((r) => isFuture(r) && r.metric_key === "calls_booked" && (r.channel === "webinar" || r.channel === "workshop")) },
-  { label: "[5/17-31] Setter booked",                expected:    57, actual: sum((r) => isFuture(r) && r.metric_key === "calls_booked" && r.channel === "setter") },
-  { label: "[5/17-31] TOTAL booked",                 expected:   362, actual: sum((r) => isFuture(r) && r.metric_key === "calls_booked") },
-  { label: "[5/17-31] TOTAL cash",                   expected:133845, actual: sum((r) => isFuture(r) && r.metric_key === "cash") },
-  { label: "[5/17-31] TOTAL revenue",                expected:183189, actual: sum((r) => isFuture(r) && r.metric_key === "revenue") },
-  { label: "[5/17-31] TOTAL deals closed",           expected:  44.3, actual: sum((r) => isFuture(r) && r.metric_key === "deals_closed") },
+  { label: "[5/17-31] Webinar funnel ad spend",      expected: 28755, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "ad_spend" && r.channel === "webinar") },
+  { label: "[5/17-31] Setter funnel ad spend",       expected:  8435, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "ad_spend" && r.channel === "setter") },
+  { label: "[5/17-31] TOTAL ad spend",               expected: 37190, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "ad_spend") },
+  { label: "[5/17-31] Webinar+workshop booked",      expected:   305, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "calls_booked" && (r.channel === "webinar" || r.channel === "workshop")) },
+  { label: "[5/17-31] Setter booked",                expected:    57, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "calls_booked" && r.channel === "setter") },
+  { label: "[5/17-31] TOTAL booked",                 expected:   362, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "calls_booked") },
+  { label: "[5/17-31] TOTAL cash",                   expected:133845, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "cash") },
+  { label: "[5/17-31] TOTAL revenue",                expected:183189, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "revenue") },
+  { label: "[5/17-31] TOTAL deals closed",           expected:  44.3, actual: sum((r) => isFuture(r) && r.metric_type === "volume" && r.metric_key === "deals_closed") },
   // ── Past half (May 1-16) — backfilled CSV "Actual" numbers ─────────
-  { label: "[5/1-16] Past webinar ad spend",         expected: 22969, actual: sum((r) => isPast(r) && r.metric_key === "ad_spend" && r.channel === "webinar") },
-  { label: "[5/1-16] Past non-webinar ad spend",     expected: 10697, actual: sum((r) => isPast(r) && r.metric_key === "ad_spend" && r.channel === "setter") },
-  { label: "[5/1-16] Past TOTAL ad spend",           expected: 33666, actual: sum((r) => isPast(r) && r.metric_key === "ad_spend"), },
-  { label: "[5/1-16] Past 4 webinars deals",         expected:    36, actual: sum((r) => isPast(r) && r.metric_key === "deals_closed" && r.channel === "webinar") },
-  { label: "[5/1-16] Past setter deals",             expected:    13, actual: sum((r) => isPast(r) && r.metric_key === "deals_closed" && r.channel === "setter") },
-  { label: "[5/1-16] Past 4 webinars cash",          expected: 34979, actual: sum((r) => isPast(r) && r.metric_key === "cash" && r.channel === "webinar") },
-  { label: "[5/1-16] Past setter cash",              expected: 38840, actual: sum((r) => isPast(r) && r.metric_key === "cash" && r.channel === "setter") },
+  { label: "[5/1-16] Past webinar ad spend",         expected: 22969, actual: sum((r) => isPast(r) && r.metric_type === "volume" && r.metric_key === "ad_spend" && r.channel === "webinar") },
+  { label: "[5/1-16] Past non-webinar ad spend",     expected: 10697, actual: sum((r) => isPast(r) && r.metric_type === "volume" && r.metric_key === "ad_spend" && r.channel === "setter") },
+  { label: "[5/1-16] Past TOTAL ad spend",           expected: 33666, actual: sum((r) => isPast(r) && r.metric_type === "volume" && r.metric_key === "ad_spend"), },
+  { label: "[5/1-16] Past 4 webinars deals",         expected:    36, actual: sum((r) => isPast(r) && r.metric_type === "volume" && r.metric_key === "deals_closed" && r.channel === "webinar") },
+  { label: "[5/1-16] Past setter deals",             expected:    13, actual: sum((r) => isPast(r) && r.metric_type === "volume" && r.metric_key === "deals_closed" && r.channel === "setter") },
+  { label: "[5/1-16] Past 4 webinars cash",          expected: 34979, actual: sum((r) => isPast(r) && r.metric_type === "volume" && r.metric_key === "cash" && r.channel === "webinar") },
+  { label: "[5/1-16] Past setter cash",              expected: 38840, actual: sum((r) => isPast(r) && r.metric_type === "volume" && r.metric_key === "cash" && r.channel === "setter") },
   // ── Full month sanity ──────────────────────────────────────────────
-  { label: "[Full May] TOTAL ad spend",              expected:  70856, actual: sum((r) => r.metric_key === "ad_spend") },
-  { label: "[Full May] TOTAL cash",                  expected: 242542, actual: sum((r) => r.metric_key === "cash") },
-  { label: "[Full May] TOTAL revenue",               expected: 332081, actual: sum((r) => r.metric_key === "revenue") }, // CSV stated 332,267 — its own sum is 332,081 (148,892 + 183,189). Match the periods.
+  { label: "[Full May] TOTAL ad spend",              expected:  70856, actual: sum((r) => r.metric_type === "volume" && r.metric_key === "ad_spend") },
+  { label: "[Full May] TOTAL cash",                  expected: 242542, actual: sum((r) => r.metric_type === "volume" && r.metric_key === "cash") },
+  { label: "[Full May] TOTAL revenue",               expected: 332081, actual: sum((r) => r.metric_type === "volume" && r.metric_key === "revenue") },
+  // monthly_total rows (the new period-level facts used by month-pace chips)
+  { label: "[monthly_total] cash",                   expected: 242542, actual: sum((r) => r.metric_type === "monthly_total" && r.metric_key === "cash") },
+  { label: "[monthly_total] ad_spend",               expected:  70856, actual: sum((r) => r.metric_type === "monthly_total" && r.metric_key === "ad_spend") },
+  { label: "[monthly_total] deals",                  expected:   80.3, actual: sum((r) => r.metric_type === "monthly_total" && r.metric_key === "deals_closed") },
+  { label: "[monthly_total] calls_booked",           expected:    499, actual: sum((r) => r.metric_type === "monthly_total" && r.metric_key === "calls_booked") },
 ];
 
 let failed = 0;

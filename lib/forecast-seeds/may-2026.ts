@@ -27,7 +27,10 @@ import type { ForecastTargetRow } from "../forecast-targets-table";
 
 const PERIOD_START = "2026-05-01";
 const PERIOD_END = "2026-05-31";
-const FORECAST_ID = "may-2026-v2";  // v2 = adds May 1-16 backfill (v1 was May 17-31 only)
+// v4 = adds blended rate targets (CSV operating goals) + monthly_total
+// rows for volume-pace chips. Bundle query now reads from these instead
+// of deriving rates from volume sums. v1/v2/v3 stay for audit.
+const FORECAST_ID = "may-2026-v4";
 
 type EventProjection = {
   date: string;
@@ -131,6 +134,36 @@ const PAST_OTHER_GAP = {
   cash:    108697 - 34979 - 38840,  // $34,878 — Skool + installments + attribution
   revenue: 148892 - 56958 - 52961,  // $38,973
 };
+
+// ─── Monthly totals (the "goal" — used for volume target chip via
+// month-pace proration: target = monthly_total × days_in_window / 31) ──
+// CSV "Full Month" headers:
+//   Cash      $242,542
+//   Revenue   $332,267  (per-period sums = $332,081 — CSV rounding)
+//   Ad Spend  $70,856
+//   Deals     80
+//   Calls Booked: 137 actual + 362 projected = 499 (calls in calendar)
+const MONTHLY_TOTALS = {
+  calls_booked: 137 + 362,       // 499
+  calls_held:   76  + 158.5,     // 234.5 (137 past held + 158.5 projected)
+  deals_closed: 36  + 44.3,      // 80.3
+  cash:         108697 + 133845, // 242,542 ✓
+  revenue:      148892 + 183189, // 332,081
+  ad_spend:     33666 + 37190,   // 70,856 ✓
+};
+
+// ─── Blended rate constants — used as the target on rate chips
+// (Show Rate, Close Rate, AOV). Source: CSV "Variables" block. We use
+// the WEEKLY WEBINAR rates because most weeks are non-workshop weeks
+// and webinar is the dominant funnel by deal volume. Workshop weeks
+// (May 24) would technically blend down but we don't switch per-week
+// — keeps the chip target consistent across periods. ────────────────
+const BLENDED_RATE_TARGETS = [
+  { metric_key: "show_rate",  value: 0.47, notes: "Weekly Webinar show rate (CSV variables block) — used as blended target on Show Rate chip" },
+  { metric_key: "close_rate", value: 0.39, notes: "Weekly Webinar close rate — used as blended target on Close Rate chip" },
+  { metric_key: "aov_cash",   value: 3019, notes: "Weekly Webinar AOV Cash — used as blended target on AOV chip" },
+  { metric_key: "acv",        value: 4136, notes: "Weekly Webinar ACV — used as blended target on ACV chip when surfaced" },
+];
 
 // Per-channel rate constants from "Variables" block lines 22-33.
 // Kept as REFERENCE rows only — TopMetrics derives blended rates at query
@@ -297,8 +330,7 @@ export function buildMay2026Rows(createdBy: string): ForecastTargetRow[] {
     rows.push({ ...evBase, metric_key: "revenue",      metric_value: SETTER_TOTALS.revenue / SETTER_DAYS });
   }
 
-  // 4) Per-channel rate constants (10 reference rows). Not consumed by
-  //    TopMetrics — bundle query derives blended rates from volume sums.
+  // 4) Per-channel rate constants (10 reference rows) — kept for audit.
   for (const rate of RATE_CONSTANTS) {
     rows.push({
       ...base,
@@ -309,6 +341,46 @@ export function buildMay2026Rows(createdBy: string): ForecastTargetRow[] {
       metric_type: "rate",
       metric_value: rate.value,
       notes: rate.notes,
+    });
+  }
+
+  // 5) BLENDED rate targets — what the chips actually read (channel='blended').
+  //    Show Rate / Close Rate / AOV chips on TopMetrics read these directly.
+  for (const rate of BLENDED_RATE_TARGETS) {
+    rows.push({
+      ...base,
+      target_date: null,
+      channel: "blended",
+      event_label: null,
+      metric_key: rate.metric_key,
+      metric_type: "rate",
+      metric_value: rate.value,
+      notes: rate.notes,
+    });
+  }
+
+  // 6) MONTHLY TOTALS — used for volume target chips via month-pace.
+  //    Volume target for a window = monthly_total × days_in_window / 31.
+  //    Stored as a single row per metric with metric_type='monthly_total'
+  //    and target_date=NULL (period-level fact).
+  const monthlyRows: Array<{ metric_key: string; metric_value: number; notes: string }> = [
+    { metric_key: "calls_booked", metric_value: MONTHLY_TOTALS.calls_booked, notes: "Full May calls booked (137 past + 362 projected)" },
+    { metric_key: "calls_held",   metric_value: MONTHLY_TOTALS.calls_held,   notes: "Full May calls held (76 past + 158.5 projected)" },
+    { metric_key: "deals_closed", metric_value: MONTHLY_TOTALS.deals_closed, notes: "Full May deals (36 past + 44.3 projected = 80 per CSV)" },
+    { metric_key: "cash",         metric_value: MONTHLY_TOTALS.cash,         notes: "Full May cash $242,542 per CSV" },
+    { metric_key: "revenue",      metric_value: MONTHLY_TOTALS.revenue,      notes: "Full May revenue $332,081 (period sum; CSV stated $332,267)" },
+    { metric_key: "ad_spend",     metric_value: MONTHLY_TOTALS.ad_spend,     notes: "Full May ad spend $70,856 per CSV" },
+  ];
+  for (const m of monthlyRows) {
+    rows.push({
+      ...base,
+      target_date: null,
+      channel: "all",
+      event_label: null,
+      metric_key: m.metric_key,
+      metric_type: "monthly_total",
+      metric_value: m.metric_value,
+      notes: m.notes,
     });
   }
 

@@ -668,8 +668,17 @@
   position: relative;
   border: 2px solid rgba(255, 255, 255, 0.15);
   flex-shrink: 0;
+  animation: avatarFlip 2s cubic-bezier(0.5, 0, 0.5, 1) 200ms 1;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
 }
 .podiumAvatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+@keyframes avatarFlip {
+  0%   { transform: rotateY(0deg);    }
+  40%  { transform: rotateY(360deg);  } /* full flip right */
+  80%  { transform: rotateY(0deg);    } /* full flip left back */
+  100% { transform: rotateY(0deg);    } /* stable */
+}
 .podiumGold .podiumAvatar {
   border-color: #ffcc33;
   box-shadow: 0 0 18px rgba(255, 204, 51, 0.55);
@@ -873,14 +882,16 @@
   color: #fff;
   position: relative;
   flex-shrink: 0;
-  overflow: hidden;
   border: 3px solid #0b1d3d;
   box-shadow:
     0 4px 14px rgba(0, 0, 0, 0.5),
     0 0 0 2px rgba(255, 122, 26, 0.4);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: avatarFlip 2s cubic-bezier(0.5, 0, 0.5, 1) 200ms 1;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
 }
-.jerseyImage img { width: 100%; height: 100%; object-fit: cover; }
+.jerseyImage img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .jerseyNumber {
   position: absolute;
   bottom: -4px;

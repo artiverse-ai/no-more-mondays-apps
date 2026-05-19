@@ -1,4 +1,4 @@
-import type { CloserScore } from "../_lib/scoring";
+import type { Achievement, CloserScore } from "../_lib/scoring";
 import styles from "./competition.module.css";
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
@@ -8,6 +8,13 @@ const RANK_META: Array<{ medal: string; cls: keyof typeof styles }> = [
   { medal: "🥈", cls: "podiumSilver" as const },
   { medal: "🥉", cls: "podiumBronze" as const },
 ];
+
+const ACHIEVEMENT_META: Record<Achievement, { icon: string; label: string; tip: string }> = {
+  "mvp":       { icon: "👑", label: "MVP",       tip: "Top scorer overall this period" },
+  "fuc-king":  { icon: "💎", label: "FUC King",  tip: "Most follow-up closes this period" },
+  "hat-trick": { icon: "🎩", label: "Hat Trick", tip: "3+ deals closed in a single day" },
+  "streak":    { icon: "🔥", label: "Streak",    tip: "3+ consecutive days with deals" },
+};
 
 /** Top-3 podium that replaces the single MVP card. Gold #1 gets a
  *  crown wobble + glow pulse; silver/bronze get softer treatments.
@@ -44,6 +51,20 @@ export function Podium({ closers }: { closers: CloserScore[] }) {
                   {c.deals} deal{c.deals !== 1 ? "s" : ""}
                   {c.fucDeals > 0 ? ` · ${c.fucDeals} FUC` : ""}
                 </div>
+                {c.achievements.length > 0 && (
+                  <div className={styles.podiumAchievements}>
+                    {c.achievements.map((a) => (
+                      <span
+                        key={a}
+                        className={styles.podiumChip}
+                        title={ACHIEVEMENT_META[a].tip}
+                      >
+                        <span aria-hidden>{ACHIEVEMENT_META[a].icon}</span>
+                        {ACHIEVEMENT_META[a].label}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className={styles.podiumPoints}>
                 <div className={styles.podiumPointsVal}>{fmt(c.basePoints)}</div>

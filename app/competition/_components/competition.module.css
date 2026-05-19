@@ -748,6 +748,43 @@
   margin-top: 2px;
 }
 
+/* Achievement chips on podium rows — slightly tighter than the
+ * leaderboard chips so the compact podium stays compact. */
+.podiumAchievements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.podiumChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff7a1a, #ffae66);
+  color: #0b1d3d;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(255, 122, 26, 0.35);
+  cursor: help;
+}
+.podiumGold .podiumChip {
+  background: linear-gradient(90deg, #ffcc33, #ffe082);
+  box-shadow: 0 2px 8px rgba(255, 204, 51, 0.5);
+}
+.podiumSilver .podiumChip {
+  background: linear-gradient(90deg, #cbd5e1, #e2e8f0);
+  box-shadow: 0 2px 6px rgba(203, 213, 225, 0.4);
+}
+.podiumBronze .podiumChip {
+  background: linear-gradient(90deg, #cd7f32, #e8a55d);
+  box-shadow: 0 2px 6px rgba(205, 127, 50, 0.4);
+}
+
 /* ─── Leaderboard ────────────────────────────────────────────────── */
 .leaderboard {
   max-width: 1280px;

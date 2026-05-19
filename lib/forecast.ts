@@ -164,7 +164,12 @@ export async function getForecastBundleForWindow(
     query: `
       WITH
       v AS (
-        -- Per-day forecast SUM — actuals for past days, projections for future
+        -- Per-day forecast SUM — actuals for past days, projections for future.
+        -- Target window is CLAMPED to elapsed period so the comparison is
+        -- apples-to-apples with actuals:
+        --   • Window entirely past   → use full window
+        --   • Window entirely future → use full window (it's the plan)
+        --   • Window contains today  → clamp end to today (ET)
         SELECT
           SUM(IF(metric_key='ad_spend',     metric_value, NULL)) AS ad_spend,
           SUM(IF(metric_key='cash',         metric_value, NULL)) AS cash,
@@ -175,7 +180,12 @@ export async function getForecastBundleForWindow(
         FROM ${FORECAST_TABLE}
         WHERE forecast_id = @forecastId
           AND metric_type = 'volume'
-          AND target_date BETWEEN DATE(@start) AND DATE(@end)
+          AND target_date BETWEEN DATE(@start)
+            AND CASE
+              WHEN CURRENT_DATE('America/New_York') < DATE(@start) THEN DATE(@end)   -- entirely future
+              WHEN CURRENT_DATE('America/New_York') >= DATE(@end)  THEN DATE(@end)   -- entirely past
+              ELSE CURRENT_DATE('America/New_York')                                  -- contains today → clamp
+            END
       ),
       rates AS (
         -- Period-constant operating goals (Show / Close / AOV)

@@ -3,7 +3,7 @@ import { TEAM } from "./_data/roster";
 import { Scoreboard } from "./_components/Scoreboard";
 import { PeriodTabs } from "./_components/PeriodTabs";
 import { Leaderboard } from "./_components/Leaderboard";
-import { MvpHero } from "./_components/MvpHero";
+import { Podium } from "./_components/Podium";
 import { Countdown } from "./_components/Countdown";
 import { RelativeTime } from "./_components/RelativeTime";
 import { HeroStrip } from "./_components/HeroStrip";
@@ -26,12 +26,6 @@ function parsePeriod(p: string | undefined): Period {
   return p === "today" || p === "week" ? p : "month";
 }
 
-const PERIOD_LABEL: Record<Period, string> = {
-  today: "Today's",
-  week: "This Week's",
-  month: "This Month's",
-};
-
 export default async function CompetitionPage({
   searchParams,
 }: {
@@ -40,21 +34,20 @@ export default async function CompetitionPage({
   const params = await searchParams;
   const period = parsePeriod(params.period);
   const board = await fetchLeaderboard(period);
-  const mvp = board.closers[0] ?? null;
 
   return (
     <main className={styles.shell}>
       <SplashIntro />
 
       <div className={styles.heroRow}>
-        <HeroStrip fetchedAt={board.fetchedAt} />
+        <HeroStrip />
         <div className={styles.heroContentCol}>
           <PeriodTabs active={period} />
           <div className={styles.countdownRow}>
             <Countdown period={period} />
           </div>
           <Scoreboard team={board.team} />
-          <MvpHero mvp={mvp} periodLabel={PERIOD_LABEL[period]} />
+          <Podium closers={board.closers} />
         </div>
       </div>
 

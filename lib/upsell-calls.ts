@@ -1,14 +1,21 @@
 // Calendly "Scaling Call" bookings → Airtable "Upsell Calls" table.
 //
-// When a student books one of the per-coach "Scaling Call | Coach X"
-// Calendly event types, this writes the BOOKING half of an Upsell Calls
-// row in the NMM Coaching CRM: student, time, coach, Calendly links,
-// Status = Upcoming. The coach fills the DISPOSITION half — call
-// outcome, cash, revenue — after the call; that is a later phase.
+// Handles the BOOKING lifecycle for the NMM Coaching CRM:
+//   invitee.created  → create the row (Status = Upcoming)
+//   invitee.canceled → flip the row to Cancelled, or to Rescheduled
+//                      when the cancellation is the old leg of a
+//                      reschedule (a fresh invitee.created follows it)
+//
+// The DISPOSITION half — call outcome, cash, revenue, no-show — is
+// filled by the coach later and is a separate phase.
 //
 // Student linkage: matched by invitee email against the Students table.
-// No match → the row is still created but left unlinked (the Linked
-// checkbox stays off) so it can be reconciled by hand.
+// No match → the row is still created but left unlinked (Linked stays
+// off) so it can be reconciled by hand.
+//
+// Rows are keyed by the Calendly join URL (it embeds the scheduled-event
+// UUID) — used both to skip duplicate deliveries and to locate the row
+// to update on cancellation.
 
 const AIRTABLE_API = "https://api.airtable.com/v0";
 const BASE = "appyrIU7120p0T3kT"; // NMM | Coaching CRM
@@ -27,14 +34,16 @@ export function parseScalingCallCoach(eventName?: string): string | null {
   return n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
 }
 
-/** Calendly v2 `invitee.created` webhook payload — only the fields used. */
-export type CalendlyInviteePayload = {
+/** Calendly v2 webhook payload — only the fields we read. Shared shape
+ *  for invitee.created and invitee.canceled. */
+export type CalendlyWebhook = {
   event?: string;
   payload?: {
     name?: string;
     email?: string;
     cancel_url?: string;
     reschedule_url?: string;
+    rescheduled?: boolean;
     scheduled_event?: {
       name?: string;
       start_time?: string;
@@ -74,33 +83,37 @@ async function findStudentRecordId(email: string): Promise<string | null> {
   return data.records[0]?.id ?? null;
 }
 
-/** The Calendly join URL embeds the scheduled-event UUID, so it's a
- *  stable per-booking key — used here to skip duplicate deliveries. */
-async function bookingExists(joinUrl: string): Promise<boolean> {
+/** Find an existing Upsell Calls row by its Calendly join URL. */
+async function findUpsellCallByJoinUrl(joinUrl: string): Promise<string | null> {
   const formula = `{Calendly Meeting Link}='${escapeFormula(joinUrl)}'`;
-  const data = await airtable<{ records: unknown[] }>(
+  const data = await airtable<{ records: Array<{ id: string }> }>(
     `${BASE}/${UPSELL_CALLS}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`,
   );
-  return data.records.length > 0;
+  return data.records[0]?.id ?? null;
 }
 
-export type BookingResult =
+export type CalendlyResult =
   | { status: "created"; recordId: string; coach: string; linked: boolean }
+  | { status: "updated"; recordId: string; newStatus: string }
   | { status: "skipped"; reason: string };
 
-export async function handleScalingCallBooking(
-  body: CalendlyInviteePayload,
-): Promise<BookingResult> {
-  if (body.event !== "invitee.created") {
-    return { status: "skipped", reason: `event=${body.event}` };
-  }
+/** Dispatch a Calendly webhook to the right handler. */
+export async function handleCalendlyEvent(
+  body: CalendlyWebhook,
+): Promise<CalendlyResult> {
+  if (body.event === "invitee.created") return handleBooking(body);
+  if (body.event === "invitee.canceled") return handleCancellation(body);
+  return { status: "skipped", reason: `event=${body.event}` };
+}
+
+async function handleBooking(body: CalendlyWebhook): Promise<CalendlyResult> {
   const p = body.payload ?? {};
   const ev = p.scheduled_event ?? {};
   const coach = parseScalingCallCoach(ev.name);
   if (!coach) return { status: "skipped", reason: "not a scaling call" };
 
   const joinUrl = ev.location?.join_url ?? "";
-  if (joinUrl && (await bookingExists(joinUrl))) {
+  if (joinUrl && (await findUpsellCallByJoinUrl(joinUrl))) {
     return { status: "skipped", reason: "duplicate booking" };
   }
 
@@ -128,4 +141,27 @@ export async function handleScalingCallBooking(
     body: JSON.stringify({ fields }),
   });
   return { status: "created", recordId: created.id, coach, linked: Boolean(studentId) };
+}
+
+async function handleCancellation(body: CalendlyWebhook): Promise<CalendlyResult> {
+  const p = body.payload ?? {};
+  const ev = p.scheduled_event ?? {};
+  if (!parseScalingCallCoach(ev.name)) {
+    return { status: "skipped", reason: "not a scaling call" };
+  }
+  const joinUrl = ev.location?.join_url ?? "";
+  if (!joinUrl) return { status: "skipped", reason: "no join url" };
+
+  const recordId = await findUpsellCallByJoinUrl(joinUrl);
+  if (!recordId) return { status: "skipped", reason: "no matching row" };
+
+  // A reschedule arrives as a cancellation of the old leg (rescheduled
+  // = true) plus a fresh invitee.created for the new time. Mark the old
+  // row Rescheduled; the new row is created by handleBooking.
+  const newStatus = p.rescheduled ? "Rescheduled" : "Cancelled";
+  await airtable(`${BASE}/${UPSELL_CALLS}/${recordId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ fields: { Status: newStatus } }),
+  });
+  return { status: "updated", recordId, newStatus };
 }

@@ -1,9 +1,9 @@
 // Calendly webhook → Airtable "Upsell Calls" intake.
 //
-// Receives invitee.created events for the org. For bookings on a
-// "Scaling Call | Coach X" event type it creates an Upsell Calls row in
-// the Coaching CRM (see lib/upsell-calls.ts). Every other Calendly
-// event is acknowledged and ignored.
+// Receives invitee.created / invitee.canceled events for the org. For
+// "Scaling Call | Coach X" bookings it creates / updates the matching
+// Upsell Calls row in the Coaching CRM (see lib/upsell-calls.ts).
+// Every other Calendly event is acknowledged and ignored.
 //
 // Setup:
 //   1. Env vars: CALENDLY_UPSELL_SIGNING_KEY, AIRTABLE_TOKEN.
@@ -16,7 +16,7 @@
 
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { handleScalingCallBooking } from "@/lib/upsell-calls";
+import { handleCalendlyEvent } from "@/lib/upsell-calls";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const result = await handleScalingCallBooking(body);
+    const result = await handleCalendlyEvent(body);
     return NextResponse.json(result);
   } catch (e) {
     console.error("[upsell-calls-webhook]", (e as Error).message);

@@ -26,6 +26,7 @@ const isPublic = createRouteMatcher([
   // so the Clerk gate must NOT redirect them to sign-in.
   "/api/calendly-webhook",
   "/api/dbt-webhook",
+  "/api/upsell-calls-webhook",
 ]);
 
 const handler = clerkMiddleware(async (auth, req) => {

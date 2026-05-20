@@ -20,20 +20,27 @@ import {
 } from "../_data/roster";
 
 const ENRICHED = "`no-more-mondays-analytics.dbt_tuddin.int_calls_enriched`";
-const CLOSERS = "`no-more-mondays-analytics.nmm_calendar.closers`";
+// Single source of truth for "who is a competing closer". The
+// team_members VIEW already encodes the canonical rule —
+// is_active = TRUE AND is_available_to_take_call = TRUE — so the
+// competition and the capacity dashboard can never disagree. Querying
+// the closers table directly with `is_active = TRUE` alone let through
+// closers who are active employees but not taking calls (e.g. Derek),
+// which surfaced them on the leaderboard incorrectly.
+const TEAM_MEMBERS = "`no-more-mondays-analytics.nmm_calendar.team_members`";
 const EMAIL_EXCLUSION =
   "prospect_email_lc NOT LIKE '%@nomoremondays.io%' " +
   "AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')";
 
-/** Fetch the set of currently-active closer first names from the admin
- *  closers table (email prefix → first name, capitalized). Anyone not in
- *  this set is excluded from the leaderboard. */
+/** Fetch the set of competing closer first names from the team_members
+ *  view (email prefix → first name, capitalized). Anyone not in this
+ *  set — inactive OR not available to take calls — is excluded from
+ *  the leaderboard. */
 async function fetchActiveCloserNames(): Promise<Set<string>> {
   const [rows] = await bq().query({
     query: `
       SELECT INITCAP(REGEXP_EXTRACT(email, r'^([^@]+)@')) AS name
-      FROM ${CLOSERS}
-      WHERE is_active = TRUE
+      FROM ${TEAM_MEMBERS}
     `,
   });
   return new Set((rows as Array<{ name: string }>).map((r) => r.name));
@@ -142,8 +149,9 @@ const DEALS_SQL = `
 `;
 
 /** Fetch raw deals for the window + active-closer set in parallel, then
- *  aggregate into a single TeamScore + ranked CloserScore[]. Inactive
- *  closers (closers.is_active=false) are excluded entirely. */
+ *  aggregate into a single TeamScore + ranked CloserScore[]. Closers not
+ *  in the team_members view (inactive, or not available to take calls)
+ *  are excluded entirely. */
 export async function fetchLeaderboard(period: Period, now: Date = new Date()): Promise<Leaderboard> {
   const { start, end } = periodWindow(period, now);
   const [activeNames, dealRowsRaw] = await Promise.all([
@@ -164,7 +172,7 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     prospectEmail: String(r.prospect_email ?? ""),
   }));
 
-  // Filter roster to active closers only (closers.is_active=true)
+  // Filter roster to competing closers only (in the team_members view)
   const activeRoster = ROSTER.filter((p) => activeNames.has(p.closerOwner));
   const perCloser = new Map<string, CloserScore>();
   const dealsByCloserByDay = new Map<string, Map<string, number>>();

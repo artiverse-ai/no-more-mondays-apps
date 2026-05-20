@@ -22,16 +22,25 @@ const BASE = "appyrIU7120p0T3kT"; // NMM | Coaching CRM
 const UPSELL_CALLS = "tblkS06zl0YBBnnsz";
 const STUDENTS = "tblMfk20VffSuxUIb";
 
-// "Scaling Call | Coach Renard" → "Renard". Matching by pattern (not a
-// hard-coded coach list) means any new "Scaling Call | Coach X" event
-// type added in Calendly flows through with zero code changes.
-const SCALING_CALL_RE = /scaling call\s*\|\s*coach\s+([a-z]+)/i;
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
-export function parseScalingCallCoach(eventName?: string): string | null {
-  const m = eventName?.match(SCALING_CALL_RE);
-  if (!m) return null;
-  const n = m[1];
-  return n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
+// An event type counts as an upsell "scaling call" if its name starts
+// with "Scaling". This catches both the per-coach links
+// ("Scaling Call | Coach Renard") AND a round-robin link (named just
+// "Scaling Call", with Calendly assigning the coach) — so round-robin
+// works the moment that link is created, with zero code changes.
+function isScalingCall(eventName?: string): boolean {
+  return /^\s*scaling/i.test(eventName ?? "");
+}
+
+// Resolve the coach's first name: from the "| Coach X" suffix when the
+// link is coach-specific, otherwise from the Calendly-assigned host
+// (round-robin links — Calendly picks the coach).
+function resolveCoach(eventName?: string, hostName?: string): string {
+  const m = eventName?.match(/\|\s*coach\s+([a-z]+)/i);
+  if (m) return cap(m[1]);
+  const first = (hostName ?? "").trim().split(/\s+/)[0];
+  return first ? cap(first) : "";
 }
 
 /** Calendly v2 webhook payload — only the fields we read. Shared shape
@@ -49,6 +58,7 @@ export type CalendlyWebhook = {
       start_time?: string;
       end_time?: string;
       location?: { join_url?: string };
+      event_memberships?: Array<{ user_name?: string; user_email?: string }>;
     };
   };
 };
@@ -109,8 +119,8 @@ export async function handleCalendlyEvent(
 async function handleBooking(body: CalendlyWebhook): Promise<CalendlyResult> {
   const p = body.payload ?? {};
   const ev = p.scheduled_event ?? {};
-  const coach = parseScalingCallCoach(ev.name);
-  if (!coach) return { status: "skipped", reason: "not a scaling call" };
+  if (!isScalingCall(ev.name)) return { status: "skipped", reason: "not a scaling call" };
+  const coach = resolveCoach(ev.name, ev.event_memberships?.[0]?.user_name);
 
   const joinUrl = ev.location?.join_url ?? "";
   if (joinUrl && (await findUpsellCallByJoinUrl(joinUrl))) {
@@ -146,7 +156,7 @@ async function handleBooking(body: CalendlyWebhook): Promise<CalendlyResult> {
 async function handleCancellation(body: CalendlyWebhook): Promise<CalendlyResult> {
   const p = body.payload ?? {};
   const ev = p.scheduled_event ?? {};
-  if (!parseScalingCallCoach(ev.name)) {
+  if (!isScalingCall(ev.name)) {
     return { status: "skipped", reason: "not a scaling call" };
   }
   const joinUrl = ev.location?.join_url ?? "";

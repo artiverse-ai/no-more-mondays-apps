@@ -66,32 +66,29 @@ type DbtWebhookPayload = {
   };
 };
 
+// We only alert on failed runs — successes and run-started events are
+// dropped (see POST). dbt's "Test endpoint" button sends a Success
+// sample, so a test won't post to Slack; that's intended.
+function isFailedRun(p: DbtWebhookPayload): boolean {
+  return (
+    p.eventType === "job.run.errored" || p.data?.runStatus === "Errored"
+  );
+}
+
 function truncate(s: string, max = 500): string {
   return s.length > max ? s.slice(0, max) + "…" : s;
 }
 
 function buildSlackText(p: DbtWebhookPayload): string {
   const d = p.data ?? {};
-  const isError =
-    p.eventType === "job.run.errored" || d.runStatus === "Errored";
-  const isSuccess = d.runStatus === "Success";
-
-  const emoji = isError ? "🔴" : isSuccess ? "✅" : "ℹ️";
-  const headline = isError
-    ? "*dbt job failed*"
-    : isSuccess
-      ? "*dbt job succeeded*"
-      : "*dbt job update*";
-  const mentions = isError
-    ? " " + MENTION_IDS.map((id) => `<@${id}>`).join(" ")
-    : "";
+  const mentions = MENTION_IDS.map((id) => `<@${id}>`).join(" ");
 
   const runUrl =
     p.accountId && d.projectId && d.runId
       ? `https://${DBT_HOST}/deploy/${p.accountId}/projects/${d.projectId}/runs/${d.runId}`
       : null;
 
-  const lines = [`${emoji} ${headline}${mentions}`];
+  const lines = [`🔴 *dbt job failed* ${mentions}`];
   if (d.jobName) lines.push(`*Job:* ${d.jobName}`);
   if (d.projectName) lines.push(`*Project:* ${d.projectName}`);
   if (d.environmentName) lines.push(`*Environment:* ${d.environmentName}`);
@@ -124,6 +121,13 @@ export async function POST(req: Request) {
     payload = JSON.parse(rawBody) as DbtWebhookPayload;
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  // Failures only. Successes, run-started events, and dbt's "Test
+  // endpoint" sample (which is always a Success) are acknowledged with
+  // 200 but never forwarded to Slack.
+  if (!isFailedRun(payload)) {
+    return NextResponse.json({ ok: true, skipped: "not a failed run" });
   }
 
   if (!SLACK_WEBHOOK_URL) {

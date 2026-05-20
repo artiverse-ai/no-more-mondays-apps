@@ -36,13 +36,13 @@ export const TEAM = {
 // Roster — jersey numbers temporary until Marek confirms the
 // closer→jersey mapping from the game poster.
 export const ROSTER: CloserProfile[] = [
-  { closerOwner: "Ben",     jersey: 10 },
+  { closerOwner: "Ben",     jersey: 10, imageUrl: "/competition/jerseys/ben.webp" },
   { closerOwner: "Tyler",   jersey:  7, imageUrl: "/competition/jerseys/tyler.webp" },
   { closerOwner: "Morgan",  jersey:  4 },
-  { closerOwner: "Cecilia", jersey:  5 },
+  { closerOwner: "Cecilia", jersey:  5, imageUrl: "/competition/jerseys/cecilia.webp" },
   { closerOwner: "Grace",   jersey:  3, imageUrl: "/competition/jerseys/grace.webp" },
-  { closerOwner: "Jordan",  jersey: 11 },
-  { closerOwner: "Destiny", jersey: 12 },
+  { closerOwner: "Jordan",  jersey: 11, imageUrl: "/competition/jerseys/jordan.webp" },
+  { closerOwner: "Destiny", jersey: 12, imageUrl: "/competition/jerseys/destiny.webp" },
   { closerOwner: "Johanna", jersey:  8 },
   { closerOwner: "Luke",    jersey:  1 },
   { closerOwner: "Derek",   jersey:  9 },

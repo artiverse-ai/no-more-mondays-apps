@@ -37,10 +37,10 @@ export const TEAM = {
 // closer→jersey mapping from the game poster.
 export const ROSTER: CloserProfile[] = [
   { closerOwner: "Ben",     jersey: 10 },
-  { closerOwner: "Tyler",   jersey:  7 },
+  { closerOwner: "Tyler",   jersey:  7, imageUrl: "/competition/jerseys/tyler.webp" },
   { closerOwner: "Morgan",  jersey:  4 },
   { closerOwner: "Cecilia", jersey:  5 },
-  { closerOwner: "Grace",   jersey:  3 },
+  { closerOwner: "Grace",   jersey:  3, imageUrl: "/competition/jerseys/grace.webp" },
   { closerOwner: "Jordan",  jersey: 11 },
   { closerOwner: "Destiny", jersey: 12 },
   { closerOwner: "Johanna", jersey:  8 },

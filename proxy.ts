@@ -21,6 +21,11 @@ const isPublic = createRouteMatcher([
   "/access-denied",
   "/sops/closer-calendar-management(.*)",
   "/competition(.*)",
+  // External webhook receivers — called by third-party services that
+  // can't carry a Clerk session. Each verifies its own HMAC signature,
+  // so the Clerk gate must NOT redirect them to sign-in.
+  "/api/calendly-webhook",
+  "/api/dbt-webhook",
 ]);
 
 const handler = clerkMiddleware(async (auth, req) => {

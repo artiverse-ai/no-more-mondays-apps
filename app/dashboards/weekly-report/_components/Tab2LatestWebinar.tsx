@@ -92,7 +92,7 @@ export function Tab2LatestWebinar({
               <DataRow label="Ad Spend" values={webinars.map((w) => fmtUsd(w.totalWebinarAdSpend))} tip={TIP.adSpendMart} />
               <DataRow label="LP Page Views" values={webinars.map((w) => fmtInt(w.lpPageViews))} tip={TIP.lpPageViews} />
               <DataRow label="LP Opt-Ins" values={webinars.map((w) => fmtInt(w.lpOptIns))} tip={TIP.lpOptIns} />
-              <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} trafficKey="lpOptInRate" rawValues={webinars.map((w) => w.lpOptInRate)} />
+              <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} trafficKey="lpOptInRate" rawValues={webinars.map((w) => w.lpOptInRate)} highlight />
               <DataRow label="Total Registrants" values={webinars.map((w) => fmtInt(w.totalRegistrants))} tip={TIP.totalRegistrantsGhl} />
               <DataRow label="↳ Meta" values={webinars.map((w) => fmtInt(w.metaRegistrants))} />
               <DataRow label="↳ ManyChat" values={webinars.map((w) => fmtInt(w.manychatRegistrants))} />
@@ -111,12 +111,12 @@ export function Tab2LatestWebinar({
               <DataRow label="Meta CTR (link)" values={webinars.map((w) => fmtPct(w.metaCtr))} tip={TIP.metaCtr} />
               <DataRow label="Meta Reported Conv." values={webinars.map((w) => fmtInt(w.metaReportedConversions))} tip={TIP.metaReportedConv} />
               <DataRow label="Meta CVR (link)" values={webinars.map((w) => fmtPct(w.metaCvr))} tip={TIP.metaCvr} />
-              <DataRow label="Meta CPL" values={webinars.map((w) => fmtUsd2(w.metaCpl))} tip={TIP.metaCpl} />
+              <DataRow label="Meta CPL" values={webinars.map((w) => fmtUsd2(w.metaCpl))} tip={TIP.metaCpl} highlight />
 
               <DivRow>Cost Efficiency</DivRow>
               <DataRow label="Cost / Reg (Paid)" values={webinars.map((w) => fmtUsd2(w.paidCpr))} tip={TIP.costPerRegPaid} trafficKey="costPerRegistrant" rawValues={webinars.map((w) => w.paidCpr)} />
               <DataRow label="Cost / Attendee" values={webinars.map((w) => fmtUsd2(w.blendedCpa))} tip={TIP.costPerAttendee} />
-              <DataRow label="Cost / Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbc))} tip={TIP.costPerBookedCall} trafficKey="costPerBookedCall" rawValues={webinars.map((w) => w.blendedCpbc)} />
+              <DataRow label="Cost / Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbc))} tip={TIP.costPerBookedCall} trafficKey="costPerBookedCall" rawValues={webinars.map((w) => w.blendedCpbc)} highlight />
               <DataRow label="Cost / Active Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbcActive))} tip={TIP.costPerActiveBookedCall} />
               <DataRow
                 label="Cost / Qualified Show"
@@ -133,8 +133,17 @@ export function Tab2LatestWebinar({
                   i === 0 && inProgress ? partial(fmtInt(w.callsBooked)) : fmtInt(w.callsBooked),
                 )}
                 tip={TIP.callsBookedTotal}
+                highlight
               />
               <DataRow label="Active Calls Booked" values={webinars.map((w) => fmtInt(w.callsBookedActive))} tip={TIP.callsBookedActive} />
+              <DataRow
+                label="Pitch → Book Rate"
+                values={webinars.map((w) =>
+                  w.pitchedAttendees ? fmtPct(w.callsBooked / w.pitchedAttendees) : "—",
+                )}
+                tip={"Share of pitched attendees (>25 min) who booked a strategy call.\ncalls_booked / pitched_attendees"}
+                highlight
+              />
               <DataRow
                 label="Shows"
                 values={webinars.map((w, i) => (i === 0 && inProgress ? partial(fmtInt(w.shows)) : fmtInt(w.shows)))}
@@ -185,6 +194,7 @@ export function Tab2LatestWebinar({
                 tip={TIP.roasCash + "\nLatest webinar column is blank — cash and deals are still accumulating (1-12 weeks for full collection)."}
                 trafficKey="roas"
                 rawValues={webinars.map((w, i) => (i === 0 ? null : w.roasCash))}
+                highlight
               />
               <DataRow
                 label="ROAS (Revenue/TCV)"
@@ -239,6 +249,7 @@ function DataRow({
   tip,
   trafficKey,
   rawValues,
+  highlight,
 }: {
   label: string;
   values: (string | ReactNode)[];
@@ -247,16 +258,22 @@ function DataRow({
   trafficKey?: ThresholdKey;
   /** Raw numeric values aligned to `values` for threshold checks. */
   rawValues?: (number | null)[];
+  /** Key-metric highlight — indigo accent + bold across the row. */
+  highlight?: boolean;
 }) {
   return (
-    <tr>
+    <tr className={highlight ? styles.hiRow : undefined}>
       <td data-tip={tip} style={tip ? { cursor: "help" } : undefined}>{label}</td>
       {values.map((v, i) => {
         const light = trafficKey ? getTrafficLight(rawValues?.[i] ?? null, trafficKey) : "neutral";
         const lhClass = i === 0 ? styles.lh : "";
         const color = trafficLightColor(light);
         return (
-          <td key={i} className={lhClass} style={color ? { color, fontWeight: 600 } : undefined}>
+          <td
+            key={i}
+            className={lhClass}
+            style={color ? { color, fontWeight: highlight ? 700 : 600 } : undefined}
+          >
             {v}
           </td>
         );

@@ -70,7 +70,7 @@ function SectionA({ data, sectionATab3, weekLabel, sqlFor }: { data: SectionADat
           change="Total Contract Value · Closer"
           tip={"SUM(revenue_generated) WHERE is_deal from int_calls_enriched.\nWindow: date_closed in sales week.\nReconciles exactly with mart_high_level_daily.total_revenue_contracted (same upstream column)."}
         />
-        <MiniCard emoji="📈" label="ROAS (Cash)" value={fmtX(data.roasCash)} change={target("4×")} tip={TIP.roasCash} sqlInfo={sqlFor("roasCash")} trafficKey="roas" rawValue={data.roasCash} />
+        <MiniCard emoji="📈" label="ROAS (Cash)" value={fmtX(data.roasCash)} change={target("4×")} tip={TIP.roasCash} sqlInfo={sqlFor("roasCash")} trafficKey="roas" rawValue={data.roasCash} highlight />
         <MiniCard emoji="📈" label="ROAS (TCV)" value={fmtX(data.roasTcv)} change="TCV / Ad Spend" tip={TIP.roasTcv} sqlInfo={sqlFor("roasTcv")} trafficKey="roas" rawValue={data.roasTcv} />
         <MiniCard emoji="📣" label="Ad Spend (Blended)" value={fmtUsd(data.adSpendBlended)} change="All Meta campaigns" tip={TIP.adSpendBlended} sqlInfo={sqlFor("adSpendBlended")} />
         <MiniCard
@@ -169,6 +169,7 @@ function SectionB({ data, sqlFor }: { data: SectionBData; sqlFor: SqlForFn }) {
           change={data.totalCallsBookedActive != null ? `Active: ${fmtInt(data.totalCallsBookedActive)}` : ""}
           tip={TIP.totalCallsBooked}
           sqlInfo={sqlFor("totalCallsBooked")}
+          highlight
         />
         <MiniCard
           emoji="📞"
@@ -179,6 +180,7 @@ function SectionB({ data, sqlFor }: { data: SectionBData; sqlFor: SqlForFn }) {
           sqlInfo={sqlFor("costPerBookedCall")}
           trafficKey="costPerBookedCall"
           rawValue={data.costPerBookedCall}
+          highlight
         />
         <MiniCard
           emoji="💰"
@@ -309,6 +311,7 @@ function MiniCard({
   sqlInfo,
   trafficKey,
   rawValue,
+  highlight,
 }: {
   emoji: string;
   label: string;
@@ -320,11 +323,13 @@ function MiniCard({
   trafficKey?: ThresholdKey;
   /** Raw numeric value for the threshold check (the rendered `value` is pre-formatted). */
   rawValue?: number | null;
+  /** Key-metric highlight — indigo accent + bold. */
+  highlight?: boolean;
 }) {
   const light = trafficKey ? getTrafficLight(rawValue, trafficKey) : "neutral";
   const color = trafficLightColor(light);
   return (
-    <div className={styles.kpiMini}>
+    <div className={`${styles.kpiMini} ${highlight ? styles.hiCard : ""}`}>
       <div className={styles.kpiMiniLbl}>
         <span>{emoji}</span>
         <span data-tip={tip} style={tip ? { cursor: "help" } : undefined}>{label}</span>

@@ -339,6 +339,29 @@
 .amb { color: var(--amber); }
 .nt { color: var(--text-muted); }
 
+/* ── Key-metric highlight ──────────────────────────────────────────
+   The priority metrics — Cost per Lead, Opt-in Rate, Pitch→Book Rate,
+   Calls Booked / Cost per Booked Call, ROAS (Cash) — get an indigo
+   accent + bold so they stand out everywhere they appear. Indigo
+   deliberately avoids the green/amber/red traffic palette and the
+   blue/purple KPI-kind bars. `.hiCard` goes on a card primitive,
+   `.hiRow` on a table <tr>. */
+.hiCard {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: #6366f1 !important;
+}
+.hiCard .topMetricLbl,
+.hiCard .kpiMiniLbl,
+.hiCard .kpiLabel { color: var(--text-primary); font-weight: 800; }
+.hiCard .topMetricVal,
+.hiCard .kpiMiniVal,
+.hiCard .kpiValue { font-weight: 800; }
+.hiRow td { background: rgba(99, 102, 241, 0.08) !important; font-weight: 700; }
+.hiRow td:first-child {
+  box-shadow: inset 3px 0 0 #6366f1;
+  color: var(--text-primary);
+}
+
 /* ============================================================================
  * §9 Funnel diagram
  * ============================================================================ */

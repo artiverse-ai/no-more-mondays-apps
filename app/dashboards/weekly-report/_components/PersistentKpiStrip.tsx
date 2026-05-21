@@ -48,6 +48,7 @@ export function PersistentKpiStrip({
     metricKey: MetricKey,
     trafficKey?: ThresholdKey,
     rawValue?: number | null,
+    highlight?: boolean,
   ) => (
     <Card
       kind={kind}
@@ -60,6 +61,7 @@ export function PersistentKpiStrip({
       sqlInfo={devMode && sqlCtx ? getResolvedSql(metricKey, sqlCtx) : null}
       trafficKey={trafficKey}
       rawValue={rawValue}
+      highlight={highlight}
     />
   );
 
@@ -70,8 +72,8 @@ export function PersistentKpiStrip({
 
       <div className={styles.kpiDivider} aria-hidden="true" />
 
-      {card("company", "Blended Cash ROAS", fmtX(data.blendedCashRoas), data.blendedCashRoas == null, "≥3× green · 2–3× orange · <2× red", `Sales wk · ${salesWeek}`, TIP.blendedCashRoas, "blendedCashRoas", "roas", data.blendedCashRoas)}
-      {card("company", "CPL Blended", fmtUsd(data.cplBlended), data.cplBlended == null, "Target <$7", `Sales wk · ${salesWeek}`, TIP.cplBlended, "cplBlended")}
+      {card("company", "Blended Cash ROAS", fmtX(data.blendedCashRoas), data.blendedCashRoas == null, "≥3× green · 2–3× orange · <2× red", `Sales wk · ${salesWeek}`, TIP.blendedCashRoas, "blendedCashRoas", "roas", data.blendedCashRoas, true)}
+      {card("company", "CPL Blended", fmtUsd(data.cplBlended), data.cplBlended == null, "Target <$7", `Sales wk · ${salesWeek}`, TIP.cplBlended, "cplBlended", undefined, undefined, true)}
       {card("company", "Cash / Booked Call (DPC)", fmtUsd(data.cashPerBookedCall), data.cashPerBookedCall == null, "Sergio's KPI", `Sales wk · ${salesWeek}`, TIP.cashPerBookedCall, "cashPerBookedCall")}
     </div>
   );
@@ -88,6 +90,7 @@ function Card({
   sqlInfo,
   trafficKey,
   rawValue,
+  highlight,
 }: {
   kind: "webinar" | "company";
   label: string;
@@ -99,12 +102,14 @@ function Card({
   sqlInfo?: import("@/lib/dev-sql").ResolvedMetricSql | null;
   trafficKey?: ThresholdKey;
   rawValue?: number | null;
+  /** Key-metric highlight — indigo accent + bold. */
+  highlight?: boolean;
 }) {
   const kindCls = kind === "webinar" ? styles.kpiWebinar : styles.kpiCompany;
   const light = trafficKey ? getTrafficLight(rawValue, trafficKey) : "neutral";
   const color = trafficLightColor(light);
   return (
-    <div className={`${styles.kpiCard} ${kindCls}`}>
+    <div className={`${styles.kpiCard} ${kindCls} ${highlight ? styles.hiCard : ""}`}>
       <div className={styles.kpiLabel}>
         <span className={styles.tip} data-tip={tooltip} style={{ cursor: "help" }}>
           {label}

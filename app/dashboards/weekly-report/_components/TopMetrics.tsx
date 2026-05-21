@@ -92,6 +92,7 @@ export function TopMetrics({ sectionA, sectionATab3, sectionB, sectionC, forecas
               : "stg_calendly · dedup by email"
           }
           chip={callsChip}
+          highlight
         />
         <TopCard
           emoji="📈"
@@ -160,15 +161,18 @@ function TopCard({
   value,
   sub,
   chip,
+  highlight,
 }: {
   emoji: string;
   label: string;
   value: string;
   sub: string;
   chip: Chip | null;
+  /** Key-metric highlight — indigo accent + bold. */
+  highlight?: boolean;
 }) {
   return (
-    <div className={styles.topMetricCard}>
+    <div className={`${styles.topMetricCard} ${highlight ? styles.hiCard : ""}`}>
       <div className={styles.topMetricLbl}>
         <span aria-hidden>{emoji}</span>
         <span>{label}</span>

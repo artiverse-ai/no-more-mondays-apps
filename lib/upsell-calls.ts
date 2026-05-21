@@ -21,6 +21,7 @@ const AIRTABLE_API = "https://api.airtable.com/v0";
 const BASE = "appyrIU7120p0T3kT"; // NMM | Coaching CRM
 const UPSELL_CALLS = "tblkS06zl0YBBnnsz";
 const STUDENTS = "tblMfk20VffSuxUIb";
+const PEOPLE = "tblyQCMReBJDmMT3r";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
@@ -93,6 +94,18 @@ async function findStudentRecordId(email: string): Promise<string | null> {
   return data.records[0]?.id ?? null;
 }
 
+/** Find a People-table record id by first name (case-insensitive) —
+ *  links the coach. No match → left unlinked (the plain-text Coach
+ *  field still carries the name). */
+async function findCoachRecordId(firstName: string): Promise<string | null> {
+  if (!firstName) return null;
+  const formula = `LOWER({First Name})='${escapeFormula(firstName.toLowerCase())}'`;
+  const data = await airtable<{ records: Array<{ id: string }> }>(
+    `${BASE}/${PEOPLE}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`,
+  );
+  return data.records[0]?.id ?? null;
+}
+
 /** Find an existing Upsell Calls row by its Calendly join URL. */
 async function findUpsellCallByJoinUrl(joinUrl: string): Promise<string | null> {
   const formula = `{Calendly Meeting Link}='${escapeFormula(joinUrl)}'`;
@@ -129,6 +142,7 @@ async function handleBooking(body: CalendlyWebhook): Promise<CalendlyResult> {
 
   const email = (p.email ?? "").trim();
   const studentId = email ? await findStudentRecordId(email) : null;
+  const coachId = await findCoachRecordId(coach);
 
   const fields: Record<string, unknown> = {
     "Student": p.name ?? "",
@@ -145,6 +159,7 @@ async function handleBooking(body: CalendlyWebhook): Promise<CalendlyResult> {
   if (p.reschedule_url) fields["Calendly Reschedule Link"] = p.reschedule_url;
   if (p.cancel_url) fields["Calendly Cancel Meeting Link"] = p.cancel_url;
   if (studentId) fields["Student Name"] = [studentId];
+  if (coachId) fields["Coach Name"] = [coachId];
 
   const created = await airtable<{ id: string }>(`${BASE}/${UPSELL_CALLS}`, {
     method: "POST",

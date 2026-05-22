@@ -61,3 +61,9 @@ export const BONUS_THRESHOLDS = {
   week:    { threshold:  2000, bonus: 200 },
   month:   { threshold:  8000, bonus: 1000 },
 } as const;
+
+/** Competition start — nothing closed/booked before this counts, on any
+ *  period view. The league opens Sunday May 24 2026, 7 AM ET; deal and
+ *  call data is day-grained (ET DATE columns) so the floor is the date.
+ *  Shared by the closer and setter leaderboards. */
+export const COMPETITION_START = "2026-05-24";

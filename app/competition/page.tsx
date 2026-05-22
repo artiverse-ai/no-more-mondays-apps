@@ -8,6 +8,7 @@ import { Countdown } from "./_components/Countdown";
 import { RelativeTime } from "./_components/RelativeTime";
 import { HeroStrip } from "./_components/HeroStrip";
 import { SplashIntro } from "./_components/SplashIntro";
+import { ViewToggle } from "./_components/ViewToggle";
 import styles from "./_components/competition.module.css";
 
 // Cache for 30s so tab clicks feel instant. The leaderboard is live
@@ -45,6 +46,7 @@ export default async function CompetitionPage({
       <SplashIntro />
 
       <div className={styles.topBar}>
+        <ViewToggle active="closer" period={period} />
         <div className={styles.heroMotivation} aria-hidden="true">
           <span className={styles.heroMotivationDot} />
           EVERY CALL COUNTS

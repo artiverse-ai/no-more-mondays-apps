@@ -8,14 +8,21 @@ const TABS: Array<{ key: Period; label: string }> = [
   { key: "month", label: "This Month" },
 ];
 
-export function PeriodTabs({ active }: { active: Period }) {
+export function PeriodTabs({
+  active,
+  basePath = "/competition",
+}: {
+  active: Period;
+  /** Page the tabs link to — "/competition" or "/competition/setter". */
+  basePath?: string;
+}) {
   return (
     <div className={styles.periodTabsRow}>
       <div className={styles.periodTabs}>
         {TABS.map((t) => (
           <Link
             key={t.key}
-            href={`/competition?period=${t.key}`}
+            href={`${basePath}?period=${t.key}`}
             className={`${styles.periodTab} ${t.key === active ? styles.periodTabActive : ""}`}
             scroll={false}
           >

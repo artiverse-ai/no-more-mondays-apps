@@ -16,6 +16,7 @@ import {
   ROSTER_BY_NAME,
   TEAM,
   BONUS_THRESHOLDS,
+  COMPETITION_START,
   type CloserProfile,
 } from "../_data/roster";
 
@@ -103,13 +104,17 @@ export type Leaderboard = {
 };
 
 /** Convert a period string + "now" timestamp to a [start, end] DATE window
- *  in ET-bucketed YYYY-MM-DD form. */
+ *  in ET-bucketed YYYY-MM-DD form. The window start is floored at
+ *  COMPETITION_START — nothing before the league opens ever counts. If
+ *  the whole window is pre-launch, start > end and queries return empty. */
 export function periodWindow(period: Period, now: Date = new Date()): { start: string; end: string } {
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const iso = (d: Date) => d.toISOString().slice(0, 10);
+  // YYYY-MM-DD strings sort lexically = chronologically.
+  const floor = (d: string) => (d < COMPETITION_START ? COMPETITION_START : d);
 
   if (period === "today") {
-    return { start: iso(today), end: iso(today) };
+    return { start: floor(iso(today)), end: iso(today) };
   }
   if (period === "week") {
     // Sales week = Sun-Sat. dow: 0=Sun..6=Sat
@@ -118,12 +123,12 @@ export function periodWindow(period: Period, now: Date = new Date()): { start: s
     sun.setUTCDate(today.getUTCDate() - dow);
     const sat = new Date(sun);
     sat.setUTCDate(sun.getUTCDate() + 6);
-    return { start: iso(sun), end: iso(sat) };
+    return { start: floor(iso(sun)), end: iso(sat) };
   }
   // month
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
-  return { start: iso(monthStart), end: iso(monthEnd) };
+  return { start: floor(iso(monthStart)), end: iso(monthEnd) };
 }
 
 /** Points = floor(cash / 10), doubled for FUC. */

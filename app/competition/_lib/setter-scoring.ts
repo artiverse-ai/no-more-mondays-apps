@@ -4,9 +4,9 @@
 // int_calls_enriched (no setter mart exists) — same source as the
 // Setter Performance dashboard.
 //
-// Bookings are grouped by call date so special-day point multipliers
-// apply per date (a booking on a 2× day is worth 200 instead of 100).
-// Show/close rates are unaffected by multipliers — they're rates.
+// Bookings are grouped by booking date so special-day point
+// multipliers apply per date (a booking on a 2× day is worth 200 not
+// 100). Show/close rates are unaffected by multipliers — they're rates.
 
 import { bq } from "@/lib/bq";
 import { periodWindow, type Period } from "./scoring";
@@ -46,20 +46,24 @@ export type SetterLeaderboard = {
 };
 
 // Per setter PER DAY — the day grain lets multipliers apply by date.
-// The period window is already floored at COMPETITION_START.
+//
+// Dated by created_date — when the call was BOOKED, not when it's
+// scheduled. A setter earns points the moment they book; a call booked
+// before launch but scheduled after must NOT count. (Filtering by the
+// appointment date wrongly credited pre-launch bookings.) The period
+// window is already floored at COMPETITION_START.
 const SETTER_SQL = `
   SELECT
-    COALESCE(setter_owner, calendly_setter_name)   AS setter,
-    FORMAT_DATE('%F', DATE(appointment_date_time)) AS call_date,
+    COALESCE(setter_owner, calendly_setter_name) AS setter,
+    FORMAT_DATE('%F', created_date)              AS booked_date,
     COUNTIF(is_call_booked)            AS bookings,
     COUNTIF(is_show_up)                AS show_ups,
     COUNTIF(is_show_rate_eligible)     AS show_rate_eligible,
     COUNTIF(is_deal)                   AS deals
   FROM ${ENRICHED}
-  WHERE appointment_date_time IS NOT NULL
-    AND DATE(appointment_date_time) BETWEEN DATE(@start) AND DATE(@end)
+  WHERE created_date BETWEEN DATE(@start) AND DATE(@end)
     AND COALESCE(setter_owner, calendly_setter_name) IN UNNEST(@setters)
-  GROUP BY setter, call_date
+  GROUP BY setter, booked_date
 `;
 
 type Acc = {
@@ -103,7 +107,7 @@ export async function fetchSetterLeaderboard(
     const bookings = num(r.bookings);
     a.bookings += bookings;
     a.points += Math.round(
-      bookings * POINTS_PER_BOOKING * multFor(String(r.call_date ?? "")),
+      bookings * POINTS_PER_BOOKING * multFor(String(r.booked_date ?? "")),
     );
     a.showUps += num(r.show_ups);
     a.showRateEligible += num(r.show_rate_eligible);

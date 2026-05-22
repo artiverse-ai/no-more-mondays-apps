@@ -9,6 +9,7 @@ import { RelativeTime } from "./_components/RelativeTime";
 import { HeroStrip } from "./_components/HeroStrip";
 import { SplashIntro } from "./_components/SplashIntro";
 import { ViewToggle } from "./_components/ViewToggle";
+import { MultiplierBanner } from "./_components/MultiplierBanner";
 import styles from "./_components/competition.module.css";
 
 // Cache for 30s so tab clicks feel instant. The leaderboard is live
@@ -52,6 +53,8 @@ export default async function CompetitionPage({
           EVERY CALL COUNTS
         </div>
       </div>
+
+      <MultiplierBanner multiplier={board.todayMultiplier} />
 
       {/* key={period} forces React to remount the whole board on
           period change so the CSS flip animations re-run for every

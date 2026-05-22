@@ -6,6 +6,7 @@ import { HeroStrip } from "../_components/HeroStrip";
 import { SplashIntro } from "../_components/SplashIntro";
 import { ViewToggle } from "../_components/ViewToggle";
 import { SetterStandings } from "../_components/SetterStandings";
+import { MultiplierBanner } from "../_components/MultiplierBanner";
 import { POINTS_PER_BOOKING } from "../_data/setters";
 import styles from "../_components/competition.module.css";
 
@@ -42,6 +43,8 @@ export default async function SetterCompetitionPage({
           EVERY CALL COUNTS
         </div>
       </div>
+
+      <MultiplierBanner multiplier={board.todayMultiplier} />
 
       {/* key={period} remounts the board on period change so the
           avatar flip animations re-run — matches the closer page. */}

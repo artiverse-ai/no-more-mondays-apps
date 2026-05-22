@@ -19,6 +19,7 @@ import {
   COMPETITION_START,
   type CloserProfile,
 } from "../_data/roster";
+import { fetchPointMultipliers, todayEt } from "./multipliers";
 
 const ENRICHED = "`no-more-mondays-analytics.dbt_tuddin.int_calls_enriched`";
 // Single source of truth for "who is a competing closer". The
@@ -101,6 +102,8 @@ export type Leaderboard = {
   allDealsCount: number;
   /** Recent activity feed, newest first, max 10. */
   recentActivity: Array<Deal & { profile: CloserProfile; points: number }>;
+  /** Point multiplier in effect for today's ET date (1 = normal). */
+  todayMultiplier: number;
 };
 
 /** Convert a period string + "now" timestamp to a [start, end] DATE window
@@ -159,15 +162,18 @@ const DEALS_SQL = `
  *  are excluded entirely. */
 export async function fetchLeaderboard(period: Period, now: Date = new Date()): Promise<Leaderboard> {
   const { start, end } = periodWindow(period, now);
-  const [activeNames, dealRowsRaw] = await Promise.all([
+  const [activeNames, dealRowsRaw, multipliers] = await Promise.all([
     fetchActiveCloserNames(),
     bq().query({
       query: DEALS_SQL,
       params: { start, end },
       types: { start: "STRING", end: "STRING" },
     }),
+    fetchPointMultipliers(),
   ]);
   const rows = dealRowsRaw[0];
+  // Points earned on a special-bonus day count ×N (e.g. double points).
+  const multFor = (date: string) => multipliers.get(date) ?? 1;
 
   const deals: Deal[] = (rows as Array<Record<string, unknown>>).map((r) => ({
     closerOwner: String(r.closer_owner ?? ""),
@@ -203,7 +209,9 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
   for (const deal of deals) {
     const closer = perCloser.get(deal.closerOwner);
     if (!closer) continue;
-    const pts = pointsForDeal(deal.cashCollected, deal.closeType);
+    const pts = Math.round(
+      pointsForDeal(deal.cashCollected, deal.closeType) * multFor(deal.dateClosed),
+    );
     closer.basePoints += pts;
     closer.cashCollected += deal.cashCollected;
     closer.deals += 1;
@@ -279,7 +287,10 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     .map((d) => {
       const profile = ROSTER_BY_NAME.get(d.closerOwner);
       if (!profile) return null;
-      return { ...d, profile, points: pointsForDeal(d.cashCollected, d.closeType) };
+      const points = Math.round(
+        pointsForDeal(d.cashCollected, d.closeType) * multFor(d.dateClosed),
+      );
+      return { ...d, profile, points };
     })
     .filter((x): x is NonNullable<typeof x> => x != null)
     .slice(0, 10);
@@ -293,5 +304,6 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     closers,
     allDealsCount: deals.length,
     recentActivity,
+    todayMultiplier: multFor(todayEt()),
   };
 }

@@ -232,6 +232,42 @@
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
 }
 
+/* ─── Special-day multiplier banner ───────────────────────────────── */
+/* Loud — only rendered on a bonus day (multiplier > 1). */
+.multiplierBanner {
+  max-width: 1280px;
+  margin: 0 auto 16px;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ff7a1a 0%, #ffd24d 50%, #ff7a1a 100%);
+  background-size: 220% 100%;
+  color: #0b1d3d;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  box-shadow:
+    0 6px 24px rgba(255, 122, 26, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  animation: multiplierShimmer 3s linear infinite;
+}
+@keyframes multiplierShimmer {
+  0%   { background-position: 0% 0; }
+  100% { background-position: 220% 0; }
+}
+.multiplierBannerSub {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: none;
+  opacity: 0.85;
+}
+
 /* Motivational chip — keeps closers pumped while they're checking the
  * board. Lives in .topBar (NOT inside the poster). */
 .heroMotivation {
@@ -1140,6 +1176,7 @@
   }
   .topBar { margin: 0 auto 8px; }
   .viewToggleBtn { padding: 7px 12px; font-size: 10px; letter-spacing: 0.6px; }
+  .multiplierBanner { font-size: 14px; padding: 10px 14px; letter-spacing: 1px; }
   .heroMotivation {
     padding: 5px 10px;
     font-size: 9px;

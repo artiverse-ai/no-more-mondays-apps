@@ -18,7 +18,7 @@ export type SetterProfile = {
 };
 
 export const SETTER_ROSTER: SetterProfile[] = [
-  { setter: "Hania" },
+  { setter: "Hania",   imageUrl: "/competition/jerseys/hania.webp" },
   { setter: "Swapnil", displayName: "Swap", imageUrl: "/competition/jerseys/swap.webp" },
-  { setter: "Sal" },
+  { setter: "Sal",     imageUrl: "/competition/jerseys/sal.webp" },
 ];

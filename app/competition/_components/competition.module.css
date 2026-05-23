@@ -232,6 +232,52 @@
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
 }
 
+/* ─── Multiplier-sheet link (persistent, informational) ───────────── */
+/* Subtle banner pointing admins at the Google Sheet where they add
+ * bonus days. Always visible — the loud "today is 2× points" banner
+ * (.multiplierBanner below) only fires on actual bonus days. */
+.multiplierSheetLink {
+  max-width: 1280px;
+  margin: 0 auto 12px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.32);
+  border-radius: 12px;
+}
+.multiplierSheetText {
+  flex: 1 1 320px;
+  min-width: 0;
+  color: #cbd5e1;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.multiplierSheetText strong {
+  color: #f5e9d6;
+  font-weight: 800;
+}
+.multiplierSheetButton {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow:
+    0 4px 14px rgba(99, 102, 241, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 150ms ease;
+  white-space: nowrap;
+}
+.multiplierSheetButton:hover { transform: translateY(-1px); }
+
 /* ─── Special-day multiplier banner ───────────────────────────────── */
 /* Loud — only rendered on a bonus day (multiplier > 1). */
 .multiplierBanner {
@@ -1177,6 +1223,9 @@
   .topBar { margin: 0 auto 8px; }
   .viewToggleBtn { padding: 7px 12px; font-size: 10px; letter-spacing: 0.6px; }
   .multiplierBanner { font-size: 14px; padding: 10px 14px; letter-spacing: 1px; }
+  .multiplierSheetLink { padding: 8px 12px; gap: 8px; }
+  .multiplierSheetText { font-size: 11.5px; flex-basis: 100%; }
+  .multiplierSheetButton { padding: 6px 12px; font-size: 11px; }
   .heroMotivation {
     padding: 5px 10px;
     font-size: 9px;

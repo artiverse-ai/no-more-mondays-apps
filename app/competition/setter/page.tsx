@@ -7,7 +7,7 @@ import { SplashIntro } from "../_components/SplashIntro";
 import { ViewToggle } from "../_components/ViewToggle";
 import { SetterStandings } from "../_components/SetterStandings";
 import { MultiplierBanner } from "../_components/MultiplierBanner";
-import { POINTS_PER_BOOKING } from "../_data/setters";
+import { MultiplierSheetLink } from "../_components/MultiplierSheetLink";
 import styles from "../_components/competition.module.css";
 
 // 30s cache so tab clicks feel instant — same as the closer page.
@@ -44,6 +44,7 @@ export default async function SetterCompetitionPage({
         </div>
       </div>
 
+      <MultiplierSheetLink />
       <MultiplierBanner multiplier={board.todayMultiplier} />
 
       {/* key={period} remounts the board on period change so the
@@ -62,8 +63,10 @@ export default async function SetterCompetitionPage({
       </div>
 
       <div className={styles.rulesFooter}>
-        <strong>Setter scoring:</strong> 1 booked call = {POINTS_PER_BOOKING} pts
-        &nbsp;·&nbsp; Show rate &amp; close rate are on the calls they own
+        <strong>Setter scoring:</strong> every $10 of cash collected from
+        your booked calls = 1 pt &nbsp;·&nbsp; multiplier (if any) applies
+        on the day you booked &nbsp;·&nbsp; show &amp; close rates are on
+        the calls you own
         <br />
         <span className={styles.rulesFooterSub}>
           Window: {board.windowStart} → {board.windowEnd} · Setters compete

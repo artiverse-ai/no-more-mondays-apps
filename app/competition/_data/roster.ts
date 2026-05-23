@@ -38,7 +38,7 @@ export const TEAM = {
 export const ROSTER: CloserProfile[] = [
   { closerOwner: "Ben",     jersey: 10, imageUrl: "/competition/jerseys/ben.webp" },
   { closerOwner: "Tyler",   jersey:  7, imageUrl: "/competition/jerseys/tyler.webp" },
-  { closerOwner: "Morgan",  jersey:  4 },
+  { closerOwner: "Morgan",  jersey:  4, imageUrl: "/competition/jerseys/morgan.webp" },
   { closerOwner: "Cecilia", jersey:  5, imageUrl: "/competition/jerseys/cecilia.webp" },
   { closerOwner: "Grace",   jersey:  3, imageUrl: "/competition/jerseys/grace.webp" },
   { closerOwner: "Jordan",  jersey: 11, imageUrl: "/competition/jerseys/jordan.webp" },

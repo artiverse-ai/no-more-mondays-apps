@@ -32,7 +32,11 @@ export function SetterStandings({ setters }: { setters: SetterScore[] }) {
                 {meta.medal}
               </span>
               <div className={styles.podiumAvatar}>
-                <span>{initial}</span>
+                {s.profile.imageUrl ? (
+                  <img src={s.profile.imageUrl} alt={name} />
+                ) : (
+                  <span>{initial}</span>
+                )}
               </div>
               <div className={styles.podiumInfo}>
                 <div className={styles.podiumName}>{name}</div>

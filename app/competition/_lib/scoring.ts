@@ -106,32 +106,59 @@ export type Leaderboard = {
   todayMultiplier: number;
 };
 
-/** Convert a period string + "now" timestamp to a [start, end] DATE window
- *  in ET-bucketed YYYY-MM-DD form. The window start is floored at
- *  COMPETITION_START — nothing before the league opens ever counts. If
- *  the whole window is pre-launch, start > end and queries return empty. */
+/** Get the [year, month, day] of `d` in America/New_York time. Month is
+ *  1-12. We split by ET because the business runs on ET sales weeks —
+ *  if we used UTC, the dashboard would flip "today" 4-5 hours early
+ *  (8 PM ET Sun = midnight UTC Mon would already read as Monday). */
+function etYmd(d: Date): [number, number, number] {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(d);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  return [get("year"), get("month"), get("day")];
+}
+const isoYmd = (y: number, m: number, d: number) =>
+  `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+/** Convert a period string + "now" timestamp to a [start, end] DATE
+ *  window in ET-bucketed YYYY-MM-DD form. The window start is floored
+ *  at COMPETITION_START — nothing before the league opens ever counts.
+ *  If the whole window is pre-launch, start > end and queries return
+ *  empty. Note: this is only the DATE bound. Setters additionally floor
+ *  at the precise launch instant (7 AM ET) via COMPETITION_LAUNCH_TS so
+ *  early-morning Sunday bookings don't slip in. */
 export function periodWindow(period: Period, now: Date = new Date()): { start: string; end: string } {
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  // YYYY-MM-DD strings sort lexically = chronologically.
-  const floor = (d: string) => (d < COMPETITION_START ? COMPETITION_START : d);
+  const [y, m, d] = etYmd(now);
+  const today = isoYmd(y, m, d);
+  const floor = (s: string) => (s < COMPETITION_START ? COMPETITION_START : s);
 
   if (period === "today") {
-    return { start: floor(iso(today)), end: iso(today) };
+    return { start: floor(today), end: today };
   }
   if (period === "week") {
-    // Sales week = Sun-Sat. dow: 0=Sun..6=Sat
-    const dow = today.getUTCDay();
-    const sun = new Date(today);
-    sun.setUTCDate(today.getUTCDate() - dow);
-    const sat = new Date(sun);
-    sat.setUTCDate(sun.getUTCDate() + 6);
-    return { start: floor(iso(sun)), end: iso(sat) };
+    // Sales week = Sun-Sat in ET. Anchor at ET noon so DST transitions
+    // don't shift the calendar date when we step days.
+    const anchor = new Date(Date.UTC(y, m - 1, d, 17)); // 17:00 UTC ≈ noon ET year-round
+    const dow = Number(
+      new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short" })
+        .format(anchor)
+        .toLowerCase()
+        .replace(/sun|mon|tue|wed|thu|fri|sat/, (s) => ({ sun: "0", mon: "1", tue: "2", wed: "3", thu: "4", fri: "5", sat: "6" }[s]!)),
+    );
+    const sunAnchor = new Date(anchor); sunAnchor.setUTCDate(anchor.getUTCDate() - dow);
+    const satAnchor = new Date(sunAnchor); satAnchor.setUTCDate(sunAnchor.getUTCDate() + 6);
+    const [sy, sm, sd] = etYmd(sunAnchor);
+    const [ey, em, ed] = etYmd(satAnchor);
+    return { start: floor(isoYmd(sy, sm, sd)), end: isoYmd(ey, em, ed) };
   }
-  // month
-  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
-  const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
-  return { start: floor(iso(monthStart)), end: iso(monthEnd) };
+  // month — ET month, ET-day boundaries
+  const monthStartAnchor = new Date(Date.UTC(y, m - 1, 1, 17));
+  // day=0 of next month = last day of this month
+  const monthEndAnchor = new Date(Date.UTC(y, m, 0, 17));
+  const [sy, sm, sd] = etYmd(monthStartAnchor);
+  const [ey, em, ed] = etYmd(monthEndAnchor);
+  return { start: floor(isoYmd(sy, sm, sd)), end: isoYmd(ey, em, ed) };
 }
 
 /** Points = floor(cash / 10), doubled for FUC. */

@@ -62,8 +62,15 @@ export const BONUS_THRESHOLDS = {
   month:   { threshold:  8000, bonus: 1000 },
 } as const;
 
-/** Competition start — nothing closed/booked before this counts, on any
- *  period view. The league opens Sunday May 24 2026, 7 AM ET; deal and
- *  call data is day-grained (ET DATE columns) so the floor is the date.
- *  Shared by the closer and setter leaderboards. */
+/** Competition launch — nothing closed/booked before this counts on any
+ *  period view. The league opens Sunday May 24 2026, 7 AM ET. Shared by
+ *  the closer and setter leaderboards.
+ *
+ *  Two constants because we filter at two grains:
+ *   - COMPETITION_START is the ET DATE used to floor period windows
+ *     (today/week/month start can't precede the launch day).
+ *   - COMPETITION_LAUNCH_TS is the exact instant — used by the setter
+ *     side, where `calendly_created_ts` is a UTC TIMESTAMP and we need
+ *     to drop bookings made before 7 AM ET on launch day. */
 export const COMPETITION_START = "2026-05-24";
+export const COMPETITION_LAUNCH_TS = "2026-05-24 11:00:00"; // 7 AM ET = 11:00 UTC

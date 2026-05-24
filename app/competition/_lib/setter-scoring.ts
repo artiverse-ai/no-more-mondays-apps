@@ -17,6 +17,7 @@ import { bq } from "@/lib/bq";
 import { periodWindow, type Period } from "./scoring";
 import { fetchPointMultipliers, todayEt } from "./multipliers";
 import { SETTER_ROSTER, type SetterProfile } from "../_data/setters";
+import { COMPETITION_LAUNCH_TS } from "../_data/roster";
 
 const ENRICHED = "`no-more-mondays-analytics.dbt_tuddin.int_calls_enriched`";
 
@@ -75,6 +76,7 @@ const SETTER_SQL = `
     SUM(IF(is_deal, CAST(cash_collected AS NUMERIC), 0)) AS cash_collected
   FROM ${ENRICHED}
   WHERE calendly_created_ts IS NOT NULL
+    AND calendly_created_ts >= TIMESTAMP(@launchTs)
     AND DATE(calendly_created_ts, 'America/New_York') BETWEEN DATE(@start) AND DATE(@end)
     AND COALESCE(setter_owner, calendly_setter_name) IN UNNEST(@setters)
   GROUP BY setter, booked_date
@@ -97,8 +99,13 @@ export async function fetchSetterLeaderboard(
   const [rowsRaw, multipliers] = await Promise.all([
     bq().query({
       query: SETTER_SQL,
-      params: { start, end, setters: SETTER_ROSTER.map((s) => s.setter) },
-      types: { start: "STRING", end: "STRING", setters: ["STRING"] },
+      params: {
+        start,
+        end,
+        launchTs: COMPETITION_LAUNCH_TS,
+        setters: SETTER_ROSTER.map((s) => s.setter),
+      },
+      types: { start: "STRING", end: "STRING", launchTs: "STRING", setters: ["STRING"] },
     }),
     fetchPointMultipliers(),
   ]);

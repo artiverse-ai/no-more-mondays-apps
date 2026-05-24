@@ -51,21 +51,31 @@ export type SetterLeaderboard = {
 };
 
 // Per setter PER DAY — the day grain lets multipliers apply by the
-// setter's booking date. Filter by created_date (when the call was
-// BOOKED), not appointment_date_time — a booking before launch must
-// not credit just because the call is scheduled after. The period
-// window is already floored at COMPETITION_START.
+// setter's booking date.
+//
+// Booking date = DATE(calendly_created_ts, 'America/New_York'). We
+// must NOT use int_calls_enriched.created_date here:
+//   - it falls back to airtable_created_date when Calendly is missing,
+//     which is the Fivetran sync time (not the real booking time —
+//     see docs/NMM_ANALYSIS_CONTEXT.md §11.12), and
+//   - it's a plain DATE() with no timezone, so on Mon 1 AM ET it
+//     already includes 5 hours of Sunday evening US activity.
+// Restricting to calendly_created_ts IS NOT NULL also keeps the
+// "competition lives in Calendly bookings" rule clean — manual
+// Airtable rows shouldn't credit a setter.
+// The period window is already floored at COMPETITION_START.
 const SETTER_SQL = `
   SELECT
     COALESCE(setter_owner, calendly_setter_name) AS setter,
-    FORMAT_DATE('%F', created_date)              AS booked_date,
+    FORMAT_DATE('%F', DATE(calendly_created_ts, 'America/New_York')) AS booked_date,
     COUNTIF(is_call_booked)            AS bookings,
     COUNTIF(is_show_up)                AS show_ups,
     COUNTIF(is_show_rate_eligible)     AS show_rate_eligible,
     COUNTIF(is_deal)                   AS deals,
     SUM(IF(is_deal, CAST(cash_collected AS NUMERIC), 0)) AS cash_collected
   FROM ${ENRICHED}
-  WHERE created_date BETWEEN DATE(@start) AND DATE(@end)
+  WHERE calendly_created_ts IS NOT NULL
+    AND DATE(calendly_created_ts, 'America/New_York') BETWEEN DATE(@start) AND DATE(@end)
     AND COALESCE(setter_owner, calendly_setter_name) IN UNNEST(@setters)
   GROUP BY setter, booked_date
 `;

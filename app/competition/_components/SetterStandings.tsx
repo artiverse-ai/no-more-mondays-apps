@@ -41,8 +41,9 @@ export function SetterStandings({ setters }: { setters: SetterScore[] }) {
               <div className={styles.podiumInfo}>
                 <div className={styles.podiumName}>{name}</div>
                 <div className={styles.podiumSub}>
-                  {fmtInt(s.bookings)} booked · {fmtPct(s.showRate)} show ·{" "}
-                  {fmtPct(s.closeRate)} close
+                  {fmtInt(s.bookings)} booked · {fmtInt(s.showUps)} shown
+                  {" "}({fmtPct(s.showRate)}) · {fmtInt(s.deals)} closed
+                  {" "}({fmtPct(s.closeRate)})
                 </div>
               </div>
               <div className={styles.podiumPoints}>

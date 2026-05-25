@@ -128,7 +128,25 @@ export function Tab2LatestWebinar({
               <DivRow>Attendance</DivRow>
               <DataRow label="Unique Attendees" values={webinars.map((w) => fmtInt(w.uniqueAttendees))} tip={TIP.uniqueAttendees} />
               <DataRow label="Pitched (>25 min)" values={webinars.map((w) => fmtInt(w.pitchedAttendees))} tip={TIP.pitchedAttendees} />
-              <DataRow label="Attend Rate (Zoom/Reg)" values={webinars.map((w) => fmtPct(w.regToAttendRate))} tip={TIP.attendRateRegToZoom} trafficKey="webinarShowUpRate" rawValues={webinars.map((w) => w.regToAttendRate)} />
+              <DataRow
+                label="Attend Rate (Zoom/Reg)"
+                values={webinars.map((w, i) => {
+                  // For the workshop slug we override the registrant total
+                  // shown above; the mart's regToAttendRate uses the OLD
+                  // (wrong) denominator, so recompute the latest column.
+                  if (i === 0 && monthlyWorkshopOverride && monthlyWorkshopOverride.total > 0) {
+                    return fmtPct(w.uniqueAttendees / monthlyWorkshopOverride.total);
+                  }
+                  return fmtPct(w.regToAttendRate);
+                })}
+                tip={TIP.attendRateRegToZoom}
+                trafficKey="webinarShowUpRate"
+                rawValues={webinars.map((w, i) =>
+                  i === 0 && monthlyWorkshopOverride && monthlyWorkshopOverride.total > 0
+                    ? w.uniqueAttendees / monthlyWorkshopOverride.total
+                    : w.regToAttendRate,
+                )}
+              />
               <DataRow label="Pitch Rate" values={webinars.map((w) => fmtPct(w.attendToPitchedRate))} tip={TIP.pitchRate} />
 
               <DivRow>Meta Funnel · Registration Campaigns Only</DivRow>
@@ -256,7 +274,12 @@ export function Tab2LatestWebinar({
       <MetaCampaignsTable campaigns={metaCampaigns} sqlInfo={metaSql} />
 
       {/* 7. Reactivation Funnel */}
-      <ReactivationFunnel webinars={webinars} headers={headers} note={reactivationNote} />
+      <ReactivationFunnel
+        webinars={webinars}
+        headers={headers}
+        note={reactivationNote}
+        latestNotApplicable={Boolean(monthlyWorkshopOverride)}
+      />
 
       {/* 8. Warning banner — ad-spend cutoff */}
       <div className={styles.bannerWarn}>
@@ -451,7 +474,20 @@ function MetaCampaignsTable({ campaigns, sqlInfo }: { campaigns: MetaCampaignRow
   );
 }
 
-function ReactivationFunnel({ webinars, headers, note }: { webinars: WebinarComparisonRowV2[]; headers: string[]; note?: string }) {
+function ReactivationFunnel({
+  webinars,
+  headers,
+  note,
+  latestNotApplicable = false,
+}: {
+  webinars: WebinarComparisonRowV2[];
+  headers: string[];
+  note?: string;
+  /** When true, the latest column shows em-dashes instead of literal 0
+   *  values. Used for the monthly-workshop slug where no formal no-show
+   *  reactivation push was run (broader outreach lives in the note). */
+  latestNotApplicable?: boolean;
+}) {
   return (
     <section className={styles.section}>
       <div className={styles.sh}>Reactivation Funnel</div>
@@ -475,16 +511,24 @@ function ReactivationFunnel({ webinars, headers, note }: { webinars: WebinarComp
           </thead>
           <tbody>
             {webinars.map((w, i) => {
+              const blanked = i === 0 && latestNotApplicable;
               const attendRate = w.reactivationPoolSize > 0 ? w.reactivationsAttended / w.reactivationPoolSize : null;
               const bookRate = w.reactivationsAttended > 0 ? w.reactivationsBooked / w.reactivationsAttended : null;
               return (
                 <tr key={w.webinarDate}>
-                  <td>{headers[i]}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(w.reactivationPoolSize)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(w.reactivationsAttended)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtPct(attendRate)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(w.reactivationsBooked)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtPct(bookRate)}</td>
+                  <td>
+                    {headers[i]}
+                    {blanked ? (
+                      <span style={{ marginLeft: 8, fontSize: 11, color: "#64748b", fontWeight: 400 }}>
+                        no formal push — see note above
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtInt(w.reactivationPoolSize)}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtInt(w.reactivationsAttended)}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtPct(attendRate)}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtInt(w.reactivationsBooked)}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtPct(bookRate)}</td>
                 </tr>
               );
             })}

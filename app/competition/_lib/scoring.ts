@@ -17,6 +17,7 @@ import {
   TEAM,
   BONUS_THRESHOLDS,
   COMPETITION_START,
+  COMPETITION_LAUNCH_TS,
   type CloserProfile,
 } from "../_data/roster";
 import { fetchPointMultipliers, todayEt } from "./multipliers";
@@ -168,6 +169,16 @@ export function pointsForDeal(cashCollected: number, closeType: "OCC" | "FUC" | 
   return Math.floor(base * multiplier);
 }
 
+// Closer leaderboard mirrors the setter rule per Sergio 2026-05-25:
+// the call must have been booked AFTER the league opens (7 AM ET Sun
+// May 24). So a deal closing today from last-week's pipeline does NOT
+// credit the closer — same way it doesn't credit the setter who
+// originally booked it. With this in place, closer totals reconcile
+// with the sum of setter cash for the same window.
+//
+// Requires calendly_created_ts IS NOT NULL — manual Airtable rows
+// without a Calendly link can't prove a post-launch booking, so they
+// don't count. Matches the setter filter exactly.
 const DEALS_SQL = `
   SELECT
     closer_owner                                AS closer_owner,
@@ -178,6 +189,8 @@ const DEALS_SQL = `
   FROM ${ENRICHED}
   WHERE is_deal
     AND date_closed BETWEEN DATE(@start) AND DATE(@end)
+    AND calendly_created_ts IS NOT NULL
+    AND calendly_created_ts >= TIMESTAMP(@launchTs)
     AND closer_owner IS NOT NULL
     AND ${EMAIL_EXCLUSION}
   ORDER BY date_closed DESC, cash_collected DESC
@@ -193,8 +206,8 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     fetchActiveCloserNames(),
     bq().query({
       query: DEALS_SQL,
-      params: { start, end },
-      types: { start: "STRING", end: "STRING" },
+      params: { start, end, launchTs: COMPETITION_LAUNCH_TS },
+      types: { start: "STRING", end: "STRING", launchTs: "STRING" },
     }),
     fetchPointMultipliers(),
   ]);

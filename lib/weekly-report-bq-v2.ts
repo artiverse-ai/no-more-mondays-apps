@@ -816,6 +816,8 @@ function mapWebinarComparisonRow(r: Record<string, unknown>): WebinarComparisonR
 // stg has no rows attributed.
 
 export type MonthlyWorkshopBreakdown = {
+  /** Total workshop registrants (14-day attribution window: people who
+   *  signed up via LP form during the lookback PLUS manychat-tagged. */
   total: number;
   meta: number;
   manychat: number;        // tag-based (manychat IG DM AND workshop tag)
@@ -823,26 +825,67 @@ export type MonthlyWorkshopBreakdown = {
   whatsapp: number;
   email: number;
   otherOrganic: number;
+  /** Promo window (e.g. Wed→Sun for May-24 workshop). Used for the cost
+   *  block so spend and conversion windows align. */
+  promoStart: string;
+  promoEnd: string;
+  metaInPromo: number;     // Meta-attributed regs WITHIN promo window
+  // Ad spend in promo window — split same way the mart does for weeklies.
+  regAdSpend: number;      // webinar_registration + monthly_workshop_registration
+  hammerAdSpend: number;   // webinar_hammer_them   + monthly_workshop_hammer_them
+  totalAdSpend: number;    // regAdSpend + hammerAdSpend
+  // Meta funnel — same registration-category filter the mart uses.
+  metaImpressions: number;
+  metaLinkClicks: number;
+  metaCtr: number | null;
+  metaCvr: number | null;
+  metaCpl: number | null;
+  metaReportedConversions: number;
+  // Sales — int_calls_enriched in a wider window covering promo + the
+  // post-workshop booking week (calls scheduled in Wed→Sat after the
+  // workshop). Same definitions as the weekly mart's calls/shows/deals.
+  salesWindowStart: string;
+  salesWindowEnd: string;
+  callsBooked: number;
+  callsBookedActive: number;
+  shows: number;
+  qualifiedShows: number;
+  dealsClosed: number;
+  cashCollected: number;
+  revenueGenerated: number;
 };
 
-/** Compute registrant breakdown for a monthly workshop.
+/** Compute registrant breakdown + cost block for a monthly workshop.
  *
- *  @param workshopTagDate `YYYY-MM-DD` — the date in the GHL tag
- *         `event: workshop-{workshopTagDate}`. For the 2026-05-25 report
- *         this is "2026-05-24" (the workshop happened Sunday; the report
- *         is dated Monday per usual recap convention).
- *  @param windowStart    `YYYY-MM-DD` — inclusive lower bound for
- *         createdAt (ET). 14-day lookback to the workshop matches the
- *         documented monthly-stg attribution window.
- *  @param windowEnd      `YYYY-MM-DD` — EXCLUSIVE upper bound for
- *         createdAt (ET). Typically workshopTagDate + 1.
+ *  Three windows are intentionally separate because they answer
+ *  different questions:
+ *   - regWindow: 14-day attribution to count workshop registrants.
+ *   - promoWindow: actual ad-campaign run for this workshop (e.g. for
+ *     May 24 it's Wed May 20 → Sun May 24 per Marek). Determines ad
+ *     spend + Meta funnel + the Meta-reg denominator used by Cost/Reg.
+ *   - salesWindow: appointments scheduled around the workshop. Defaults
+ *     to promoStart through 6 days AFTER the workshop so post-workshop
+ *     bookings get captured.
+ *
+ *  @param workshopTagDate `YYYY-MM-DD` — date in `event: workshop-{date}`.
+ *  @param regWindowStart  `YYYY-MM-DD` — registrant lookback start.
+ *  @param regWindowEnd    `YYYY-MM-DD` — registrant lookback end (excl).
+ *  @param promoStart      `YYYY-MM-DD` — ad campaign window start.
+ *  @param promoEnd        `YYYY-MM-DD` — ad campaign window end (incl).
+ *  @param salesStart      `YYYY-MM-DD` — appointment_date_time window start.
+ *  @param salesEnd        `YYYY-MM-DD` — appointment_date_time window end (incl).
  */
 export async function fetchMonthlyWorkshopBreakdown(
   workshopTagDate: string,
-  windowStart: string,
-  windowEnd: string,
+  regWindowStart: string,
+  regWindowEnd: string,
+  promoStart: string,
+  promoEnd: string,
+  salesStart: string,
+  salesEnd: string,
 ): Promise<MonthlyWorkshopBreakdown> {
-  const sql = `
+  // Registrants + Meta-in-promo classification. One query, two outputs.
+  const regsSql = `
     WITH workshop_contacts AS (
       SELECT DISTINCT contact_id
       FROM \`${PROJECT}.raw_ghl.contact_tags\`
@@ -862,21 +905,23 @@ export async function fetchMonthlyWorkshopBreakdown(
     regs AS (
       SELECT
         LOWER(email) AS email_lc,
+        PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', createdAt) AS created_ts,
         JSON_VALUE(others, '$.eventData.url_params.utm_source')  AS utm_source,
         JSON_VALUE(others, '$.eventData.url_params.utm_medium')  AS utm_medium,
         JSON_VALUE(others, '$.eventData.url_params.ref')         AS ref_param,
         JSON_VALUE(others, '$.organic_source')                   AS organic_source
       FROM \`${PROJECT}.raw_ghl.registrations_monthly_workshop\`
       WHERE PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', createdAt)
-              >= TIMESTAMP(@windowStart)
+              >= TIMESTAMP(@regWindowStart)
         AND PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', createdAt)
-              <  TIMESTAMP(@windowEnd)
+              <  TIMESTAMP(@regWindowEnd)
         AND email IS NOT NULL
         AND LOWER(email) NOT LIKE '%@nomoremondays.io%'
     ),
     classified AS (
       SELECT
         email_lc,
+        created_ts,
         CASE
           WHEN LOWER(IFNULL(utm_source,'')) LIKE '%whatsapp%'
             OR LOWER(IFNULL(utm_medium,'')) = 'whatsapp'                                         THEN 'whatsapp'
@@ -891,39 +936,113 @@ export async function fetchMonthlyWorkshopBreakdown(
       FROM regs
     ),
     deduped AS (
-      SELECT email_lc, ANY_VALUE(channel) AS channel FROM classified GROUP BY 1
-    ),
-    by_channel AS (
-      SELECT
-        SUM(IF(channel = 'meta',          1, 0)) AS meta,
-        SUM(IF(channel = 'setter',        1, 0)) AS setter,
-        SUM(IF(channel = 'whatsapp',      1, 0)) AS whatsapp,
-        SUM(IF(channel = 'email',         1, 0)) AS email,
-        SUM(IF(channel = 'other_organic', 1, 0)) AS other_organic
-      FROM deduped
+      SELECT email_lc, ANY_VALUE(channel) AS channel,
+             ANY_VALUE(created_ts) AS created_ts
+      FROM classified GROUP BY 1
     )
     SELECT
-      b.meta, b.setter, b.whatsapp, b.email, b.other_organic,
-      (SELECT n FROM manychat_workshop) AS manychat,
-      b.meta + b.setter + b.whatsapp + b.email + b.other_organic
-        + (SELECT n FROM manychat_workshop) AS total
-    FROM by_channel b
+      SUM(IF(channel = 'meta',          1, 0)) AS meta,
+      SUM(IF(channel = 'setter',        1, 0)) AS setter,
+      SUM(IF(channel = 'whatsapp',      1, 0)) AS whatsapp,
+      SUM(IF(channel = 'email',         1, 0)) AS email,
+      SUM(IF(channel = 'other_organic', 1, 0)) AS other_organic,
+      SUM(IF(channel = 'meta'
+             AND created_ts >= TIMESTAMP(@promoStart)
+             AND created_ts <  TIMESTAMP(DATE_ADD(DATE(@promoEnd), INTERVAL 1 DAY)),
+             1, 0))                              AS meta_in_promo,
+      (SELECT n FROM manychat_workshop)          AS manychat
+    FROM deduped
   `;
-  const [rows] = await bq().query({
-    query: sql,
-    params: { workshopTagDate, windowStart, windowEnd },
-    types: { workshopTagDate: "STRING", windowStart: "STRING", windowEnd: "STRING" },
-  });
-  const r = (rows[0] ?? {}) as Record<string, unknown>;
+  // Ad spend + Meta funnel — same registration/hammer-them split the mart
+  // uses, but date_day in promo window. We include both webinar_* and
+  // monthly_workshop_* categories so the workshop's dedicated campaigns
+  // (if any) AND the shared weekly registration spend that drove
+  // workshop traffic both land in the numerator.
+  const spendSql = `
+    SELECT
+      SUM(IF(campaign_category IN ('webinar_registration','monthly_workshop_registration'),    spend_usd,   0)) AS reg_spend,
+      SUM(IF(campaign_category IN ('webinar_hammer_them','monthly_workshop_hammer_them'),      spend_usd,   0)) AS hammer_spend,
+      SUM(IF(campaign_category IN ('webinar_registration','monthly_workshop_registration'),    impressions, 0)) AS meta_impressions,
+      SUM(IF(campaign_category IN ('webinar_registration','monthly_workshop_registration'),    link_clicks, 0)) AS meta_link_clicks,
+      SUM(IF(campaign_category IN ('webinar_registration','monthly_workshop_registration'),    conversions, 0)) AS meta_reported_conversions
+    FROM \`${PROJECT}.dbt_tuddin.stg_meta_campaigns\`
+    WHERE date_day BETWEEN DATE(@promoStart) AND DATE(@promoEnd)
+  `;
+  // Sales — int_calls_enriched, calls whose appointment is in the sales window.
+  const salesSql = `
+    SELECT
+      COUNT(DISTINCT IF(is_call_booked,                                  prospect_email_lc, NULL)) AS calls_booked,
+      COUNT(DISTINCT IF(is_call_booked AND NOT IFNULL(is_canceled, FALSE), prospect_email_lc, NULL)) AS calls_booked_active,
+      COUNT(DISTINCT IF(is_show_up,                                      prospect_email_lc, NULL)) AS shows,
+      COUNT(DISTINCT IF(is_close_rate_eligible,                          prospect_email_lc, NULL)) AS qualified_shows,
+      COUNT(DISTINCT IF(is_deal,                                         prospect_email_lc, NULL)) AS deals,
+      SUM(IF(is_deal, cash_collected,    0))                                                       AS cash,
+      SUM(IF(is_deal, revenue_generated, 0))                                                       AS revenue
+    FROM \`${PROJECT}.dbt_tuddin.int_calls_enriched\`
+    WHERE DATE(appointment_date_time) BETWEEN DATE(@salesStart) AND DATE(@salesEnd)
+      AND prospect_email_lc NOT LIKE '%@nomoremondays.io%'
+      AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
+  `;
+  const [regsR, spendR, salesR] = await Promise.all([
+    bq().query({
+      query: regsSql,
+      params: { workshopTagDate, regWindowStart, regWindowEnd, promoStart, promoEnd },
+      types: {
+        workshopTagDate: "STRING",
+        regWindowStart: "STRING", regWindowEnd: "STRING",
+        promoStart: "STRING", promoEnd: "STRING",
+      },
+    }),
+    bq().query({
+      query: spendSql,
+      params: { promoStart, promoEnd },
+      types: { promoStart: "STRING", promoEnd: "STRING" },
+    }),
+    bq().query({
+      query: salesSql,
+      params: { salesStart, salesEnd },
+      types: { salesStart: "STRING", salesEnd: "STRING" },
+    }),
+  ]);
+  const reg = (regsR[0]?.[0] ?? {}) as Record<string, unknown>;
+  const sp  = (spendR[0]?.[0] ?? {}) as Record<string, unknown>;
+  const sa  = (salesR[0]?.[0] ?? {}) as Record<string, unknown>;
   const n = (v: unknown) => Number(v ?? 0);
+  const regSpend     = n(sp.reg_spend);
+  const hammerSpend  = n(sp.hammer_spend);
+  const totalSpend   = regSpend + hammerSpend;
+  const impressions  = n(sp.meta_impressions);
+  const linkClicks   = n(sp.meta_link_clicks);
+  const conversions  = n(sp.meta_reported_conversions);
+  const meta         = n(reg.meta);
+  const setter       = n(reg.setter);
+  const whatsapp     = n(reg.whatsapp);
+  const email        = n(reg.email);
+  const otherOrganic = n(reg.other_organic);
+  const manychat     = n(reg.manychat);
   return {
-    total: n(r.total),
-    meta: n(r.meta),
-    manychat: n(r.manychat),
-    setter: n(r.setter),
-    whatsapp: n(r.whatsapp),
-    email: n(r.email),
-    otherOrganic: n(r.other_organic),
+    total: meta + setter + whatsapp + email + otherOrganic + manychat,
+    meta, manychat, setter, whatsapp, email, otherOrganic,
+    promoStart, promoEnd,
+    metaInPromo: n(reg.meta_in_promo),
+    regAdSpend: regSpend,
+    hammerAdSpend: hammerSpend,
+    totalAdSpend: totalSpend,
+    metaImpressions: impressions,
+    metaLinkClicks: linkClicks,
+    metaCtr: impressions > 0 ? linkClicks / impressions : null,
+    metaCvr: linkClicks > 0 ? conversions / linkClicks : null,
+    metaCpl: conversions > 0 ? regSpend / conversions : null,
+    metaReportedConversions: conversions,
+    salesWindowStart: salesStart,
+    salesWindowEnd: salesEnd,
+    callsBooked:        n(sa.calls_booked),
+    callsBookedActive:  n(sa.calls_booked_active),
+    shows:              n(sa.shows),
+    qualifiedShows:     n(sa.qualified_shows),
+    dealsClosed:        n(sa.deals),
+    cashCollected:      n(sa.cash),
+    revenueGenerated:   n(sa.revenue),
   };
 }
 

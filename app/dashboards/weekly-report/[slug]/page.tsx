@@ -122,18 +122,30 @@ export default async function Page({
 
   // ── One-off override: 2026-05-25 Monday report covers a Sunday MONTHLY
   // WORKSHOP rather than the regular Sunday webinar. mart_webinar_events
-  // sources registrants from stg_ghl_weekly_webinar_regs which doesn't
-  // touch the workshop funnel, so its breakdown is wrong. Pull the
-  // tag-based + raw-form numbers and pass them as an override. The
-  // workshop's GHL tag is `event: workshop-2026-05-24` (Sunday — the
-  // day the workshop actually happened, NOT the report's Monday slug).
+  // bakes in weekly-webinar assumptions (registrant source, ad-spend
+  // attribution split). We pull tag-based registrants + raw monthly-
+  // workshop form + actual workshop-window ad spend + sales from
+  // int_calls_enriched and override the latest column end-to-end.
+  //
+  // Windows:
+  //  - regWindow: 14-day lookback for workshop registrants (matches the
+  //    documented monthly-stg attribution convention).
+  //  - promoWindow: Wed → Sun (2026-05-20..05-24) per Marek — the actual
+  //    ad campaign window for this workshop.
+  //  - salesWindow: Wed before workshop through following Saturday so
+  //    post-workshop bookings get attributed (calls scheduled by
+  //    workshop attendees over the following week).
   let monthlyWorkshopOverride: MonthlyWorkshopBreakdown | undefined;
   let reactivationNote: string | undefined;
   if (slug === "2026-05-25") {
     monthlyWorkshopOverride = await fetchMonthlyWorkshopBreakdown(
-      "2026-05-24",  // GHL tag date (workshop day, not report day)
-      "2026-05-10",  // 14-day lookback per monthly-stg attribution convention
-      "2026-05-25",  // exclusive upper bound: through end of workshop day
+      "2026-05-24",  // workshop tag date (Sunday, not the Monday slug)
+      "2026-05-10",  // regWindowStart: 14-day reg lookback start
+      "2026-05-25",  // regWindowEnd: exclusive upper (end of workshop day)
+      "2026-05-20",  // promoStart: Wed before workshop
+      "2026-05-24",  // promoEnd: workshop day (inclusive)
+      "2026-05-20",  // salesStart: appointments from start of promo
+      "2026-05-30",  // salesEnd: appointments through following Saturday
     ).catch(() => undefined);
     reactivationNote =
       "No formal “no-show reactivation” push this cycle, but the team ran " +

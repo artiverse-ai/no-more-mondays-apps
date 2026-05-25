@@ -52,15 +52,27 @@ export function Tab2LatestWebinar({
   reactivationNote,
 }: Tab2LatestWebinarProps) {
   // For the 2026-05-25 monthly-workshop report we override the latest
-  // column's registrant slice. Historical columns (W-1, W-2) keep their
-  // mart_webinar_events values for comparison context.
-  const regValues = (
-    pickOverride: (o: MonthlyWorkshopBreakdown) => number,
-    pickRow: (w: WebinarComparisonRowV2) => number | null,
-  ): string[] =>
-    webinars.map((w, i) =>
-      i === 0 && monthlyWorkshopOverride ? fmtInt(pickOverride(monthlyWorkshopOverride)) : fmtInt(pickRow(w)),
-    );
+  // column's registrant slice, ad spend, Meta funnel, sales, and all
+  // derived rates. Historical columns (W-1, W-2) keep their normal mart
+  // values for comparison context.
+  const ovr = monthlyWorkshopOverride; // shorthand
+  const isLatestOvr = (i: number) => i === 0 && ovr !== undefined;
+  // Pick override value if latest column AND override present, else mart.
+  // Each helper handles a different format.
+  const overrideInt = (pickO: (o: MonthlyWorkshopBreakdown) => number, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
+    webinars.map((w, i) => (isLatestOvr(i) ? fmtInt(pickO(ovr!)) : fmtInt(pickM(w))));
+  const overrideUsd = (pickO: (o: MonthlyWorkshopBreakdown) => number, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
+    webinars.map((w, i) => (isLatestOvr(i) ? fmtUsd(pickO(ovr!)) : fmtUsd(pickM(w))));
+  const overrideUsd2 = (pickO: (o: MonthlyWorkshopBreakdown) => number | null, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
+    webinars.map((w, i) => (isLatestOvr(i) ? fmtUsd2(pickO(ovr!)) : fmtUsd2(pickM(w))));
+  const overridePct = (pickO: (o: MonthlyWorkshopBreakdown) => number | null, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
+    webinars.map((w, i) => (isLatestOvr(i) ? fmtPct(pickO(ovr!)) : fmtPct(pickM(w))));
+  const overrideX = (pickO: (o: MonthlyWorkshopBreakdown) => number | null, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
+    webinars.map((w, i) => (isLatestOvr(i) ? fmtX(pickO(ovr!)) : fmtX(pickM(w))));
+  // Backwards-compat alias for the existing registrant rows.
+  const regValues = overrideInt;
+  // Derived helpers for rates that combine override + mart fields.
+  const safeDiv = (n: number, d: number): number | null => (d > 0 ? n / d : null);
   const headers = [
     webinars[0]?.webinarDate ?? "—",
     webinars[1]?.webinarDate ?? "—",
@@ -109,7 +121,7 @@ export function Tab2LatestWebinar({
             </thead>
             <tbody>
               <DivRow>Registration</DivRow>
-              <DataRow label="Ad Spend" values={webinars.map((w) => fmtUsd(w.totalWebinarAdSpend))} tip={TIP.adSpendMart} />
+              <DataRow label="Ad Spend" values={overrideUsd((o) => o.totalAdSpend, (w) => w.totalWebinarAdSpend)} tip={TIP.adSpendMart} />
               <DataRow label="LP Page Views" values={webinars.map((w) => fmtInt(w.lpPageViews))} tip={TIP.lpPageViews} />
               <DataRow label="LP Opt-Ins" values={webinars.map((w) => fmtInt(w.lpOptIns))} tip={TIP.lpOptIns} />
               <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} trafficKey="lpOptInRate" rawValues={webinars.map((w) => w.lpOptInRate)} highlight />
@@ -150,34 +162,49 @@ export function Tab2LatestWebinar({
               <DataRow label="Pitch Rate" values={webinars.map((w) => fmtPct(w.attendToPitchedRate))} tip={TIP.pitchRate} />
 
               <DivRow>Meta Funnel · Registration Campaigns Only</DivRow>
-              <DataRow label="Meta Impressions" values={webinars.map((w) => fmtInt(w.metaImpressions))} tip={TIP.metaImpressions} />
-              <DataRow label="Meta Link Clicks" values={webinars.map((w) => fmtInt(w.metaLinkClicks))} tip={TIP.metaLinkClicks} />
-              <DataRow label="Meta CTR (link)" values={webinars.map((w) => fmtPct(w.metaCtr))} tip={TIP.metaCtr} />
-              <DataRow label="Meta Reported Conv." values={webinars.map((w) => fmtInt(w.metaReportedConversions))} tip={TIP.metaReportedConv} />
-              <DataRow label="Meta CVR (link)" values={webinars.map((w) => fmtPct(w.metaCvr))} tip={TIP.metaCvr} />
-              <DataRow label="Meta CPL" values={webinars.map((w) => fmtUsd2(w.metaCpl))} tip={TIP.metaCpl} highlight />
+              <DataRow label="Meta Impressions"     values={overrideInt((o) => o.metaImpressions, (w) => w.metaImpressions)} tip={TIP.metaImpressions} />
+              <DataRow label="Meta Link Clicks"     values={overrideInt((o) => o.metaLinkClicks, (w) => w.metaLinkClicks)} tip={TIP.metaLinkClicks} />
+              <DataRow label="Meta CTR (link)"      values={overridePct((o) => o.metaCtr, (w) => w.metaCtr)} tip={TIP.metaCtr} />
+              <DataRow label="Meta Reported Conv."  values={overrideInt((o) => o.metaReportedConversions, (w) => w.metaReportedConversions)} tip={TIP.metaReportedConv} />
+              <DataRow label="Meta CVR (link)"      values={overridePct((o) => o.metaCvr, (w) => w.metaCvr)} tip={TIP.metaCvr} />
+              <DataRow label="Meta CPL"             values={overrideUsd2((o) => o.metaCpl, (w) => w.metaCpl)} tip={TIP.metaCpl} highlight />
 
               <DivRow>Cost Efficiency</DivRow>
-              {monthlyWorkshopOverride ? (
-                <tr>
-                  <td colSpan={4} style={{ padding: "6px 12px", fontSize: 11, color: "#92400e", background: "#fef3c7", borderTop: "1px solid #fcd34d" }}>
-                    ⚠ Cost-per metrics in this section still use the mart&apos;s
-                    standard Sunday/Wed spend attribution and the old
-                    registrant counts — not tuned for monthly workshops.
-                    True 14-day registration spend ≈ <strong>$11,450</strong>;
-                    mart shows <strong>$718</strong> for this row. Mart fix
-                    pending.
-                  </td>
-                </tr>
-              ) : null}
-              <DataRow label="Cost / Reg (Paid)" values={webinars.map((w) => fmtUsd2(w.paidCpr))} tip={TIP.costPerRegPaid} trafficKey="costPerRegistrant" rawValues={webinars.map((w) => w.paidCpr)} />
-              <DataRow label="Cost / Attendee" values={webinars.map((w) => fmtUsd2(w.blendedCpa))} tip={TIP.costPerAttendee} />
-              <DataRow label="Cost / Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbc))} tip={TIP.costPerBookedCall} trafficKey="costPerBookedCall" rawValues={webinars.map((w) => w.blendedCpbc)} highlight />
-              <DataRow label="Cost / Active Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbcActive))} tip={TIP.costPerActiveBookedCall} />
+              <DataRow
+                label="Cost / Reg (Paid)"
+                values={overrideUsd2((o) => safeDiv(o.regAdSpend, o.metaInPromo), (w) => w.paidCpr)}
+                tip={TIP.costPerRegPaid}
+                trafficKey="costPerRegistrant"
+                rawValues={webinars.map((w, i) =>
+                  isLatestOvr(i) ? safeDiv(ovr!.regAdSpend, ovr!.metaInPromo) : w.paidCpr,
+                )}
+              />
+              <DataRow
+                label="Cost / Attendee"
+                values={overrideUsd2((o) => safeDiv(o.totalAdSpend, webinars[0]?.uniqueAttendees ?? 0), (w) => w.blendedCpa)}
+                tip={TIP.costPerAttendee}
+              />
+              <DataRow
+                label="Cost / Booked Call"
+                values={overrideUsd2((o) => safeDiv(o.totalAdSpend, o.callsBooked), (w) => w.blendedCpbc)}
+                tip={TIP.costPerBookedCall}
+                trafficKey="costPerBookedCall"
+                rawValues={webinars.map((w, i) =>
+                  isLatestOvr(i) ? safeDiv(ovr!.totalAdSpend, ovr!.callsBooked) : w.blendedCpbc,
+                )}
+                highlight
+              />
+              <DataRow
+                label="Cost / Active Booked Call"
+                values={overrideUsd2((o) => safeDiv(o.totalAdSpend, o.callsBookedActive), (w) => w.blendedCpbcActive)}
+                tip={TIP.costPerActiveBookedCall}
+              />
               <DataRow
                 label="Cost / Qualified Show"
                 values={webinars.map((w, i) =>
-                  i === 0 && inProgress ? naCell() : fmtUsd2(w.blendedCostPerQualifiedShow),
+                  isLatestOvr(i)
+                    ? fmtUsd2(safeDiv(ovr!.totalAdSpend, ovr!.qualifiedShows))
+                    : i === 0 && inProgress ? naCell() : fmtUsd2(w.blendedCostPerQualifiedShow),
                 )}
                 tip={TIP.costPerQualifiedShow}
               />
@@ -185,83 +212,112 @@ export function Tab2LatestWebinar({
               <DivRow>Sales — Webinar-Attributed</DivRow>
               <DataRow
                 label="Calls Booked"
-                values={webinars.map((w, i) =>
-                  i === 0 && inProgress ? partial(fmtInt(w.callsBooked)) : fmtInt(w.callsBooked),
-                )}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtInt(ovr!.callsBooked);
+                  return i === 0 && inProgress ? partial(fmtInt(w.callsBooked)) : fmtInt(w.callsBooked);
+                })}
                 tip={TIP.callsBookedTotal}
                 highlight
               />
-              <DataRow label="Active Calls Booked" values={webinars.map((w) => fmtInt(w.callsBookedActive))} tip={TIP.callsBookedActive} />
+              <DataRow
+                label="Active Calls Booked"
+                values={overrideInt((o) => o.callsBookedActive, (w) => w.callsBookedActive)}
+                tip={TIP.callsBookedActive}
+              />
               <DataRow
                 label="Pitch → Book Rate"
-                values={webinars.map((w) =>
-                  w.pitchedAttendees ? fmtPct(w.callsBooked / w.pitchedAttendees) : "—",
-                )}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return w.pitchedAttendees ? fmtPct(ovr!.callsBooked / w.pitchedAttendees) : "—";
+                  return w.pitchedAttendees ? fmtPct(w.callsBooked / w.pitchedAttendees) : "—";
+                })}
                 tip={"Share of pitched attendees (>25 min) who booked a strategy call.\ncalls_booked / pitched_attendees"}
                 highlight
               />
               <DataRow
                 label="Shows"
-                values={webinars.map((w, i) => (i === 0 && inProgress ? partial(fmtInt(w.shows)) : fmtInt(w.shows)))}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtInt(ovr!.shows);
+                  return i === 0 && inProgress ? partial(fmtInt(w.shows)) : fmtInt(w.shows);
+                })}
                 tip={TIP.showsHeld}
               />
               <DataRow
                 label="Qualified Shows"
-                values={webinars.map((w, i) =>
-                  i === 0 && inProgress ? partial(fmtInt(w.qualifiedShows)) : fmtInt(w.qualifiedShows),
-                )}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtInt(ovr!.qualifiedShows);
+                  return i === 0 && inProgress ? partial(fmtInt(w.qualifiedShows)) : fmtInt(w.qualifiedShows);
+                })}
                 tip={TIP.funnelQualifiedShows}
               />
               <DataRow
                 label="Deals"
-                values={webinars.map((w, i) =>
-                  i === 0 && inProgress ? partial(fmtInt(w.dealsClosed)) : fmtInt(w.dealsClosed),
-                )}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtInt(ovr!.dealsClosed);
+                  return i === 0 && inProgress ? partial(fmtInt(w.dealsClosed)) : fmtInt(w.dealsClosed);
+                })}
                 tip={TIP.dealsCycle}
               />
               <DataRow
                 label="Cash"
-                values={webinars.map((w, i) =>
-                  i === 0 && inProgress ? partial(fmtUsd(w.cashCollected)) : fmtUsd(w.cashCollected),
-                )}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtUsd(ovr!.cashCollected);
+                  return i === 0 && inProgress ? partial(fmtUsd(w.cashCollected)) : fmtUsd(w.cashCollected);
+                })}
                 tip={TIP.cashCollected}
               />
               <DataRow
                 label="Cash Collected / Attendee"
-                values={webinars.map((w, i) =>
-                  i === 0 && inProgress
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtUsd2(safeDiv(ovr!.cashCollected, w.uniqueAttendees));
+                  return i === 0 && inProgress
                     ? partial(fmtUsd2(w.cashCollectedPerAttendee))
-                    : fmtUsd2(w.cashCollectedPerAttendee),
-                )}
+                    : fmtUsd2(w.cashCollectedPerAttendee);
+                })}
                 tip={TIP.cashCollectedPerAttendee}
               />
               <DataRow
                 label="Contract Value / Attendee"
-                values={webinars.map((w, i) =>
-                  i === 0 && inProgress
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtUsd2(safeDiv(ovr!.revenueGenerated, w.uniqueAttendees));
+                  return i === 0 && inProgress
                     ? partial(fmtUsd2(w.contractValuePerAttendee))
-                    : fmtUsd2(w.contractValuePerAttendee),
-                )}
+                    : fmtUsd2(w.contractValuePerAttendee);
+                })}
                 tip={TIP.contractValuePerAttendee}
               />
               <DataRow
                 label="ROAS (Cash)"
-                values={webinars.map((w, i) => (i === 0 ? "" : fmtX(w.roasCash)))}
-                tip={TIP.roasCash + "\nLatest webinar column is blank — cash and deals are still accumulating (1-12 weeks for full collection)."}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtX(safeDiv(ovr!.cashCollected, ovr!.totalAdSpend));
+                  return i === 0 ? "" : fmtX(w.roasCash);
+                })}
+                tip={TIP.roasCash + (ovr ? "\nWorkshop ROAS uses Wed–Sun promo-window ad spend; deals still accumulating." : "\nLatest webinar column is blank — cash and deals are still accumulating (1-12 weeks for full collection).")}
                 trafficKey="roas"
-                rawValues={webinars.map((w, i) => (i === 0 ? null : w.roasCash))}
+                rawValues={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return safeDiv(ovr!.cashCollected, ovr!.totalAdSpend);
+                  return i === 0 ? null : w.roasCash;
+                })}
                 highlight
               />
               <DataRow
                 label="ROAS (Revenue/TCV)"
-                values={webinars.map((w, i) => (i === 0 ? "" : fmtX(w.roasRevenue)))}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtX(safeDiv(ovr!.revenueGenerated, ovr!.totalAdSpend));
+                  return i === 0 ? "" : fmtX(w.roasRevenue);
+                })}
                 tip={"Latest webinar column is blank — deals are still closing (1-4 weeks). Prior webinars are mature and comparable."}
                 trafficKey="roas"
-                rawValues={webinars.map((w, i) => (i === 0 ? null : w.roasRevenue))}
+                rawValues={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return safeDiv(ovr!.revenueGenerated, ovr!.totalAdSpend);
+                  return i === 0 ? null : w.roasRevenue;
+                })}
               />
               <DataRow
                 label="CAC"
-                values={webinars.map((w, i) => (i === 0 ? "" : fmtUsd2(w.cac)))}
+                values={webinars.map((w, i) => {
+                  if (isLatestOvr(i)) return fmtUsd2(safeDiv(ovr!.totalAdSpend, ovr!.dealsClosed));
+                  return i === 0 ? "" : fmtUsd2(w.cac);
+                })}
                 tip={"CAC = ad_spend / deals_closed. Latest webinar's deals are still accumulating — column blank until mature."}
               />
             </tbody>

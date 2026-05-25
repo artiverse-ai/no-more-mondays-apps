@@ -158,6 +158,18 @@ export function Tab2LatestWebinar({
               <DataRow label="Meta CPL" values={webinars.map((w) => fmtUsd2(w.metaCpl))} tip={TIP.metaCpl} highlight />
 
               <DivRow>Cost Efficiency</DivRow>
+              {monthlyWorkshopOverride ? (
+                <tr>
+                  <td colSpan={4} style={{ padding: "6px 12px", fontSize: 11, color: "#92400e", background: "#fef3c7", borderTop: "1px solid #fcd34d" }}>
+                    ⚠ Cost-per metrics in this section still use the mart&apos;s
+                    standard Sunday/Wed spend attribution and the old
+                    registrant counts — not tuned for monthly workshops.
+                    True 14-day registration spend ≈ <strong>$11,450</strong>;
+                    mart shows <strong>$718</strong> for this row. Mart fix
+                    pending.
+                  </td>
+                </tr>
+              ) : null}
               <DataRow label="Cost / Reg (Paid)" values={webinars.map((w) => fmtUsd2(w.paidCpr))} tip={TIP.costPerRegPaid} trafficKey="costPerRegistrant" rawValues={webinars.map((w) => w.paidCpr)} />
               <DataRow label="Cost / Attendee" values={webinars.map((w) => fmtUsd2(w.blendedCpa))} tip={TIP.costPerAttendee} />
               <DataRow label="Cost / Booked Call" values={webinars.map((w) => fmtUsd2(w.blendedCpbc))} tip={TIP.costPerBookedCall} trafficKey="costPerBookedCall" rawValues={webinars.map((w) => w.blendedCpbc)} highlight />

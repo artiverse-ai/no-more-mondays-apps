@@ -1,4 +1,5 @@
-import type { Achievement, CloserScore } from "../_lib/scoring";
+import type { Achievement, CloserBonusConfig, CloserScore } from "../_lib/scoring";
+import { PersonalBonusBar } from "./PersonalBonusBar";
 import styles from "./competition.module.css";
 
 const fmtInt = (n: number) => Math.round(n).toLocaleString();
@@ -15,7 +16,7 @@ const ACHIEVEMENT_META: Record<Achievement, { icon: string; label: string; tip: 
 
 const RANK_MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
-export function CloserCard({ score }: { score: CloserScore }) {
+export function CloserCard({ score, closerBonus }: { score: CloserScore; closerBonus: CloserBonusConfig }) {
   const { profile, basePoints, deals, fucDeals, rank, achievements } = score;
   const displayName = profile.displayName ?? profile.closerOwner;
   const initial = displayName.slice(0, 2).toUpperCase();
@@ -50,6 +51,11 @@ export function CloserCard({ score }: { score: CloserScore }) {
             ))}
           </div>
         )}
+        <PersonalBonusBar
+          points={basePoints}
+          threshold={closerBonus.perCloserThreshold}
+          bonusUsd={closerBonus.perCloserBonusUsd}
+        />
       </div>
       <div>
         <div className={styles.closerPoints}>{fmtInt(basePoints)}</div>

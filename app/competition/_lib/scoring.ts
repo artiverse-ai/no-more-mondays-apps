@@ -89,8 +89,19 @@ export type TeamScore = {
   totalPoints: number;
   bonusEarned: boolean;
   bonusThreshold: number;
+  /** Dollar value the team unlocks at bonusThreshold (per period). */
+  bonusUsd: number;
   totalDeals: number;
   totalCash: number;                  // internal only — not rendered
+};
+
+/** Per-closer bonus config for the active period. Shared across all
+ *  closers — the threshold is the same number of points each one must
+ *  individually clear to unlock perCloserBonusUsd. UI uses this to
+ *  draw the per-closer loading bar + the "$X to unlock" hint. */
+export type CloserBonusConfig = {
+  perCloserThreshold: number;
+  perCloserBonusUsd: number;
 };
 
 export type Leaderboard = {
@@ -105,6 +116,9 @@ export type Leaderboard = {
   recentActivity: Array<Deal & { profile: CloserProfile; points: number }>;
   /** Point multiplier in effect for today's ET date (1 = normal). */
   todayMultiplier: number;
+  /** Per-closer bonus tier for this period — used by Podium + CloserCard
+   *  to draw the per-closer progress bar. */
+  closerBonus: CloserBonusConfig;
 };
 
 /** Get the [year, month, day] of `d` in America/New_York time. Month is
@@ -307,8 +321,9 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
 
   // Single team aggregate
   const basePoints = closers.reduce((s, c) => s + c.basePoints, 0);
-  const threshold = BONUS_THRESHOLDS[period].threshold;
-  const bonusValue = BONUS_THRESHOLDS[period].bonus;
+  const tiers = BONUS_THRESHOLDS[period];
+  const threshold = tiers.teamThreshold;
+  const bonusValue = tiers.teamBonusPts;
   const bonusEarned = basePoints >= threshold;
   const team: TeamScore = {
     name: TEAM.name,
@@ -318,8 +333,13 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     totalPoints: basePoints + (bonusEarned ? bonusValue : 0),
     bonusEarned,
     bonusThreshold: threshold,
+    bonusUsd: tiers.teamBonusUsd,
     totalDeals: closers.reduce((s, c) => s + c.deals, 0),
     totalCash: closers.reduce((s, c) => s + c.cashCollected, 0),
+  };
+  const closerBonus: CloserBonusConfig = {
+    perCloserThreshold: tiers.perCloserThreshold,
+    perCloserBonusUsd: tiers.perCloserBonusUsd,
   };
 
   // Recent activity feed (newest 10 deals)
@@ -345,5 +365,6 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     allDealsCount: deals.length,
     recentActivity,
     todayMultiplier: multFor(todayEt()),
+    closerBonus,
   };
 }

@@ -1,4 +1,4 @@
-import type { CloserScore } from "../_lib/scoring";
+import type { CloserBonusConfig, CloserScore } from "../_lib/scoring";
 import { CloserCard } from "./CloserCard";
 import styles from "./competition.module.css";
 
@@ -8,9 +8,11 @@ import styles from "./competition.module.css";
 export function Leaderboard({
   closers,
   podiumSize,
+  closerBonus,
 }: {
   closers: CloserScore[];
   podiumSize: number;
+  closerBonus: CloserBonusConfig;
 }) {
   const field = closers.slice(podiumSize);
   if (field.length === 0) return null;
@@ -25,7 +27,7 @@ export function Leaderboard({
       </div>
       <div className={styles.leaderboardList}>
         {field.map((c) => (
-          <CloserCard key={c.profile.closerOwner} score={c} />
+          <CloserCard key={c.profile.closerOwner} score={c} closerBonus={closerBonus} />
         ))}
       </div>
     </section>

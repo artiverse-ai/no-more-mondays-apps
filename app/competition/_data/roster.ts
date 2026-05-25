@@ -53,13 +53,38 @@ export const ROSTER_BY_NAME: Map<string, CloserProfile> = new Map(
   ROSTER.map((r) => [r.closerOwner, r]),
 );
 
-/** Bonus thresholds — the SINGLE team total to cross for the period to
- *  unlock the bonus reward. Old per-team thresholds doubled since now
- *  all closers contribute to one pool. Tweak as the league matures. */
+/** Bonus tiers per period. Two tracks:
+ *  - TEAM: combined points to unlock a team bonus pool (everyone shares).
+ *  - PER-CLOSER: individual points to unlock a personal bonus (each
+ *    closer who clears it gets the $$ regardless of team total).
+ *
+ *  Points are kept for the in-app loading bars / team_bonus_points field
+ *  the existing UI consumes. Dollar values are the actual payout —
+ *  closers want to see "$X if I cross this" not just "+N pts".
+ *
+ *  Defaults below are placeholders. Tune as the league matures. */
 export const BONUS_THRESHOLDS = {
-  today:   { threshold:   400, bonus:  40 },
-  week:    { threshold:  2000, bonus: 200 },
-  month:   { threshold:  8000, bonus: 1000 },
+  today: {
+    teamThreshold:        400,
+    teamBonusPts:          40,
+    teamBonusUsd:          50,
+    perCloserThreshold:   100,
+    perCloserBonusUsd:     25,
+  },
+  week: {
+    teamThreshold:       2000,
+    teamBonusPts:         200,
+    teamBonusUsd:         200,
+    perCloserThreshold:   500,
+    perCloserBonusUsd:    100,
+  },
+  month: {
+    teamThreshold:       8000,
+    teamBonusPts:        1000,
+    teamBonusUsd:        1000,
+    perCloserThreshold:  2000,
+    perCloserBonusUsd:    400,
+  },
 } as const;
 
 /** Competition launch — nothing closed/booked before this counts on any

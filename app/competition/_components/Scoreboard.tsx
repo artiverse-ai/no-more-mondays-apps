@@ -2,6 +2,8 @@ import type { TeamScore } from "../_lib/scoring";
 import styles from "./competition.module.css";
 
 const fmtInt = (n: number) => Math.round(n).toLocaleString();
+const fmtUsd = (n: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
 // IMPORTANT: closers see this dashboard. Show ONLY points + deal counts —
 // never cash totals.
@@ -9,6 +11,8 @@ const fmtInt = (n: number) => Math.round(n).toLocaleString();
 // Single-team layout — big "NO MORE MONDAYS" team total dominates, with
 // a horizontal bonus-progress bar showing how close we are to unlocking
 // the period bonus. Per Ben 2026-05-19: one team, threshold-based unlock.
+// $ value of the bonus surfaced inline so closers know what they're
+// playing for, not just the abstract point total.
 export function Scoreboard({ team }: { team: TeamScore }) {
   const pctToBonus = Math.min(100, Math.round((team.basePoints / team.bonusThreshold) * 100));
   const pointsToGo = Math.max(0, team.bonusThreshold - team.basePoints);
@@ -28,8 +32,8 @@ export function Scoreboard({ team }: { team: TeamScore }) {
         <div className={styles.bonusBarFill} style={{ width: `${pctToBonus}%` }} />
         <div className={styles.bonusBarLabel}>
           {team.bonusEarned
-            ? `🏆 BONUS UNLOCKED · +${fmtInt(team.bonusPoints)}`
-            : `${fmtInt(pointsToGo)} pts to ${fmtInt(team.bonusThreshold)} bonus`}
+            ? `🏆 TEAM BONUS UNLOCKED · ${fmtUsd(team.bonusUsd)}`
+            : `${fmtInt(pointsToGo)} pts to ${fmtUsd(team.bonusUsd)} team bonus (${fmtInt(team.bonusThreshold)} pts)`}
         </div>
       </div>
     </section>

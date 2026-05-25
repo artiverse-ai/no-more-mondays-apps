@@ -1,4 +1,5 @@
-import type { Achievement, CloserScore } from "../_lib/scoring";
+import type { Achievement, CloserBonusConfig, CloserScore } from "../_lib/scoring";
+import { PersonalBonusBar } from "./PersonalBonusBar";
 import styles from "./competition.module.css";
 
 const fmt = (n: number) => Math.round(n).toLocaleString();
@@ -19,7 +20,7 @@ const ACHIEVEMENT_META: Record<Achievement, { icon: string; label: string; tip: 
 /** Top-3 podium that replaces the single MVP card. Gold #1 gets a
  *  crown wobble + glow pulse; silver/bronze get softer treatments.
  *  Each row staggers in on load. Hidden if nobody has scored yet. */
-export function Podium({ closers }: { closers: CloserScore[] }) {
+export function Podium({ closers, closerBonus }: { closers: CloserScore[]; closerBonus: CloserBonusConfig }) {
   const top3 = closers.slice(0, 3).filter((c) => c.basePoints > 0);
   if (top3.length === 0) return null;
 
@@ -69,6 +70,13 @@ export function Podium({ closers }: { closers: CloserScore[] }) {
               <div className={styles.podiumPoints}>
                 <div className={styles.podiumPointsVal}>{fmt(c.basePoints)}</div>
                 <div className={styles.podiumPointsLbl}>PTS</div>
+              </div>
+              <div className={styles.podiumBar}>
+                <PersonalBonusBar
+                  points={c.basePoints}
+                  threshold={closerBonus.perCloserThreshold}
+                  bonusUsd={closerBonus.perCloserBonusUsd}
+                />
               </div>
             </div>
           );

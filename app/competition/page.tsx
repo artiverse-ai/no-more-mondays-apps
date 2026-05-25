@@ -70,11 +70,11 @@ export default async function CompetitionPage({
               <Countdown period={period} />
             </div>
             <Scoreboard team={board.team} />
-            <Podium closers={board.closers} />
+            <Podium closers={board.closers} closerBonus={board.closerBonus} />
           </div>
         </div>
 
-        <Leaderboard closers={board.closers} podiumSize={podiumSize} />
+        <Leaderboard closers={board.closers} podiumSize={podiumSize} closerBonus={board.closerBonus} />
       </div>
 
       <section className={styles.activity}>

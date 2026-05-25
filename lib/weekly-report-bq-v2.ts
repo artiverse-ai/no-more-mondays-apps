@@ -968,18 +968,23 @@ export async function fetchMonthlyWorkshopBreakdown(
     FROM \`${PROJECT}.dbt_tuddin.stg_meta_campaigns\`
     WHERE date_day BETWEEN DATE(@promoStart) AND DATE(@promoEnd)
   `;
-  // Sales — int_calls_enriched, calls whose appointment is in the sales window.
+  // Sales — int_calls_enriched, filtered to calls that closers tagged
+  // `internal_note = 'live webinar'` (per Taziem 2026-05-25: that's the
+  // workshop-attribution flag used by the team), deduped by prospect
+  // email. Date window keeps the latest column scoped to this cycle.
   const salesSql = `
     SELECT
-      COUNT(DISTINCT IF(is_call_booked,                                  prospect_email_lc, NULL)) AS calls_booked,
-      COUNT(DISTINCT IF(is_call_booked AND NOT IFNULL(is_canceled, FALSE), prospect_email_lc, NULL)) AS calls_booked_active,
+      COUNT(DISTINCT prospect_email_lc)                                                            AS calls_booked,
+      COUNT(DISTINCT IF(NOT IFNULL(is_canceled, FALSE), prospect_email_lc, NULL))                  AS calls_booked_active,
       COUNT(DISTINCT IF(is_show_up,                                      prospect_email_lc, NULL)) AS shows,
       COUNT(DISTINCT IF(is_close_rate_eligible,                          prospect_email_lc, NULL)) AS qualified_shows,
       COUNT(DISTINCT IF(is_deal,                                         prospect_email_lc, NULL)) AS deals,
       SUM(IF(is_deal, cash_collected,    0))                                                       AS cash,
       SUM(IF(is_deal, revenue_generated, 0))                                                       AS revenue
     FROM \`${PROJECT}.dbt_tuddin.int_calls_enriched\`
-    WHERE DATE(appointment_date_time) BETWEEN DATE(@salesStart) AND DATE(@salesEnd)
+    WHERE LOWER(IFNULL(internal_note, '')) = 'live webinar'
+      AND prospect_email_lc IS NOT NULL
+      AND DATE(appointment_date_time) BETWEEN DATE(@salesStart) AND DATE(@salesEnd)
       AND prospect_email_lc NOT LIKE '%@nomoremondays.io%'
       AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
   `;

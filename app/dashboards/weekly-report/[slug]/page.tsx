@@ -148,15 +148,19 @@ export default async function Page({
       "2026-05-30",  // salesEnd: appointments through following Saturday
     ).catch(() => undefined);
     // Hard-coded total ad spend per Taziem 2026-05-25 — actual workshop
-    // spend ($5,487) is not derivable from stg_meta_campaigns because
-    // it spans uncategorized campaigns and one-off boosts the team
-    // tracks manually. Cost-per metrics use this number as numerator.
-    // Keep regAdSpend (used by Cost/Reg Paid) at its derived value; the
-    // delta lands in hammer so totalAdSpend = regAdSpend + hammerAdSpend.
+    // spend ($5,487) is not derivable from stg_meta_campaigns (spans
+    // uncategorized campaigns and manual boosts). Drive ALL downstream
+    // cost-per metrics from this number: Cost/Reg Paid and Meta CPL
+    // would otherwise use the smaller derived reg-only spend.
     if (monthlyWorkshopOverride) {
       const HARDCODED_TOTAL_AD_SPEND = 5487;
+      const conversions = monthlyWorkshopOverride.metaReportedConversions;
       monthlyWorkshopOverride.totalAdSpend = HARDCODED_TOTAL_AD_SPEND;
-      monthlyWorkshopOverride.hammerAdSpend = HARDCODED_TOTAL_AD_SPEND - monthlyWorkshopOverride.regAdSpend;
+      monthlyWorkshopOverride.regAdSpend = HARDCODED_TOTAL_AD_SPEND;
+      monthlyWorkshopOverride.hammerAdSpend = 0;
+      monthlyWorkshopOverride.metaCpl = conversions > 0
+        ? HARDCODED_TOTAL_AD_SPEND / conversions
+        : null;
     }
     reactivationNote =
       "No formal “no-show reactivation” push this cycle, but the team ran " +

@@ -796,6 +796,138 @@ function mapWebinarComparisonRow(r: Record<string, unknown>): WebinarComparisonR
 }
 
 // ============================================================================
+// MONTHLY-WORKSHOP REGISTRANTS OVERRIDE (one-off, slug-gated)
+// ============================================================================
+//
+// The 2026-05-25 weekly report covers a Sunday MONTHLY WORKSHOP rather than
+// the regular Sunday webinar. mart_webinar_events sources registrants from
+// stg_ghl_weekly_webinar_regs which doesn't cover the workshop funnel, so
+// the breakdown there is wrong (low total, missing WhatsApp/Email channels,
+// ManyChat count attributed to the wrong event tag).
+//
+// This override queries the raw monthly-workshop registrations directly +
+// uses the contact_tags table with `event: workshop-YYYY-MM-DD` instead of
+// `event: webinar-YYYY-MM-DD` for the ManyChat slice. WhatsApp + Email
+// rows are surfaced even when zero (helpful for the note).
+//
+// We bypass stg_ghl_monthly_webinar_regs because its attribution depends on
+// stg_ht_weekly_metrics carrying `webinar_type = 'Monthly Workshop'` for
+// the date — for 2026-05-24 the funnel sheet still says 'Sunday', so the
+// stg has no rows attributed.
+
+export type MonthlyWorkshopBreakdown = {
+  total: number;
+  meta: number;
+  manychat: number;        // tag-based (manychat IG DM AND workshop tag)
+  setter: number;
+  whatsapp: number;
+  email: number;
+  otherOrganic: number;
+};
+
+/** Compute registrant breakdown for a monthly workshop.
+ *
+ *  @param workshopTagDate `YYYY-MM-DD` — the date in the GHL tag
+ *         `event: workshop-{workshopTagDate}`. For the 2026-05-25 report
+ *         this is "2026-05-24" (the workshop happened Sunday; the report
+ *         is dated Monday per usual recap convention).
+ *  @param windowStart    `YYYY-MM-DD` — inclusive lower bound for
+ *         createdAt (ET). 14-day lookback to the workshop matches the
+ *         documented monthly-stg attribution window.
+ *  @param windowEnd      `YYYY-MM-DD` — EXCLUSIVE upper bound for
+ *         createdAt (ET). Typically workshopTagDate + 1.
+ */
+export async function fetchMonthlyWorkshopBreakdown(
+  workshopTagDate: string,
+  windowStart: string,
+  windowEnd: string,
+): Promise<MonthlyWorkshopBreakdown> {
+  const sql = `
+    WITH workshop_contacts AS (
+      SELECT DISTINCT contact_id
+      FROM \`${PROJECT}.raw_ghl.contact_tags\`
+      WHERE tag = CONCAT('event: workshop-', @workshopTagDate)
+        AND COALESCE(_fivetran_deleted, FALSE) = FALSE
+    ),
+    manychat_contacts AS (
+      SELECT DISTINCT contact_id
+      FROM \`${PROJECT}.raw_ghl.contact_tags\`
+      WHERE tag = 'webinar registration - [manychat ig dm]'
+        AND COALESCE(_fivetran_deleted, FALSE) = FALSE
+    ),
+    manychat_workshop AS (
+      SELECT COUNT(*) AS n
+      FROM workshop_contacts INNER JOIN manychat_contacts USING (contact_id)
+    ),
+    regs AS (
+      SELECT
+        LOWER(email) AS email_lc,
+        JSON_VALUE(others, '$.eventData.url_params.utm_source')  AS utm_source,
+        JSON_VALUE(others, '$.eventData.url_params.utm_medium')  AS utm_medium,
+        JSON_VALUE(others, '$.eventData.url_params.ref')         AS ref_param,
+        JSON_VALUE(others, '$.organic_source')                   AS organic_source
+      FROM \`${PROJECT}.raw_ghl.registrations_monthly_workshop\`
+      WHERE PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', createdAt)
+              >= TIMESTAMP(@windowStart)
+        AND PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', createdAt)
+              <  TIMESTAMP(@windowEnd)
+        AND email IS NOT NULL
+        AND LOWER(email) NOT LIKE '%@nomoremondays.io%'
+    ),
+    classified AS (
+      SELECT
+        email_lc,
+        CASE
+          WHEN LOWER(IFNULL(utm_source,'')) LIKE '%whatsapp%'
+            OR LOWER(IFNULL(utm_medium,'')) = 'whatsapp'                                         THEN 'whatsapp'
+          WHEN LOWER(IFNULL(utm_medium,'')) = 'email'
+            OR LOWER(IFNULL(utm_source,'')) IN ('convertkit','klaviyo','mailchimp','sendgrid')   THEN 'email'
+          WHEN utm_medium = 'paid'
+            AND (utm_source IN ('fb','ig','an') OR LOWER(IFNULL(utm_source,'')) LIKE 'fb%'
+                 OR utm_source = 'th')                                                            THEN 'meta'
+          WHEN LOWER(IFNULL(ref_param,'')) IN ('swp','hna','sal')                                THEN 'setter'
+          ELSE 'other_organic'
+        END AS channel
+      FROM regs
+    ),
+    deduped AS (
+      SELECT email_lc, ANY_VALUE(channel) AS channel FROM classified GROUP BY 1
+    ),
+    by_channel AS (
+      SELECT
+        SUM(IF(channel = 'meta',          1, 0)) AS meta,
+        SUM(IF(channel = 'setter',        1, 0)) AS setter,
+        SUM(IF(channel = 'whatsapp',      1, 0)) AS whatsapp,
+        SUM(IF(channel = 'email',         1, 0)) AS email,
+        SUM(IF(channel = 'other_organic', 1, 0)) AS other_organic
+      FROM deduped
+    )
+    SELECT
+      b.meta, b.setter, b.whatsapp, b.email, b.other_organic,
+      (SELECT n FROM manychat_workshop) AS manychat,
+      b.meta + b.setter + b.whatsapp + b.email + b.other_organic
+        + (SELECT n FROM manychat_workshop) AS total
+    FROM by_channel b
+  `;
+  const [rows] = await bq().query({
+    query: sql,
+    params: { workshopTagDate, windowStart, windowEnd },
+    types: { workshopTagDate: "STRING", windowStart: "STRING", windowEnd: "STRING" },
+  });
+  const r = (rows[0] ?? {}) as Record<string, unknown>;
+  const n = (v: unknown) => Number(v ?? 0);
+  return {
+    total: n(r.total),
+    meta: n(r.meta),
+    manychat: n(r.manychat),
+    setter: n(r.setter),
+    whatsapp: n(r.whatsapp),
+    email: n(r.email),
+    otherOrganic: n(r.other_organic),
+  };
+}
+
+// ============================================================================
 // SECTION 6 — TAB 2 META CAMPAIGNS (§9)
 // ============================================================================
 

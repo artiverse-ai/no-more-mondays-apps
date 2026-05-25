@@ -21,8 +21,10 @@ import {
   fetchSetterOverall,
   fetchSetterByMode,
   fetchBookingModeExtended,
+  fetchMonthlyWorkshopBreakdown,
   comparisonDatesForMode,
   metaPromoWindow,
+  type MonthlyWorkshopBreakdown,
 } from "@/lib/weekly-report-bq-v2";
 import { getSnapshot, listInsights, type Insight } from "@/lib/weekly-report-snapshots";
 import { InsightsEditor, type EditableInsight } from "../_components/InsightsEditor";
@@ -118,6 +120,29 @@ export default async function Page({
   // Section B needs the KPI strip values (Cash/Booked, Show Rate, CPL) — compute after.
   const sectionB = await fetchSectionBData(kpiStart, kpiEnd, kpiStrip);
 
+  // ── One-off override: 2026-05-25 Monday report covers a Sunday MONTHLY
+  // WORKSHOP rather than the regular Sunday webinar. mart_webinar_events
+  // sources registrants from stg_ghl_weekly_webinar_regs which doesn't
+  // touch the workshop funnel, so its breakdown is wrong. Pull the
+  // tag-based + raw-form numbers and pass them as an override. The
+  // workshop's GHL tag is `event: workshop-2026-05-24` (Sunday — the
+  // day the workshop actually happened, NOT the report's Monday slug).
+  let monthlyWorkshopOverride: MonthlyWorkshopBreakdown | undefined;
+  let reactivationNote: string | undefined;
+  if (slug === "2026-05-25") {
+    monthlyWorkshopOverride = await fetchMonthlyWorkshopBreakdown(
+      "2026-05-24",  // GHL tag date (workshop day, not report day)
+      "2026-05-10",  // 14-day lookback per monthly-stg attribution convention
+      "2026-05-25",  // exclusive upper bound: through end of workshop day
+    ).catch(() => undefined);
+    reactivationNote =
+      "No formal “no-show reactivation” push this cycle, but the team ran " +
+      "broader outreach: Email blast to ~12,000 contacts, SMS to ~5,000, " +
+      "and 8 WhatsApp groups (~600 members each ≈ 4,800 reached). " +
+      "Attribution per channel isn't broken out below — read the table as the " +
+      "aggregate of those touches.";
+  }
+
   // Forecast targets (null-safe — returns all nulls if forecast_targets is
   // empty or no forecast covers this window). Failure is non-fatal.
   const forecast = await getForecastBundleForWindow(kpiStart, kpiEnd).catch(() => null);
@@ -187,6 +212,8 @@ export default async function Page({
         contextBanner={contextBanner}
         devMode={devMode && isAdmin}
         sqlCtx={sqlCtx}
+        monthlyWorkshopOverride={monthlyWorkshopOverride}
+        reactivationNote={reactivationNote}
       />
     ),
     t4ai: (

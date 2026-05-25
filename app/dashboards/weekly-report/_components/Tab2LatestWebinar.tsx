@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { WebinarComparisonRowV2, MetaCampaignRow } from "@/lib/weekly-report-bq-v2";
+import type { WebinarComparisonRowV2, MetaCampaignRow, MonthlyWorkshopBreakdown } from "@/lib/weekly-report-bq-v2";
 import { getResolvedSql, type SqlCtx } from "@/lib/dev-sql";
 import { TIP } from "@/lib/metric-tips";
 import {
@@ -29,6 +29,14 @@ export type Tab2LatestWebinarProps = {
   contextBanner: { tag: string; title: string; body: string };
   devMode?: boolean;
   sqlCtx?: SqlCtx;
+  /** Override for the 2026-05-25 monthly-workshop report. When present,
+   *  replaces the latest-column registrant breakdown with these tag-based
+   *  + raw-form numbers and shows WhatsApp/Email rows. */
+  monthlyWorkshopOverride?: MonthlyWorkshopBreakdown;
+  /** Reactivation funnel note rendered ABOVE the table when set. Used for
+   *  one-off reports (like the 2026-05-25 workshop) where the reactivation
+   *  push happened outside our normal tracked channels. */
+  reactivationNote?: string;
 };
 
 export function Tab2LatestWebinar({
@@ -40,7 +48,19 @@ export function Tab2LatestWebinar({
   contextBanner,
   devMode = false,
   sqlCtx,
+  monthlyWorkshopOverride,
+  reactivationNote,
 }: Tab2LatestWebinarProps) {
+  // For the 2026-05-25 monthly-workshop report we override the latest
+  // column's registrant slice. Historical columns (W-1, W-2) keep their
+  // mart_webinar_events values for comparison context.
+  const regValues = (
+    pickOverride: (o: MonthlyWorkshopBreakdown) => number,
+    pickRow: (w: WebinarComparisonRowV2) => number | null,
+  ): string[] =>
+    webinars.map((w, i) =>
+      i === 0 && monthlyWorkshopOverride ? fmtInt(pickOverride(monthlyWorkshopOverride)) : fmtInt(pickRow(w)),
+    );
   const headers = [
     webinars[0]?.webinarDate ?? "—",
     webinars[1]?.webinarDate ?? "—",
@@ -93,11 +113,17 @@ export function Tab2LatestWebinar({
               <DataRow label="LP Page Views" values={webinars.map((w) => fmtInt(w.lpPageViews))} tip={TIP.lpPageViews} />
               <DataRow label="LP Opt-Ins" values={webinars.map((w) => fmtInt(w.lpOptIns))} tip={TIP.lpOptIns} />
               <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} trafficKey="lpOptInRate" rawValues={webinars.map((w) => w.lpOptInRate)} highlight />
-              <DataRow label="Total Registrants" values={webinars.map((w) => fmtInt(w.totalRegistrants))} tip={TIP.totalRegistrantsGhl} />
-              <DataRow label="↳ Meta" values={webinars.map((w) => fmtInt(w.metaRegistrants))} />
-              <DataRow label="↳ ManyChat" values={webinars.map((w) => fmtInt(w.manychatRegistrants))} />
-              <DataRow label="↳ Setter" values={webinars.map((w) => fmtInt(w.setterRegistrants))} />
-              <DataRow label="↳ Other organic" values={webinars.map((w) => fmtInt(w.otherOrganicRegistrants))} />
+              <DataRow label="Total Registrants" values={regValues((o) => o.total,        (w) => w.totalRegistrants)}        tip={TIP.totalRegistrantsGhl} />
+              <DataRow label="↳ Meta"            values={regValues((o) => o.meta,         (w) => w.metaRegistrants)} />
+              <DataRow label="↳ ManyChat"        values={regValues((o) => o.manychat,     (w) => w.manychatRegistrants)} />
+              <DataRow label="↳ Setter"          values={regValues((o) => o.setter,       (w) => w.setterRegistrants)} />
+              {monthlyWorkshopOverride ? (
+                <>
+                  <DataRow label="↳ WhatsApp" values={[fmtInt(monthlyWorkshopOverride.whatsapp), "—", "—"]} />
+                  <DataRow label="↳ Email"    values={[fmtInt(monthlyWorkshopOverride.email),    "—", "—"]} />
+                </>
+              ) : null}
+              <DataRow label="↳ Other organic"   values={regValues((o) => o.otherOrganic, (w) => w.otherOrganicRegistrants)} />
 
               <DivRow>Attendance</DivRow>
               <DataRow label="Unique Attendees" values={webinars.map((w) => fmtInt(w.uniqueAttendees))} tip={TIP.uniqueAttendees} />
@@ -230,7 +256,7 @@ export function Tab2LatestWebinar({
       <MetaCampaignsTable campaigns={metaCampaigns} sqlInfo={metaSql} />
 
       {/* 7. Reactivation Funnel */}
-      <ReactivationFunnel webinars={webinars} headers={headers} />
+      <ReactivationFunnel webinars={webinars} headers={headers} note={reactivationNote} />
 
       {/* 8. Warning banner — ad-spend cutoff */}
       <div className={styles.bannerWarn}>
@@ -425,10 +451,16 @@ function MetaCampaignsTable({ campaigns, sqlInfo }: { campaigns: MetaCampaignRow
   );
 }
 
-function ReactivationFunnel({ webinars, headers }: { webinars: WebinarComparisonRowV2[]; headers: string[] }) {
+function ReactivationFunnel({ webinars, headers, note }: { webinars: WebinarComparisonRowV2[]; headers: string[]; note?: string }) {
   return (
     <section className={styles.section}>
       <div className={styles.sh}>Reactivation Funnel</div>
+      {note ? (
+        <div className={styles.bannerInfo} style={{ marginBottom: 8 }}>
+          <span className={styles.bIcon}>ℹ</span>
+          <p style={{ whiteSpace: "pre-line", margin: 0 }}>{note}</p>
+        </div>
+      ) : null}
       <div className={styles.tw}>
         <table className={styles.dt}>
           <thead>

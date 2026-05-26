@@ -352,7 +352,15 @@ export function Tab2LatestWebinar({
         webinars={webinars}
         headers={headers}
         note={reactivationNote}
-        latestNotApplicable={Boolean(monthlyWorkshopOverride)}
+        latestOverride={
+          monthlyWorkshopOverride
+            ? {
+                poolSize: monthlyWorkshopOverride.reactivationPoolSize,
+                attended: monthlyWorkshopOverride.reactivationsAttended,
+                booked:   monthlyWorkshopOverride.reactivationsBooked,
+              }
+            : undefined
+        }
       />
 
       {/* 8. Warning banner — ad-spend cutoff */}
@@ -552,15 +560,15 @@ function ReactivationFunnel({
   webinars,
   headers,
   note,
-  latestNotApplicable = false,
+  latestOverride,
 }: {
   webinars: WebinarComparisonRowV2[];
   headers: string[];
   note?: string;
-  /** When true, the latest column shows em-dashes instead of literal 0
-   *  values. Used for the monthly-workshop slug where no formal no-show
-   *  reactivation push was run (broader outreach lives in the note). */
-  latestNotApplicable?: boolean;
+  /** When set, overrides the latest column's reactivation numbers with
+   *  values computed from custom tag membership (workshop slug). Older
+   *  columns continue to read from mart_webinar_events. */
+  latestOverride?: { poolSize: number; attended: number; booked: number };
 }) {
   return (
     <section className={styles.section}>
@@ -585,24 +593,19 @@ function ReactivationFunnel({
           </thead>
           <tbody>
             {webinars.map((w, i) => {
-              const blanked = i === 0 && latestNotApplicable;
-              const attendRate = w.reactivationPoolSize > 0 ? w.reactivationsAttended / w.reactivationPoolSize : null;
-              const bookRate = w.reactivationsAttended > 0 ? w.reactivationsBooked / w.reactivationsAttended : null;
+              const poolSize = (i === 0 && latestOverride) ? latestOverride.poolSize : w.reactivationPoolSize;
+              const attended = (i === 0 && latestOverride) ? latestOverride.attended : w.reactivationsAttended;
+              const booked   = (i === 0 && latestOverride) ? latestOverride.booked   : w.reactivationsBooked;
+              const attendRate = poolSize > 0 ? attended / poolSize : null;
+              const bookRate   = attended > 0 ? booked / attended : null;
               return (
                 <tr key={w.webinarDate}>
-                  <td>
-                    {headers[i]}
-                    {blanked ? (
-                      <span style={{ marginLeft: 8, fontSize: 11, color: "#64748b", fontWeight: 400 }}>
-                        no formal push — see note above
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtInt(w.reactivationPoolSize)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtInt(w.reactivationsAttended)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtPct(attendRate)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtInt(w.reactivationsBooked)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{blanked ? "—" : fmtPct(bookRate)}</td>
+                  <td>{headers[i]}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(poolSize)}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(attended)}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{fmtPct(attendRate)}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(booked)}</td>
+                  <td className={i === 0 ? styles.lh : ""}>{fmtPct(bookRate)}</td>
                 </tr>
               );
             })}

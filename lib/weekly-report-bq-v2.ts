@@ -841,6 +841,12 @@ export type MonthlyWorkshopBreakdown = {
    *  cost-per metric (Cost/Reg, Cost/Attendee, ROAS, CAC) for the
    *  workshop because the workshop's actual cost was both. */
   totalSpend: number;
+  /** Reactivation funnel — contacts in the SMS/Email/WhatsApp push pool
+   *  (intersection of all `reactivationPoolTags`), how many attended the
+   *  workshop, and how many booked a call from it. */
+  reactivationPoolSize: number;
+  reactivationsAttended: number;
+  reactivationsBooked: number;
   // Meta funnel — same registration-category filter the mart uses.
   metaImpressions: number;
   metaLinkClicks: number;
@@ -881,6 +887,9 @@ export type MonthlyWorkshopBreakdown = {
  *  @param promoEnd        `YYYY-MM-DD` — ad campaign window end (incl).
  *  @param salesStart      `YYYY-MM-DD` — appointment_date_time window start.
  *  @param salesEnd        `YYYY-MM-DD` — appointment_date_time window end (incl).
+ *  @param reactivationPoolTags `string[]` — GHL tags ANDed to define the
+ *         reactivation pool (e.g. `['status: 5 star approved lead']`).
+ *         Empty array → pool size is 0 (no funnel computed).
  */
 export async function fetchMonthlyWorkshopBreakdown(
   workshopTagDate: string,
@@ -890,6 +899,7 @@ export async function fetchMonthlyWorkshopBreakdown(
   promoEnd: string,
   salesStart: string,
   salesEnd: string,
+  reactivationPoolTags: string[] = [],
 ): Promise<MonthlyWorkshopBreakdown> {
   // Registrants + Meta-in-promo classification. One query, two outputs.
   const regsSql = `
@@ -995,7 +1005,43 @@ export async function fetchMonthlyWorkshopBreakdown(
       AND prospect_email_lc NOT LIKE '%@nomoremondays.io%'
       AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
   `;
-  const [regsR, spendR, salesR] = await Promise.all([
+  // Reactivation funnel — pool is the AND of `reactivationPoolTags`,
+  // attended uses the workshop attendance tag, booked uses int_calls_enriched
+  // (live-webinar calls in the sales window, joined by email).
+  const reactivSql = reactivationPoolTags.length === 0 ? null : `
+    WITH pool AS (
+      SELECT contact_id
+      FROM \`${PROJECT}.raw_ghl.contact_tags\`
+      WHERE tag IN UNNEST(@poolTags)
+        AND COALESCE(_fivetran_deleted, FALSE) = FALSE
+      GROUP BY contact_id
+      HAVING COUNT(DISTINCT tag) = ARRAY_LENGTH(@poolTags)
+    ),
+    attended AS (
+      SELECT DISTINCT contact_id
+      FROM \`${PROJECT}.raw_ghl.contact_tags\`
+      WHERE tag = CONCAT('status: attended-workshop-', @workshopTagDate)
+        AND COALESCE(_fivetran_deleted, FALSE) = FALSE
+    ),
+    pool_emails AS (
+      SELECT DISTINCT LOWER(c.email) AS email_lc
+      FROM pool p
+      JOIN \`${PROJECT}.raw_ghl.contacts\` c ON c.id = p.contact_id
+      WHERE c.email IS NOT NULL
+    ),
+    booked_pool AS (
+      SELECT COUNT(DISTINCT e.prospect_email_lc) AS n
+      FROM \`${PROJECT}.dbt_tuddin.int_calls_enriched\` e
+      INNER JOIN pool_emails p ON e.prospect_email_lc = p.email_lc
+      WHERE LOWER(IFNULL(e.internal_note, '')) = 'live webinar'
+        AND DATE(e.appointment_date_time) BETWEEN DATE(@salesStart) AND DATE(@salesEnd)
+    )
+    SELECT
+      (SELECT COUNT(*) FROM pool)                                                     AS pool_size,
+      (SELECT COUNT(*) FROM pool p INNER JOIN attended a USING (contact_id))          AS attended,
+      (SELECT n FROM booked_pool)                                                     AS booked
+  `;
+  const [regsR, spendR, salesR, reactivR] = await Promise.all([
     bq().query({
       query: regsSql,
       params: { workshopTagDate, regWindowStart, regWindowEnd, promoStart, promoEnd },
@@ -1015,10 +1061,22 @@ export async function fetchMonthlyWorkshopBreakdown(
       params: { salesStart, salesEnd },
       types: { salesStart: "STRING", salesEnd: "STRING" },
     }),
+    reactivSql
+      ? bq().query({
+          query: reactivSql,
+          params: { workshopTagDate, salesStart, salesEnd, poolTags: reactivationPoolTags },
+          types: {
+            workshopTagDate: "STRING",
+            salesStart: "STRING", salesEnd: "STRING",
+            poolTags: ["STRING"],
+          },
+        })
+      : Promise.resolve([[]] as unknown as [Array<Record<string, unknown>>]),
   ]);
   const reg = (regsR[0]?.[0] ?? {}) as Record<string, unknown>;
   const sp  = (spendR[0]?.[0] ?? {}) as Record<string, unknown>;
   const sa  = (salesR[0]?.[0] ?? {}) as Record<string, unknown>;
+  const rc  = (reactivR[0]?.[0] ?? {}) as Record<string, unknown>;
   const n = (v: unknown) => Number(v ?? 0);
   const regSpend     = n(sp.reg_spend);
   const hammerSpend  = n(sp.hammer_spend);
@@ -1042,6 +1100,9 @@ export async function fetchMonthlyWorkshopBreakdown(
     totalAdSpend: totalSpend,
     reactivationCost: 0,                     // overridden in page.tsx for the workshop slug
     totalSpend: totalSpend,                  // default = totalAdSpend; overridden when reactivation cost is set
+    reactivationPoolSize:  n(rc.pool_size),
+    reactivationsAttended: n(rc.attended),
+    reactivationsBooked:   n(rc.booked),
     metaImpressions: impressions,
     metaLinkClicks: linkClicks,
     metaCtr: impressions > 0 ? linkClicks / impressions : null,

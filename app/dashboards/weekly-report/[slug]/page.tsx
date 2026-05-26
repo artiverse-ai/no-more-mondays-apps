@@ -146,6 +146,9 @@ export default async function Page({
       "2026-05-24",  // promoEnd: workshop day (inclusive)
       "2026-05-20",  // salesStart: appointments from start of promo
       "2026-05-30",  // salesEnd: appointments through following Saturday
+      // Reactivation pool — AND of GHL tags. Add the SMS-retargeting
+      // tag here once Taziem confirms the exact name.
+      ["status: 5 star approved lead"],
     ).catch(() => undefined);
     // Hard-coded workshop cost per Taziem 2026-05-26. Three layers:
     //   - totalSpend       = $8,487 (drives every cost-per-X metric)
@@ -169,11 +172,10 @@ export default async function Page({
         : null;
     }
     reactivationNote =
-      "No formal “no-show reactivation” push this cycle, but the team ran " +
-      "broader outreach: Email blast to ~12,000 contacts, SMS to ~5,000, " +
-      "and 8 WhatsApp groups (~600 members each ≈ 4,800 reached). " +
-      "Attribution per channel isn't broken out below — read the table as the " +
-      "aggregate of those touches.";
+      "Reactivation pool below is contacts tagged `status: 5 star approved lead` " +
+      "who were targeted by the May 24 SMS/Email/WhatsApp push. Channel-level " +
+      "attribution (which channel drove which attend/book) isn't broken out — " +
+      "the funnel rolls up all touches together.";
   }
 
   // Forecast targets (null-safe — returns all nulls if forecast_targets is

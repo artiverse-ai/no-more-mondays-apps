@@ -63,10 +63,10 @@ export default async function SetterCompetitionPage({
       </div>
 
       <div className={styles.rulesFooter}>
-        <strong>Setter scoring:</strong> every $10 of cash collected from
-        your booked calls = 1 pt &nbsp;·&nbsp; multiplier (if any) applies
-        on the day you booked &nbsp;·&nbsp; show &amp; close rates are on
-        the calls you own
+        <strong>Setter scoring:</strong> every $10 of cash collected on
+        any deal you booked = 1 pt &nbsp;·&nbsp; multiplier (if any)
+        applies on the close date &nbsp;·&nbsp; booking + show stats
+        count your post-launch hustle only
         <br />
         <span className={styles.rulesFooterSub}>
           Window: {board.windowStart} → {board.windowEnd} · Setters compete

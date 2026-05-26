@@ -51,35 +51,51 @@ export type SetterLeaderboard = {
   todayMultiplier: number;
 };
 
-// Per setter PER DAY — the day grain lets multipliers apply by the
-// setter's booking date.
+// Per Marek 2026-05-26: setters get credit for any deal that closes
+// in the window, regardless of when the underlying call was booked.
+// Mirrors the closer-side change. Booking-side stats (bookings,
+// shows, show-rate) keep the post-launch booking filter — those
+// measure the setter's current hustle, not lagging deal flow.
 //
-// Booking date = DATE(calendly_created_ts, 'America/New_York'). We
-// must NOT use int_calls_enriched.created_date here:
-//   - it falls back to airtable_created_date when Calendly is missing,
-//     which is the Fivetran sync time (not the real booking time —
-//     see docs/NMM_ANALYSIS_CONTEXT.md §11.12), and
-//   - it's a plain DATE() with no timezone, so on Mon 1 AM ET it
-//     already includes 5 hours of Sunday evening US activity.
-// Restricting to calendly_created_ts IS NOT NULL also keeps the
-// "competition lives in Calendly bookings" rule clean — manual
-// Airtable rows shouldn't credit a setter.
-// The period window is already floored at COMPETITION_START.
+// Implemented as two unioned queries, distinguished by row_type:
+//   - 'booking': counts/stats for post-launch bookings in the period.
+//     Used for `bookings`, `show_ups`, `show_rate_eligible`.
+//   - 'deal':    deals + cash for any close in the period, no booking
+//     filter. Used for `deals` and `cash_collected`. Day = close_date
+//     so multipliers apply on the close.
 const SETTER_SQL = `
   SELECT
     COALESCE(setter_owner, calendly_setter_name) AS setter,
-    FORMAT_DATE('%F', DATE(calendly_created_ts, 'America/New_York')) AS booked_date,
+    'booking'                                    AS row_type,
+    FORMAT_DATE('%F', DATE(calendly_created_ts, 'America/New_York')) AS day,
     COUNTIF(is_call_booked)            AS bookings,
     COUNTIF(is_show_up)                AS show_ups,
     COUNTIF(is_show_rate_eligible)     AS show_rate_eligible,
-    COUNTIF(is_deal)                   AS deals,
-    SUM(IF(is_deal, CAST(cash_collected AS NUMERIC), 0)) AS cash_collected
+    0                                  AS deals,
+    CAST(0 AS NUMERIC)                 AS cash_collected
   FROM ${ENRICHED}
   WHERE calendly_created_ts IS NOT NULL
     AND calendly_created_ts >= TIMESTAMP(@launchTs)
     AND DATE(calendly_created_ts, 'America/New_York') BETWEEN DATE(@start) AND DATE(@end)
     AND COALESCE(setter_owner, calendly_setter_name) IN UNNEST(@setters)
-  GROUP BY setter, booked_date
+  GROUP BY setter, day
+
+  UNION ALL
+
+  SELECT
+    COALESCE(setter_owner, calendly_setter_name) AS setter,
+    'deal'                                       AS row_type,
+    FORMAT_DATE('%F', date_closed)               AS day,
+    0                                  AS bookings,
+    0                                  AS show_ups,
+    0                                  AS show_rate_eligible,
+    COUNT(*)                           AS deals,
+    SUM(CAST(cash_collected AS NUMERIC)) AS cash_collected
+  FROM ${ENRICHED}
+  WHERE is_deal
+    AND date_closed BETWEEN DATE(@start) AND DATE(@end)
+    AND COALESCE(setter_owner, calendly_setter_name) IN UNNEST(@setters)
+  GROUP BY setter, day
 `;
 
 type Acc = {
@@ -128,7 +144,10 @@ export async function fetchSetterLeaderboard(
     const a = acc.get(String(r.setter ?? ""));
     if (!a) continue;
     const cash = num(r.cash_collected);
-    const day = String(r.booked_date ?? "");
+    // `day` is the booking date on 'booking' rows (cash=0 so the
+    // multiplier doesn't matter), and the close date on 'deal' rows
+    // (where the multiplier should apply).
+    const day = String(r.day ?? "");
     a.bookings += num(r.bookings);
     a.cashCollected += cash;
     a.points += Math.floor((cash / 10) * multFor(day));

@@ -985,19 +985,33 @@ export async function fetchMonthlyWorkshopBreakdown(
     FROM \`${PROJECT}.dbt_tuddin.stg_meta_campaigns\`
     WHERE date_day BETWEEN DATE(@promoStart) AND DATE(@promoEnd)
   `;
-  // Sales — int_calls_enriched, filtered to calls that closers tagged
-  // `internal_note = 'live webinar'` (per Taziem 2026-05-25: that's the
-  // workshop-attribution flag used by the team), deduped by prospect
-  // email. Date window keeps the latest column scoped to this cycle.
+  // Sales splits across two sources:
+  //   1. stg_calendly  → calls_booked + calls_booked_active. Calendly is
+  //      the source of truth for "is the booking still alive" (status
+  //      flips to 'canceled' the moment the prospect cancels — much
+  //      cleaner than Airtable's is_canceled flag which can lag or
+  //      misclassify reschedules). Per Taziem 2026-05-26.
+  //   2. int_calls_enriched → shows, qualified_shows, deals, cash,
+  //      revenue. These are outcomes the closer dispositions in
+  //      Airtable, so Airtable is the source of truth.
+  const calendlySql = `
+    SELECT
+      COUNT(DISTINCT LOWER(invitee_email))                                              AS calls_booked,
+      COUNT(DISTINCT IF(status = 'active', LOWER(invitee_email), NULL))                 AS calls_booked_active
+    FROM \`${PROJECT}.dbt_tuddin.stg_calendly\`
+    WHERE LOWER(internal_note) = 'live webinar'
+      AND invitee_email IS NOT NULL
+      AND LOWER(invitee_email) NOT LIKE '%@nomoremondays.io%'
+      AND LOWER(invitee_email) NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
+      AND DATE(start_time, 'America/New_York') BETWEEN DATE(@salesStart) AND DATE(@salesEnd)
+  `;
   const salesSql = `
     SELECT
-      COUNT(DISTINCT prospect_email_lc)                                                            AS calls_booked,
-      COUNT(DISTINCT IF(NOT IFNULL(is_canceled, FALSE), prospect_email_lc, NULL))                  AS calls_booked_active,
-      COUNT(DISTINCT IF(is_show_up,                                      prospect_email_lc, NULL)) AS shows,
-      COUNT(DISTINCT IF(is_close_rate_eligible,                          prospect_email_lc, NULL)) AS qualified_shows,
-      COUNT(DISTINCT IF(is_deal,                                         prospect_email_lc, NULL)) AS deals,
-      SUM(IF(is_deal, cash_collected,    0))                                                       AS cash,
-      SUM(IF(is_deal, revenue_generated, 0))                                                       AS revenue
+      COUNT(DISTINCT IF(is_show_up,             prospect_email_lc, NULL)) AS shows,
+      COUNT(DISTINCT IF(is_close_rate_eligible, prospect_email_lc, NULL)) AS qualified_shows,
+      COUNT(DISTINCT IF(is_deal,                prospect_email_lc, NULL)) AS deals,
+      SUM(IF(is_deal, cash_collected,    0))                              AS cash,
+      SUM(IF(is_deal, revenue_generated, 0))                              AS revenue
     FROM \`${PROJECT}.dbt_tuddin.int_calls_enriched\`
     WHERE LOWER(IFNULL(internal_note, '')) = 'live webinar'
       AND prospect_email_lc IS NOT NULL
@@ -1040,7 +1054,7 @@ export async function fetchMonthlyWorkshopBreakdown(
       (SELECT COUNT(*) FROM pool p INNER JOIN attended a USING (contact_id))          AS attended,
       (SELECT n FROM booked_pool)                                                     AS booked
   `;
-  const [regsR, spendR, salesR, reactivR] = await Promise.all([
+  const [regsR, spendR, salesR, reactivR, calendlyR] = await Promise.all([
     bq().query({
       query: regsSql,
       params: { workshopTagDate, regWindowStart, regWindowEnd, promoStart, promoEnd },
@@ -1071,11 +1085,17 @@ export async function fetchMonthlyWorkshopBreakdown(
           },
         })
       : Promise.resolve([[]] as unknown as [Array<Record<string, unknown>>]),
+    bq().query({
+      query: calendlySql,
+      params: { salesStart, salesEnd },
+      types: { salesStart: "STRING", salesEnd: "STRING" },
+    }),
   ]);
   const reg = (regsR[0]?.[0] ?? {}) as Record<string, unknown>;
   const sp  = (spendR[0]?.[0] ?? {}) as Record<string, unknown>;
   const sa  = (salesR[0]?.[0] ?? {}) as Record<string, unknown>;
   const rc  = (reactivR[0]?.[0] ?? {}) as Record<string, unknown>;
+  const cal = (calendlyR[0]?.[0] ?? {}) as Record<string, unknown>;
   const n = (v: unknown) => Number(v ?? 0);
   const regSpend     = n(sp.reg_spend);
   const hammerSpend  = n(sp.hammer_spend);
@@ -1110,8 +1130,8 @@ export async function fetchMonthlyWorkshopBreakdown(
     metaReportedConversions: conversions,
     salesWindowStart: salesStart,
     salesWindowEnd: salesEnd,
-    callsBooked:        n(sa.calls_booked),
-    callsBookedActive:  n(sa.calls_booked_active),
+    callsBooked:        n(cal.calls_booked),
+    callsBookedActive:  n(cal.calls_booked_active),
     shows:              n(sa.shows),
     qualifiedShows:     n(sa.qualified_shows),
     dealsClosed:        n(sa.deals),

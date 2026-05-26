@@ -1005,17 +1005,16 @@ export async function fetchMonthlyWorkshopBreakdown(
       AND prospect_email_lc NOT LIKE '%@nomoremondays.io%'
       AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
   `;
-  // Reactivation funnel — pool is the AND of `reactivationPoolTags`,
-  // attended uses the workshop attendance tag, booked uses int_calls_enriched
+  // Reactivation funnel — pool is the OR of `reactivationPoolTags`
+  // (union: contact reached via ANY of the listed channels), attended
+  // uses the workshop attendance tag, booked uses int_calls_enriched
   // (live-webinar calls in the sales window, joined by email).
   const reactivSql = reactivationPoolTags.length === 0 ? null : `
     WITH pool AS (
-      SELECT contact_id
+      SELECT DISTINCT contact_id
       FROM \`${PROJECT}.raw_ghl.contact_tags\`
       WHERE tag IN UNNEST(@poolTags)
         AND COALESCE(_fivetran_deleted, FALSE) = FALSE
-      GROUP BY contact_id
-      HAVING COUNT(DISTINCT tag) = ARRAY_LENGTH(@poolTags)
     ),
     attended AS (
       SELECT DISTINCT contact_id

@@ -21,10 +21,11 @@ export default function Page() {
             30 days. Same funnel-tag filters, hosts, and charts as Funnel
             Search.
           </p>
-          <p className="mt-2 text-xs text-amber-700">
-            ⏱ Searches typically take <strong>60–120 seconds</strong> —
-            Calendly&apos;s API is the bottleneck. Be patient on first
-            load; the loading strip shows progress.
+          <p className="mt-2 text-xs text-emerald-700">
+            ⚡ Searches now run against BigQuery (
+            <code>dbt_tuddin.stg_calendly</code>) — results usually
+            return in under 2 seconds. Data lags Calendly by up to
+            ~6 hours (Fivetran sync cadence).
           </p>
         </div>
         <a

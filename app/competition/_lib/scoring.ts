@@ -17,7 +17,6 @@ import {
   TEAM,
   BONUS_THRESHOLDS,
   COMPETITION_START,
-  COMPETITION_LAUNCH_TS,
   type CloserProfile,
 } from "../_data/roster";
 import { fetchPointMultipliers, todayEt } from "./multipliers";
@@ -183,16 +182,19 @@ export function pointsForDeal(cashCollected: number, closeType: "OCC" | "FUC" | 
   return Math.floor(base * multiplier);
 }
 
-// Closer leaderboard mirrors the setter rule per Sergio 2026-05-25:
-// the call must have been booked AFTER the league opens (7 AM ET Sun
-// May 24). So a deal closing today from last-week's pipeline does NOT
-// credit the closer — same way it doesn't credit the setter who
-// originally booked it. With this in place, closer totals reconcile
-// with the sum of setter cash for the same window.
+// Closer leaderboard per Marek 2026-05-26: any deal closed in the
+// competition window counts, regardless of when the underlying call
+// was booked. The launch floor still applies at the DATE grain
+// (date_closed >= 2026-05-24) so pre-launch closes never count.
 //
-// Requires calendly_created_ts IS NOT NULL — manual Airtable rows
-// without a Calendly link can't prove a post-launch booking, so they
-// don't count. Matches the setter filter exactly.
+// This is the "closers get credit for closes" interpretation — sales
+// reps work whatever pipeline is in front of them, so they shouldn't
+// be penalized for last-week's bookings that happen to close now.
+//
+// Setter side intentionally stays stricter (calendly_created_ts >= launch)
+// because setters earn on bookings they make AFTER the league opens —
+// rewarding the action they actually control. The two boards will not
+// reconcile point-for-point during the first ~1-2 weeks of the season.
 const DEALS_SQL = `
   SELECT
     closer_owner                                AS closer_owner,
@@ -203,8 +205,6 @@ const DEALS_SQL = `
   FROM ${ENRICHED}
   WHERE is_deal
     AND date_closed BETWEEN DATE(@start) AND DATE(@end)
-    AND calendly_created_ts IS NOT NULL
-    AND calendly_created_ts >= TIMESTAMP(@launchTs)
     AND closer_owner IS NOT NULL
     AND ${EMAIL_EXCLUSION}
   ORDER BY date_closed DESC, cash_collected DESC
@@ -220,8 +220,8 @@ export async function fetchLeaderboard(period: Period, now: Date = new Date()): 
     fetchActiveCloserNames(),
     bq().query({
       query: DEALS_SQL,
-      params: { start, end, launchTs: COMPETITION_LAUNCH_TS },
-      types: { start: "STRING", end: "STRING", launchTs: "STRING" },
+      params: { start, end },
+      types: { start: "STRING", end: "STRING" },
     }),
     fetchPointMultipliers(),
   ]);

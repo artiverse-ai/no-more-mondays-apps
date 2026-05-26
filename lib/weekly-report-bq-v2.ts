@@ -834,6 +834,13 @@ export type MonthlyWorkshopBreakdown = {
   regAdSpend: number;      // webinar_registration + monthly_workshop_registration
   hammerAdSpend: number;   // webinar_hammer_them   + monthly_workshop_hammer_them
   totalAdSpend: number;    // regAdSpend + hammerAdSpend
+  /** Cost of the reactivation push (SMS, Email, WhatsApp blasts). Set
+   *  manually for the workshop slug — not in stg_meta_campaigns. */
+  reactivationCost: number;
+  /** Headline cost figure: ad spend + reactivation cost. Drives every
+   *  cost-per metric (Cost/Reg, Cost/Attendee, ROAS, CAC) for the
+   *  workshop because the workshop's actual cost was both. */
+  totalSpend: number;
   // Meta funnel — same registration-category filter the mart uses.
   metaImpressions: number;
   metaLinkClicks: number;
@@ -1033,6 +1040,8 @@ export async function fetchMonthlyWorkshopBreakdown(
     regAdSpend: regSpend,
     hammerAdSpend: hammerSpend,
     totalAdSpend: totalSpend,
+    reactivationCost: 0,                     // overridden in page.tsx for the workshop slug
+    totalSpend: totalSpend,                  // default = totalAdSpend; overridden when reactivation cost is set
     metaImpressions: impressions,
     metaLinkClicks: linkClicks,
     metaCtr: impressions > 0 ? linkClicks / impressions : null,

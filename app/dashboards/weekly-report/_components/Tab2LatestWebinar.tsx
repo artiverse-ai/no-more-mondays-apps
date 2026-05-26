@@ -121,7 +121,13 @@ export function Tab2LatestWebinar({
             </thead>
             <tbody>
               <DivRow>Registration</DivRow>
-              <DataRow label="Ad Spend" values={overrideUsd((o) => o.totalAdSpend, (w) => w.totalWebinarAdSpend)} tip={TIP.adSpendMart} />
+              {ovr ? (
+                <>
+                  <DataRow label="Total Spend"        values={[fmtUsd(ovr.totalSpend),       "—", "—"]} tip={"Ad spend + reactivation push (SMS/Email/WhatsApp).\nDrives every cost-per metric below."} />
+                  <DataRow label="↳ Reactivation Cost" values={[fmtUsd(ovr.reactivationCost), "—", "—"]} tip={"Cost of the SMS/Email/WhatsApp reactivation pushes. Manual entry — not in stg_meta_campaigns."} />
+                </>
+              ) : null}
+              <DataRow label={ovr ? "↳ Ad Spend" : "Ad Spend"} values={overrideUsd((o) => o.totalAdSpend, (w) => w.totalWebinarAdSpend)} tip={TIP.adSpendMart} />
               <DataRow label="LP Page Views" values={webinars.map((w) => fmtInt(w.lpPageViews))} tip={TIP.lpPageViews} />
               <DataRow label="LP Opt-Ins" values={webinars.map((w) => fmtInt(w.lpOptIns))} tip={TIP.lpOptIns} />
               <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} trafficKey="lpOptInRate" rawValues={webinars.map((w) => w.lpOptInRate)} highlight />
@@ -181,29 +187,29 @@ export function Tab2LatestWebinar({
               />
               <DataRow
                 label="Cost / Attendee"
-                values={overrideUsd2((o) => safeDiv(o.totalAdSpend, webinars[0]?.uniqueAttendees ?? 0), (w) => w.blendedCpa)}
+                values={overrideUsd2((o) => safeDiv(o.totalSpend, webinars[0]?.uniqueAttendees ?? 0), (w) => w.blendedCpa)}
                 tip={TIP.costPerAttendee}
               />
               <DataRow
                 label="Cost / Booked Call"
-                values={overrideUsd2((o) => safeDiv(o.totalAdSpend, o.callsBooked), (w) => w.blendedCpbc)}
+                values={overrideUsd2((o) => safeDiv(o.totalSpend, o.callsBooked), (w) => w.blendedCpbc)}
                 tip={TIP.costPerBookedCall}
                 trafficKey="costPerBookedCall"
                 rawValues={webinars.map((w, i) =>
-                  isLatestOvr(i) ? safeDiv(ovr!.totalAdSpend, ovr!.callsBooked) : w.blendedCpbc,
+                  isLatestOvr(i) ? safeDiv(ovr!.totalSpend, ovr!.callsBooked) : w.blendedCpbc,
                 )}
                 highlight
               />
               <DataRow
                 label="Cost / Active Booked Call"
-                values={overrideUsd2((o) => safeDiv(o.totalAdSpend, o.callsBookedActive), (w) => w.blendedCpbcActive)}
+                values={overrideUsd2((o) => safeDiv(o.totalSpend, o.callsBookedActive), (w) => w.blendedCpbcActive)}
                 tip={TIP.costPerActiveBookedCall}
               />
               <DataRow
                 label="Cost / Qualified Show"
                 values={webinars.map((w, i) =>
                   isLatestOvr(i)
-                    ? fmtUsd2(safeDiv(ovr!.totalAdSpend, ovr!.qualifiedShows))
+                    ? fmtUsd2(safeDiv(ovr!.totalSpend, ovr!.qualifiedShows))
                     : i === 0 && inProgress ? naCell() : fmtUsd2(w.blendedCostPerQualifiedShow),
                 )}
                 tip={TIP.costPerQualifiedShow}
@@ -288,13 +294,13 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="ROAS (Cash)"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtX(safeDiv(ovr!.cashCollected, ovr!.totalAdSpend));
+                  if (isLatestOvr(i)) return fmtX(safeDiv(ovr!.cashCollected, ovr!.totalSpend));
                   return i === 0 ? "" : fmtX(w.roasCash);
                 })}
-                tip={TIP.roasCash + (ovr ? "\nWorkshop ROAS uses Wed–Sun promo-window ad spend; deals still accumulating." : "\nLatest webinar column is blank — cash and deals are still accumulating (1-12 weeks for full collection).")}
+                tip={TIP.roasCash + (ovr ? "\nWorkshop ROAS uses Total Spend (ads + reactivation) as the denominator; deals still accumulating." : "\nLatest webinar column is blank — cash and deals are still accumulating (1-12 weeks for full collection).")}
                 trafficKey="roas"
                 rawValues={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return safeDiv(ovr!.cashCollected, ovr!.totalAdSpend);
+                  if (isLatestOvr(i)) return safeDiv(ovr!.cashCollected, ovr!.totalSpend);
                   return i === 0 ? null : w.roasCash;
                 })}
                 highlight
@@ -302,23 +308,23 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="ROAS (Revenue/TCV)"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtX(safeDiv(ovr!.revenueGenerated, ovr!.totalAdSpend));
+                  if (isLatestOvr(i)) return fmtX(safeDiv(ovr!.revenueGenerated, ovr!.totalSpend));
                   return i === 0 ? "" : fmtX(w.roasRevenue);
                 })}
                 tip={"Latest webinar column is blank — deals are still closing (1-4 weeks). Prior webinars are mature and comparable."}
                 trafficKey="roas"
                 rawValues={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return safeDiv(ovr!.revenueGenerated, ovr!.totalAdSpend);
+                  if (isLatestOvr(i)) return safeDiv(ovr!.revenueGenerated, ovr!.totalSpend);
                   return i === 0 ? null : w.roasRevenue;
                 })}
               />
               <DataRow
                 label="CAC"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtUsd2(safeDiv(ovr!.totalAdSpend, ovr!.dealsClosed));
+                  if (isLatestOvr(i)) return fmtUsd2(safeDiv(ovr!.totalSpend, ovr!.dealsClosed));
                   return i === 0 ? "" : fmtUsd2(w.cac);
                 })}
-                tip={"CAC = ad_spend / deals_closed. Latest webinar's deals are still accumulating — column blank until mature."}
+                tip={"CAC = total_spend / deals_closed. Latest webinar's deals are still accumulating — column blank until mature."}
               />
             </tbody>
           </table>

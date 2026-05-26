@@ -147,19 +147,25 @@ export default async function Page({
       "2026-05-20",  // salesStart: appointments from start of promo
       "2026-05-30",  // salesEnd: appointments through following Saturday
     ).catch(() => undefined);
-    // Hard-coded total ad spend per Taziem 2026-05-25 — actual workshop
-    // spend ($5,487) is not derivable from stg_meta_campaigns (spans
-    // uncategorized campaigns and manual boosts). Drive ALL downstream
-    // cost-per metrics from this number: Cost/Reg Paid and Meta CPL
-    // would otherwise use the smaller derived reg-only spend.
+    // Hard-coded workshop cost per Taziem 2026-05-26. Three layers:
+    //   - totalSpend       = $8,487 (drives every cost-per-X metric)
+    //   - reactivationCost = $3,000 (SMS / Email / WhatsApp pushes)
+    //   - totalAdSpend     = $5,487 (Meta ads — displayed as "Ad Spend")
+    //
+    // None of these are derivable from stg_meta_campaigns; reactivation
+    // spend isn't even tracked there. Manual override for this slug only.
     if (monthlyWorkshopOverride) {
-      const HARDCODED_TOTAL_AD_SPEND = 5487;
+      const HARDCODED_TOTAL_SPEND       = 8487;
+      const HARDCODED_REACTIVATION_COST = 3000;
+      const HARDCODED_AD_SPEND          = 5487;
       const conversions = monthlyWorkshopOverride.metaReportedConversions;
-      monthlyWorkshopOverride.totalAdSpend = HARDCODED_TOTAL_AD_SPEND;
-      monthlyWorkshopOverride.regAdSpend = HARDCODED_TOTAL_AD_SPEND;
-      monthlyWorkshopOverride.hammerAdSpend = 0;
+      monthlyWorkshopOverride.totalSpend       = HARDCODED_TOTAL_SPEND;
+      monthlyWorkshopOverride.reactivationCost = HARDCODED_REACTIVATION_COST;
+      monthlyWorkshopOverride.totalAdSpend     = HARDCODED_AD_SPEND;
+      monthlyWorkshopOverride.regAdSpend       = HARDCODED_TOTAL_SPEND;   // Cost/Reg uses total
+      monthlyWorkshopOverride.hammerAdSpend    = 0;
       monthlyWorkshopOverride.metaCpl = conversions > 0
-        ? HARDCODED_TOTAL_AD_SPEND / conversions
+        ? HARDCODED_TOTAL_SPEND / conversions
         : null;
     }
     reactivationNote =

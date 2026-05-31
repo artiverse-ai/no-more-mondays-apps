@@ -41,8 +41,10 @@ yarn-error.log*
 next-env.d.ts
 .env*.local
 
-# Claude Code session state
-.claude/
+# Claude Code session state (settings, transcripts, worktrees) — ignore everything inside .claude
+.claude/*
+# …except Claude Skills, which ARE distributable artifacts and belong in git
+!.claude/skills/
 
 # clerk configuration (can include secrets)
 /.clerk/

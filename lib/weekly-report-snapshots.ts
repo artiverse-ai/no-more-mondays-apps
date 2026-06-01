@@ -284,7 +284,7 @@ type MergeSnapshotInput = Omit<
   | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
   | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
   | "workshopTagDate" | "retargetingEmailTag" | "retargetingSmsTag" | "reactivationCost"
-  | "totalAdSpendOverride"
+  | "totalAdSpendOverride" | "useMartRegistrants"
 > & {
   tab2NarrativeTag?: string | null;
   tab2NarrativeTitle?: string | null;
@@ -294,6 +294,7 @@ type MergeSnapshotInput = Omit<
   retargetingSmsTag?: string | null;
   reactivationCost?: number | null;
   totalAdSpendOverride?: number | null;
+  useMartRegistrants?: boolean | null;
 };
 
 async function mergeSnapshot(
@@ -499,7 +500,7 @@ type CreateSnapshotInput = Omit<
   | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
   | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
   | "workshopTagDate" | "retargetingEmailTag" | "retargetingSmsTag" | "reactivationCost"
-  | "totalAdSpendOverride"
+  | "totalAdSpendOverride" | "useMartRegistrants"
 > & {
   tab2NarrativeTag?: string | null;
   tab2NarrativeTitle?: string | null;
@@ -509,6 +510,7 @@ type CreateSnapshotInput = Omit<
   retargetingSmsTag?: string | null;
   reactivationCost?: number | null;
   totalAdSpendOverride?: number | null;
+  useMartRegistrants?: boolean | null;
 };
 
 export async function createSnapshot(s: CreateSnapshotInput): Promise<void> {

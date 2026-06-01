@@ -389,11 +389,13 @@ export function Tab2LatestWebinar({
         note={reactivationNote}
         columnOverrides={webinars.map((_, i) => {
           const co = colOvr(i);
-          return co ? {
+          if (!co) return undefined;
+          return {
             poolSize: co.reactivationPoolSize,
             attended: co.reactivationsAttended,
             booked:   co.reactivationsBooked,
-          } : undefined;
+            byChannel: co.reactivationByChannel ?? undefined,
+          };
         })}
       />
 
@@ -590,6 +592,14 @@ function MetaCampaignsTable({ campaigns, sqlInfo }: { campaigns: MetaCampaignRow
   );
 }
 
+type ChannelStats = { tag: string; poolSize: number; attended: number; booked: number };
+type ColumnOverride = {
+  poolSize: number;
+  attended: number;
+  booked: number;
+  byChannel?: { email: ChannelStats; sms: ChannelStats };
+};
+
 function ReactivationFunnel({
   webinars,
   headers,
@@ -603,7 +613,7 @@ function ReactivationFunnel({
    *  replaces that column's mart_webinar_events reactivation numbers
    *  with tag-based + workshop-snapshot values (used for both the
    *  latest column AND historical workshop columns). */
-  columnOverrides?: Array<{ poolSize: number; attended: number; booked: number } | undefined>;
+  columnOverrides?: Array<ColumnOverride | undefined>;
 }) {
   return (
     <section className={styles.section}>
@@ -627,23 +637,32 @@ function ReactivationFunnel({
             </tr>
           </thead>
           <tbody>
-            {webinars.map((w, i) => {
+            {webinars.flatMap((w, i) => {
               const ovr = columnOverrides?.[i];
               const poolSize = ovr ? ovr.poolSize : w.reactivationPoolSize;
               const attended = ovr ? ovr.attended : w.reactivationsAttended;
               const booked   = ovr ? ovr.booked   : w.reactivationsBooked;
-              const attendRate = poolSize > 0 ? attended / poolSize : null;
-              const bookRate   = attended > 0 ? booked / attended : null;
-              return (
-                <tr key={w.webinarDate}>
-                  <td>{headers[i]}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(poolSize)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(attended)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtPct(attendRate)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtInt(booked)}</td>
-                  <td className={i === 0 ? styles.lh : ""}>{fmtPct(bookRate)}</td>
-                </tr>
-              );
+              const lh = i === 0 ? styles.lh : "";
+              const mkRow = (key: string, label: string, p: number, a: number, b: number, sub: boolean) => {
+                const ar = p > 0 ? a / p : null;
+                const br = a > 0 ? b / a : null;
+                return (
+                  <tr key={key}>
+                    <td style={sub ? { paddingLeft: 24, color: "#64748b" } : undefined}>{label}</td>
+                    <td className={lh}>{fmtInt(p)}</td>
+                    <td className={lh}>{fmtInt(a)}</td>
+                    <td className={lh}>{fmtPct(ar)}</td>
+                    <td className={lh}>{fmtInt(b)}</td>
+                    <td className={lh}>{fmtPct(br)}</td>
+                  </tr>
+                );
+              };
+              const rows = [mkRow(`${w.webinarDate}-total`, headers[i], poolSize, attended, booked, false)];
+              if (ovr?.byChannel) {
+                rows.push(mkRow(`${w.webinarDate}-email`, "↳ Email", ovr.byChannel.email.poolSize, ovr.byChannel.email.attended, ovr.byChannel.email.booked, true));
+                rows.push(mkRow(`${w.webinarDate}-sms`,   "↳ SMS",   ovr.byChannel.sms.poolSize,   ovr.byChannel.sms.attended,   ovr.byChannel.sms.booked,   true));
+              }
+              return rows;
             })}
           </tbody>
         </table>

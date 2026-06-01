@@ -841,12 +841,21 @@ export type MonthlyWorkshopBreakdown = {
    *  cost-per metric (Cost/Reg, Cost/Attendee, ROAS, CAC) for the
    *  workshop because the workshop's actual cost was both. */
   totalSpend: number;
-  /** Reactivation funnel — contacts in the SMS/Email/WhatsApp push pool
-   *  (intersection of all `reactivationPoolTags`), how many attended the
-   *  workshop, and how many booked a call from it. */
+  /** Reactivation funnel — contacts in the SMS/Email push pool (UNION
+   *  of the two channel tags), how many attended the workshop, and how
+   *  many booked a call from it. Combined totals; per-channel split is
+   *  in `reactivationByChannel` when tags are passed by channel. */
   reactivationPoolSize: number;
   reactivationsAttended: number;
   reactivationsBooked: number;
+  /** Per-channel reactivation breakdown — non-null when the fetcher is
+   *  called with named email/sms tags (the normal monthly workshop
+   *  case). The UI uses this to bifurcate the funnel into two rows
+   *  per workshop column. */
+  reactivationByChannel: {
+    email: { tag: string; poolSize: number; attended: number; booked: number };
+    sms:   { tag: string; poolSize: number; attended: number; booked: number };
+  } | null;
   // Meta funnel — same registration-category filter the mart uses.
   metaImpressions: number;
   metaLinkClicks: number;
@@ -1019,16 +1028,28 @@ export async function fetchMonthlyWorkshopBreakdown(
       AND prospect_email_lc NOT LIKE '%@nomoremondays.io%'
       AND prospect_email_lc NOT IN ('jaromir1998@gmail.com','marek@sintano.com')
   `;
-  // Reactivation funnel — pool is the OR of `reactivationPoolTags`
-  // (union: contact reached via ANY of the listed channels), attended
-  // uses the workshop attendance tag, booked uses int_calls_enriched
-  // (live-webinar calls in the sales window, joined by email).
+  // Reactivation funnel — by convention reactivationPoolTags[0] is the
+  // Email channel and [1] is the SMS channel (caller is page.tsx which
+  // builds the array from snapshot.retargetingEmailTag/retargetingSmsTag).
+  // We compute BOTH the per-channel funnel AND the union total in one
+  // query so the UI can bifurcate by channel.
+  const emailTag = reactivationPoolTags[0] ?? null;
+  const smsTag   = reactivationPoolTags[1] ?? null;
   const reactivSql = reactivationPoolTags.length === 0 ? null : `
-    WITH pool AS (
+    WITH email_pool AS (
       SELECT DISTINCT contact_id
       FROM \`${PROJECT}.raw_ghl.contact_tags\`
-      WHERE tag IN UNNEST(@poolTags)
-        AND COALESCE(_fivetran_deleted, FALSE) = FALSE
+      WHERE tag = @emailTag AND COALESCE(_fivetran_deleted, FALSE) = FALSE
+    ),
+    sms_pool AS (
+      SELECT DISTINCT contact_id
+      FROM \`${PROJECT}.raw_ghl.contact_tags\`
+      WHERE tag = @smsTag AND COALESCE(_fivetran_deleted, FALSE) = FALSE
+    ),
+    union_pool AS (
+      SELECT contact_id FROM email_pool
+      UNION DISTINCT
+      SELECT contact_id FROM sms_pool
     ),
     attended AS (
       SELECT DISTINCT contact_id
@@ -1036,23 +1057,35 @@ export async function fetchMonthlyWorkshopBreakdown(
       WHERE tag = CONCAT('status: attended-workshop-', @workshopTagDate)
         AND COALESCE(_fivetran_deleted, FALSE) = FALSE
     ),
-    pool_emails AS (
+    email_emails AS (
       SELECT DISTINCT LOWER(c.email) AS email_lc
-      FROM pool p
-      JOIN \`${PROJECT}.raw_ghl.contacts\` c ON c.id = p.contact_id
+      FROM email_pool p JOIN \`${PROJECT}.raw_ghl.contacts\` c ON c.id = p.contact_id
       WHERE c.email IS NOT NULL
     ),
-    booked_pool AS (
-      SELECT COUNT(DISTINCT e.prospect_email_lc) AS n
+    sms_emails AS (
+      SELECT DISTINCT LOWER(c.email) AS email_lc
+      FROM sms_pool p JOIN \`${PROJECT}.raw_ghl.contacts\` c ON c.id = p.contact_id
+      WHERE c.email IS NOT NULL
+    ),
+    union_emails AS (
+      SELECT email_lc FROM email_emails UNION DISTINCT SELECT email_lc FROM sms_emails
+    ),
+    booked_filter AS (
+      SELECT DISTINCT e.prospect_email_lc
       FROM \`${PROJECT}.dbt_tuddin.int_calls_enriched\` e
-      INNER JOIN pool_emails p ON e.prospect_email_lc = p.email_lc
       WHERE LOWER(IFNULL(e.internal_note, '')) = 'live webinar'
         AND DATE(e.appointment_date_time) BETWEEN DATE(@salesStart) AND DATE(@salesEnd)
     )
     SELECT
-      (SELECT COUNT(*) FROM pool)                                                     AS pool_size,
-      (SELECT COUNT(*) FROM pool p INNER JOIN attended a USING (contact_id))          AS attended,
-      (SELECT n FROM booked_pool)                                                     AS booked
+      (SELECT COUNT(*) FROM email_pool)                                                  AS email_pool,
+      (SELECT COUNT(*) FROM sms_pool)                                                    AS sms_pool,
+      (SELECT COUNT(*) FROM union_pool)                                                  AS pool_size,
+      (SELECT COUNT(*) FROM email_pool p INNER JOIN attended a USING (contact_id))       AS email_attended,
+      (SELECT COUNT(*) FROM sms_pool p INNER JOIN attended a USING (contact_id))         AS sms_attended,
+      (SELECT COUNT(*) FROM union_pool p INNER JOIN attended a USING (contact_id))       AS attended,
+      (SELECT COUNT(*) FROM email_emails e INNER JOIN booked_filter b ON e.email_lc = b.prospect_email_lc) AS email_booked,
+      (SELECT COUNT(*) FROM sms_emails   s INNER JOIN booked_filter b ON s.email_lc = b.prospect_email_lc) AS sms_booked,
+      (SELECT COUNT(*) FROM union_emails u INNER JOIN booked_filter b ON u.email_lc = b.prospect_email_lc) AS booked
   `;
   const [regsR, spendR, salesR, reactivR, calendlyR] = await Promise.all([
     bq().query({
@@ -1077,11 +1110,15 @@ export async function fetchMonthlyWorkshopBreakdown(
     reactivSql
       ? bq().query({
           query: reactivSql,
-          params: { workshopTagDate, salesStart, salesEnd, poolTags: reactivationPoolTags },
+          params: {
+            workshopTagDate, salesStart, salesEnd,
+            emailTag: emailTag ?? "",
+            smsTag:   smsTag   ?? "",
+          },
           types: {
             workshopTagDate: "STRING",
             salesStart: "STRING", salesEnd: "STRING",
-            poolTags: ["STRING"],
+            emailTag: "STRING", smsTag: "STRING",
           },
         })
       : Promise.resolve([[]] as unknown as [Array<Record<string, unknown>>]),
@@ -1122,6 +1159,20 @@ export async function fetchMonthlyWorkshopBreakdown(
     reactivationPoolSize:  n(rc.pool_size),
     reactivationsAttended: n(rc.attended),
     reactivationsBooked:   n(rc.booked),
+    reactivationByChannel: (emailTag || smsTag) ? {
+      email: {
+        tag: emailTag ?? "",
+        poolSize: n(rc.email_pool),
+        attended: n(rc.email_attended),
+        booked:   n(rc.email_booked),
+      },
+      sms: {
+        tag: smsTag ?? "",
+        poolSize: n(rc.sms_pool),
+        attended: n(rc.sms_attended),
+        booked:   n(rc.sms_booked),
+      },
+    } : null,
     metaImpressions: impressions,
     metaLinkClicks: linkClicks,
     metaCtr: impressions > 0 ? linkClicks / impressions : null,

@@ -69,20 +69,52 @@ export function Tab2LatestWebinar({
   // column's registrant slice, ad spend, Meta funnel, sales, and all
   // derived rates. Historical columns (W-1, W-2) keep their normal mart
   // values for comparison context.
-  const ovr = monthlyWorkshopOverride; // shorthand
+  const ovr = monthlyWorkshopOverride; // shorthand (latest column only)
   const isLatestOvr = (i: number) => i === 0 && ovr !== undefined;
-  // Pick override value if latest column AND override present, else mart.
-  // Each helper handles a different format.
-  const overrideInt = (pickO: (o: MonthlyWorkshopBreakdown) => number, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
-    webinars.map((w, i) => (isLatestOvr(i) ? fmtInt(pickO(ovr!)) : fmtInt(pickM(w))));
-  const overrideUsd = (pickO: (o: MonthlyWorkshopBreakdown) => number, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
-    webinars.map((w, i) => (isLatestOvr(i) ? fmtUsd(pickO(ovr!)) : fmtUsd(pickM(w))));
-  const overrideUsd2 = (pickO: (o: MonthlyWorkshopBreakdown) => number | null, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
-    webinars.map((w, i) => (isLatestOvr(i) ? fmtUsd2(pickO(ovr!)) : fmtUsd2(pickM(w))));
-  const overridePct = (pickO: (o: MonthlyWorkshopBreakdown) => number | null, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
-    webinars.map((w, i) => (isLatestOvr(i) ? fmtPct(pickO(ovr!)) : fmtPct(pickM(w))));
-  const overrideX = (pickO: (o: MonthlyWorkshopBreakdown) => number | null, pickM: (w: WebinarComparisonRowV2) => number | null): string[] =>
-    webinars.map((w, i) => (isLatestOvr(i) ? fmtX(pickO(ovr!)) : fmtX(pickM(w))));
+  // Apply override to ANY column that has a workshop snapshot via colOvr.
+  // The pick functions now receive the column's row too so ratios with
+  // per-column denominators (e.g. Cost / Attendee = spend / attendees(i))
+  // use that column's mart values, not webinars[0]'s.
+  const overrideInt = (
+    pickO: (o: MonthlyWorkshopBreakdown, w: WebinarComparisonRowV2) => number,
+    pickM: (w: WebinarComparisonRowV2) => number | null,
+  ): string[] =>
+    webinars.map((w, i) => {
+      const co = colOvr(i);
+      return co ? fmtInt(pickO(co, w)) : fmtInt(pickM(w));
+    });
+  const overrideUsd = (
+    pickO: (o: MonthlyWorkshopBreakdown, w: WebinarComparisonRowV2) => number,
+    pickM: (w: WebinarComparisonRowV2) => number | null,
+  ): string[] =>
+    webinars.map((w, i) => {
+      const co = colOvr(i);
+      return co ? fmtUsd(pickO(co, w)) : fmtUsd(pickM(w));
+    });
+  const overrideUsd2 = (
+    pickO: (o: MonthlyWorkshopBreakdown, w: WebinarComparisonRowV2) => number | null,
+    pickM: (w: WebinarComparisonRowV2) => number | null,
+  ): string[] =>
+    webinars.map((w, i) => {
+      const co = colOvr(i);
+      return co ? fmtUsd2(pickO(co, w)) : fmtUsd2(pickM(w));
+    });
+  const overridePct = (
+    pickO: (o: MonthlyWorkshopBreakdown, w: WebinarComparisonRowV2) => number | null,
+    pickM: (w: WebinarComparisonRowV2) => number | null,
+  ): string[] =>
+    webinars.map((w, i) => {
+      const co = colOvr(i);
+      return co ? fmtPct(pickO(co, w)) : fmtPct(pickM(w));
+    });
+  const overrideX = (
+    pickO: (o: MonthlyWorkshopBreakdown, w: WebinarComparisonRowV2) => number | null,
+    pickM: (w: WebinarComparisonRowV2) => number | null,
+  ): string[] =>
+    webinars.map((w, i) => {
+      const co = colOvr(i);
+      return co ? fmtX(pickO(co, w)) : fmtX(pickM(w));
+    });
   // Backwards-compat alias for the existing registrant rows.
   const regValues = overrideInt;
   // Derived helpers for rates that combine override + mart fields.
@@ -216,13 +248,14 @@ export function Tab2LatestWebinar({
                 values={overrideUsd2((o) => safeDiv(o.regAdSpend, o.metaInPromo), (w) => w.paidCpr)}
                 tip={TIP.costPerRegPaid}
                 trafficKey="costPerRegistrant"
-                rawValues={webinars.map((w, i) =>
-                  isLatestOvr(i) ? safeDiv(ovr!.regAdSpend, ovr!.metaInPromo) : w.paidCpr,
-                )}
+                rawValues={webinars.map((w, i) => {
+                  const co = colOvr(i);
+                  return co ? safeDiv(co.regAdSpend, co.metaInPromo) : w.paidCpr;
+                })}
               />
               <DataRow
                 label="Cost / Attendee"
-                values={overrideUsd2((o) => safeDiv(o.totalSpend, webinars[0]?.uniqueAttendees ?? 0), (w) => w.blendedCpa)}
+                values={overrideUsd2((o, w) => safeDiv(o.totalSpend, w.uniqueAttendees), (w) => w.blendedCpa)}
                 tip={TIP.costPerAttendee}
               />
               <DataRow
@@ -230,9 +263,10 @@ export function Tab2LatestWebinar({
                 values={overrideUsd2((o) => safeDiv(o.totalSpend, o.callsBooked), (w) => w.blendedCpbc)}
                 tip={TIP.costPerBookedCall}
                 trafficKey="costPerBookedCall"
-                rawValues={webinars.map((w, i) =>
-                  isLatestOvr(i) ? safeDiv(ovr!.totalSpend, ovr!.callsBooked) : w.blendedCpbc,
-                )}
+                rawValues={webinars.map((w, i) => {
+                  const co = colOvr(i);
+                  return co ? safeDiv(co.totalSpend, co.callsBooked) : w.blendedCpbc;
+                })}
                 highlight
               />
               <DataRow
@@ -242,11 +276,11 @@ export function Tab2LatestWebinar({
               />
               <DataRow
                 label="Cost / Qualified Show"
-                values={webinars.map((w, i) =>
-                  isLatestOvr(i)
-                    ? fmtUsd2(safeDiv(ovr!.totalSpend, ovr!.qualifiedShows))
-                    : i === 0 && inProgress ? naCell() : fmtUsd2(w.blendedCostPerQualifiedShow),
-                )}
+                values={webinars.map((w, i) => {
+                  const co = colOvr(i);
+                  if (co) return fmtUsd2(safeDiv(co.totalSpend, co.qualifiedShows));
+                  return i === 0 && inProgress ? naCell() : fmtUsd2(w.blendedCostPerQualifiedShow);
+                })}
                 tip={TIP.costPerQualifiedShow}
               />
 
@@ -254,7 +288,8 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="Calls Booked"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtInt(ovr!.callsBooked);
+                  const co = colOvr(i);
+                  if (co) return fmtInt(co.callsBooked);
                   return i === 0 && inProgress ? partial(fmtInt(w.callsBooked)) : fmtInt(w.callsBooked);
                 })}
                 tip={TIP.callsBookedTotal}
@@ -268,7 +303,8 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="Pitch → Book Rate"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return w.pitchedAttendees ? fmtPct(ovr!.callsBooked / w.pitchedAttendees) : "—";
+                  const co = colOvr(i);
+                  if (co) return w.pitchedAttendees ? fmtPct(co.callsBooked / w.pitchedAttendees) : "—";
                   return w.pitchedAttendees ? fmtPct(w.callsBooked / w.pitchedAttendees) : "—";
                 })}
                 tip={"Share of pitched attendees (>25 min) who booked a strategy call.\ncalls_booked / pitched_attendees"}
@@ -277,7 +313,8 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="Shows"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtInt(ovr!.shows);
+                  const co = colOvr(i);
+                  if (co) return fmtInt(co.shows);
                   return i === 0 && inProgress ? partial(fmtInt(w.shows)) : fmtInt(w.shows);
                 })}
                 tip={TIP.showsHeld}
@@ -285,7 +322,8 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="Qualified Shows"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtInt(ovr!.qualifiedShows);
+                  const co = colOvr(i);
+                  if (co) return fmtInt(co.qualifiedShows);
                   return i === 0 && inProgress ? partial(fmtInt(w.qualifiedShows)) : fmtInt(w.qualifiedShows);
                 })}
                 tip={TIP.funnelQualifiedShows}
@@ -293,7 +331,8 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="Deals"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtInt(ovr!.dealsClosed);
+                  const co = colOvr(i);
+                  if (co) return fmtInt(co.dealsClosed);
                   return i === 0 && inProgress ? partial(fmtInt(w.dealsClosed)) : fmtInt(w.dealsClosed);
                 })}
                 tip={TIP.dealsCycle}
@@ -301,7 +340,8 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="Cash"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtUsd(ovr!.cashCollected);
+                  const co = colOvr(i);
+                  if (co) return fmtUsd(co.cashCollected);
                   return i === 0 && inProgress ? partial(fmtUsd(w.cashCollected)) : fmtUsd(w.cashCollected);
                 })}
                 tip={TIP.cashCollected}
@@ -309,7 +349,8 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="Cash Collected / Attendee"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtUsd2(safeDiv(ovr!.cashCollected, w.uniqueAttendees));
+                  const co = colOvr(i);
+                  if (co) return fmtUsd2(safeDiv(co.cashCollected, w.uniqueAttendees));
                   return i === 0 && inProgress
                     ? partial(fmtUsd2(w.cashCollectedPerAttendee))
                     : fmtUsd2(w.cashCollectedPerAttendee);
@@ -319,7 +360,8 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="Contract Value / Attendee"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtUsd2(safeDiv(ovr!.revenueGenerated, w.uniqueAttendees));
+                  const co = colOvr(i);
+                  if (co) return fmtUsd2(safeDiv(co.revenueGenerated, w.uniqueAttendees));
                   return i === 0 && inProgress
                     ? partial(fmtUsd2(w.contractValuePerAttendee))
                     : fmtUsd2(w.contractValuePerAttendee);
@@ -329,13 +371,15 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="ROAS (Cash)"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtX(safeDiv(ovr!.cashCollected, ovr!.totalSpend));
+                  const co = colOvr(i);
+                  if (co) return fmtX(safeDiv(co.cashCollected, co.totalSpend));
                   return i === 0 ? "" : fmtX(w.roasCash);
                 })}
                 tip={TIP.roasCash + (ovr ? "\nWorkshop ROAS uses Total Spend (ads + reactivation) as the denominator; deals still accumulating." : "\nLatest webinar column is blank — cash and deals are still accumulating (1-12 weeks for full collection).")}
                 trafficKey="roas"
                 rawValues={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return safeDiv(ovr!.cashCollected, ovr!.totalSpend);
+                  const co = colOvr(i);
+                  if (co) return safeDiv(co.cashCollected, co.totalSpend);
                   return i === 0 ? null : w.roasCash;
                 })}
                 highlight
@@ -343,20 +387,23 @@ export function Tab2LatestWebinar({
               <DataRow
                 label="ROAS (Revenue/TCV)"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtX(safeDiv(ovr!.revenueGenerated, ovr!.totalSpend));
+                  const co = colOvr(i);
+                  if (co) return fmtX(safeDiv(co.revenueGenerated, co.totalSpend));
                   return i === 0 ? "" : fmtX(w.roasRevenue);
                 })}
                 tip={"Latest webinar column is blank — deals are still closing (1-4 weeks). Prior webinars are mature and comparable."}
                 trafficKey="roas"
                 rawValues={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return safeDiv(ovr!.revenueGenerated, ovr!.totalSpend);
+                  const co = colOvr(i);
+                  if (co) return safeDiv(co.revenueGenerated, co.totalSpend);
                   return i === 0 ? null : w.roasRevenue;
                 })}
               />
               <DataRow
                 label="CAC"
                 values={webinars.map((w, i) => {
-                  if (isLatestOvr(i)) return fmtUsd2(safeDiv(ovr!.totalSpend, ovr!.dealsClosed));
+                  const co = colOvr(i);
+                  if (co) return fmtUsd2(safeDiv(co.totalSpend, co.dealsClosed));
                   return i === 0 ? "" : fmtUsd2(w.cac);
                 })}
                 tip={"CAC = total_spend / deals_closed. Latest webinar's deals are still accumulating — column blank until mature."}

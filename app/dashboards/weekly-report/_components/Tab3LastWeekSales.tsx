@@ -67,7 +67,7 @@ function FunnelPlusKpis({ weekLabel, funnel, money, sqlInfo }: { weekLabel: stri
     <section className={styles.section}>
       <div className={styles.sh}>Sales Funnel — {weekLabel}{sqlInfo ? <SqlInfoButton resolved={sqlInfo} /> : null}</div>
       <div className={styles.funnel}>
-        {stages.map((s) => (
+        {stages.map((s, i) => (
           <div key={s.label}>
             <div className={styles.fRow}>
               <div className={styles.fBar} style={{ background: s.bg, borderColor: s.border, width: `${(s.value / pros) * 100}%` }}>
@@ -75,6 +75,13 @@ function FunnelPlusKpis({ weekLabel, funnel, money, sqlInfo }: { weekLabel: stri
                 <span className={styles.fVal} style={{ color: s.color }}>{fmtInt(s.value)}</span>
               </div>
             </div>
+            {/* Match Tab 1 Section C — connector under Prospects with
+                D'd + Setter DQ counts. Mirrored across all templates. */}
+            {i === 0 ? (
+              <div className={styles.fConn}>
+                <span className={styles.fRate}>Pros (D&apos;d) {fmtInt(funnel.prospectsDd)} · Setter DQ {fmtInt(funnel.setterDq)}</span>
+              </div>
+            ) : null}
           </div>
         ))}
       </div>

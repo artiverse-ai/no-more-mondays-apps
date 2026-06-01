@@ -47,6 +47,12 @@ export type Snapshot = {
    *  registered attendees via the regular weekly-webinar funnel
    *  (so the mart row IS accurate) instead of the workshop form. */
   useMartRegistrants: boolean | null;
+  /** Override the workshop attendance tag string. Default
+   *  `status: attended-workshop-{workshopTagDate}` works for workshops
+   *  registered via the dedicated workshop form. Workshops run through
+   *  the regular weekly-webinar funnel use `attended: event: webinar-{date}`
+   *  (or whatever the team applies). Set explicitly to that string. */
+  attendanceTag: string | null;
   insightsGenerationStatus: InsightsGenStatus;
   insightsGeneratedAt: string | null;
   insightsGenerationError: string | null;
@@ -107,6 +113,7 @@ async function ensure(): Promise<void> {
         ["reactivation_cost",        "NUMERIC"],
         ["total_ad_spend_override",  "NUMERIC"],
         ["use_mart_registrants",     "BOOL"],
+        ["attendance_tag",           "STRING"],
       ].filter(([col]) => !colSet.has(col));
       if (missing.length > 0) {
         await bq().query({
@@ -146,6 +153,7 @@ async function ensure(): Promise<void> {
       reactivation_cost NUMERIC,
       total_ad_spend_override NUMERIC,
       use_mart_registrants BOOL,
+      attendance_tag STRING,
       insights_generation_status STRING,
       insights_generated_at TIMESTAMP,
       insights_generation_error STRING,
@@ -284,7 +292,7 @@ type MergeSnapshotInput = Omit<
   | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
   | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
   | "workshopTagDate" | "retargetingEmailTag" | "retargetingSmsTag" | "reactivationCost"
-  | "totalAdSpendOverride" | "useMartRegistrants"
+  | "totalAdSpendOverride" | "useMartRegistrants" | "attendanceTag"
 > & {
   tab2NarrativeTag?: string | null;
   tab2NarrativeTitle?: string | null;
@@ -295,6 +303,7 @@ type MergeSnapshotInput = Omit<
   reactivationCost?: number | null;
   totalAdSpendOverride?: number | null;
   useMartRegistrants?: boolean | null;
+  attendanceTag?: string | null;
 };
 
 async function mergeSnapshot(
@@ -392,6 +401,7 @@ type RawSnap = {
   reactivation_cost: string | number | null;
   total_ad_spend_override: string | number | null;
   use_mart_registrants: boolean | null;
+  attendance_tag: string | null;
   insights_generation_status: string | null;
   insights_generated_at: string | null;
   insights_generation_error: string | null;
@@ -427,6 +437,7 @@ function rowToSnapshot(r: RawSnap): Snapshot {
     reactivationCost: r.reactivation_cost == null ? null : Number(r.reactivation_cost),
     totalAdSpendOverride: r.total_ad_spend_override == null ? null : Number(r.total_ad_spend_override),
     useMartRegistrants:   r.use_mart_registrants ?? null,
+    attendanceTag:        r.attendance_tag ?? null,
     insightsGenerationStatus: (r.insights_generation_status as InsightsGenStatus | null) ?? "pending",
     insightsGeneratedAt: r.insights_generated_at,
     insightsGenerationError: r.insights_generation_error,
@@ -443,7 +454,7 @@ const SNAPSHOT_FIELDS = `slug,
   context_tag, context_title, context_body,
   tab2_narrative_tag, tab2_narrative_title, tab2_narrative_body,
   FORMAT_DATE('%F', workshop_tag_date) AS workshop_tag_date,
-  retargeting_email_tag, retargeting_sms_tag, reactivation_cost, total_ad_spend_override, use_mart_registrants,
+  retargeting_email_tag, retargeting_sms_tag, reactivation_cost, total_ad_spend_override, use_mart_registrants, attendance_tag,
   insights_generation_status,
   FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', insights_generated_at, 'UTC') AS insights_generated_at,
   insights_generation_error,
@@ -500,7 +511,7 @@ type CreateSnapshotInput = Omit<
   | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
   | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
   | "workshopTagDate" | "retargetingEmailTag" | "retargetingSmsTag" | "reactivationCost"
-  | "totalAdSpendOverride" | "useMartRegistrants"
+  | "totalAdSpendOverride" | "useMartRegistrants" | "attendanceTag"
 > & {
   tab2NarrativeTag?: string | null;
   tab2NarrativeTitle?: string | null;
@@ -511,6 +522,7 @@ type CreateSnapshotInput = Omit<
   reactivationCost?: number | null;
   totalAdSpendOverride?: number | null;
   useMartRegistrants?: boolean | null;
+  attendanceTag?: string | null;
 };
 
 export async function createSnapshot(s: CreateSnapshotInput): Promise<void> {

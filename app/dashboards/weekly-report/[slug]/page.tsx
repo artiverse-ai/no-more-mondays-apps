@@ -160,6 +160,7 @@ export default async function Page({
 
     const br = await fetchMonthlyWorkshopBreakdown(
       wsDate, regStart, regEnd, promoStart, promoEnd, salesStart, salesEnd, tags,
+      s.attendanceTag,
     ).catch(() => undefined);
     if (!br) return undefined;
 

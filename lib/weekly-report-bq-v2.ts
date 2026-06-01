@@ -909,6 +909,10 @@ export async function fetchMonthlyWorkshopBreakdown(
   salesStart: string,
   salesEnd: string,
   reactivationPoolTags: string[] = [],
+  /** Override the workshop attendance tag string. Default
+   *  `status: attended-workshop-{workshopTagDate}`. Some workshops use
+   *  `attended: event: webinar-{date}` instead (team-specific). */
+  attendanceTagOverride: string | null = null,
 ): Promise<MonthlyWorkshopBreakdown> {
   // Registrants + Meta-in-promo classification. One query, two outputs.
   const regsSql = `
@@ -1054,7 +1058,7 @@ export async function fetchMonthlyWorkshopBreakdown(
     attended AS (
       SELECT DISTINCT contact_id
       FROM \`${PROJECT}.raw_ghl.contact_tags\`
-      WHERE tag = CONCAT('status: attended-workshop-', @workshopTagDate)
+      WHERE tag = @attendanceTag
         AND COALESCE(_fivetran_deleted, FALSE) = FALSE
     ),
     email_emails AS (
@@ -1114,11 +1118,14 @@ export async function fetchMonthlyWorkshopBreakdown(
             workshopTagDate, salesStart, salesEnd,
             emailTag: emailTag ?? "",
             smsTag:   smsTag   ?? "",
+            attendanceTag: attendanceTagOverride
+              ?? `status: attended-workshop-${workshopTagDate}`,
           },
           types: {
             workshopTagDate: "STRING",
             salesStart: "STRING", salesEnd: "STRING",
             emailTag: "STRING", smsTag: "STRING",
+            attendanceTag: "STRING",
           },
         })
       : Promise.resolve([[]] as unknown as [Array<Record<string, unknown>>]),

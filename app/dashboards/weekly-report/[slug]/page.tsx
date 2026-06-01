@@ -22,7 +22,7 @@ import {
   fetchSetterByMode,
   fetchBookingModeExtended,
   fetchMonthlyWorkshopBreakdown,
-  fetchPreviousMonthlyWorkshopDates,
+  fetchRecentWebinarDates,
   comparisonDatesForMode,
   metaPromoWindow,
   type MonthlyWorkshopBreakdown,
@@ -74,11 +74,11 @@ export default async function Page({
   const { mwStart, mwEnd } = computeMarketingWindow(latestWebinarDate);
 
   // Comparison IN-list per spec §7 — depends on report type. For
-  // monthly workshops the dates aren't on a strict 28-day cadence, so
-  // we look up the actual prior workshop dates from the funnel-sheet
-  // stg instead of date-math.
+  // monthly workshops we pull the last 3 ACTUAL events (any type) from
+  // mart_webinar_events so the comparison columns line up with whatever
+  // ran most recently (workshop, Sunday webinar, Wed webinar — mixed).
   const compDates = reportType === "monthly_workshop_recap"
-    ? await fetchPreviousMonthlyWorkshopDates(latestWebinarDate, 3)
+    ? await fetchRecentWebinarDates(latestWebinarDate, 3)
     : comparisonDatesForMode(latestWebinarDate, reportType);
 
   // Promo window for the Meta campaigns table — 4 days ending on latest.

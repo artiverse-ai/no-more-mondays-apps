@@ -1377,22 +1377,24 @@ export function comparisonDatesForMode(latest: string, mode: "weekly_recap" | "m
   return [latest, addDays(latest, -3), addDays(latest, -7)];
 }
 
-/** Look up the most recent N monthly-workshop dates at or before `latest`,
- *  from stg_ht_weekly_metrics (the funnel-sheet source of truth). Used by
- *  the 3-webinar comparison on the monthly-workshop slug so the older two
- *  columns line up with REAL prior workshops instead of date-math
- *  approximations.
+/** Look up the most recent N webinar/workshop dates at or before
+ *  `latest`, regardless of type (Sunday webinar, Wednesday webinar,
+ *  Monthly Workshop). Sourced from mart_webinar_events so only events
+ *  with metric rows show up — no orphans.
  *
- *  Returns dates newest-first. If fewer than N workshops exist on/before
- *  `latest`, the array is padded with addDays(latest, -28*i) so the UI
- *  always renders N columns. */
-export async function fetchPreviousMonthlyWorkshopDates(latest: string, n: number): Promise<string[]> {
+ *  Used by the monthly-workshop slug's 3-event comparison so the older
+ *  two columns line up with whatever the previous two events actually
+ *  were (e.g. May 31 workshop → May 24 workshop → May 20 Wed webinar).
+ *
+ *  Returns dates newest-first. If fewer than N rows exist (very fresh
+ *  environment), pads with addDays(latest, -7*i) so the UI always
+ *  renders N columns. */
+export async function fetchRecentWebinarDates(latest: string, n: number): Promise<string[]> {
   const sql = `
-    SELECT FORMAT_DATE('%F', week) AS d
-    FROM \`${PROJECT}.dbt_tuddin.stg_ht_weekly_metrics\`
-    WHERE webinar_type = 'Monthly Workshop'
-      AND week <= DATE(@latest)
-    ORDER BY week DESC
+    SELECT FORMAT_DATE('%F', webinar_date) AS d
+    FROM \`${PROJECT}.dbt_tuddin.mart_webinar_events\`
+    WHERE webinar_date <= DATE(@latest)
+    ORDER BY webinar_date DESC
     LIMIT @n
   `;
   const [rows] = await bq().query({
@@ -1403,9 +1405,13 @@ export async function fetchPreviousMonthlyWorkshopDates(latest: string, n: numbe
   const dates = (rows as Array<{ d?: string | { value: string } }>)
     .map((r) => (typeof r.d === "string" ? r.d : r.d?.value ?? ""))
     .filter(Boolean);
-  while (dates.length < n) dates.push(addDays(latest, -28 * dates.length));
+  while (dates.length < n) dates.push(addDays(latest, -7 * dates.length));
   return dates;
 }
+
+/** @deprecated Use fetchRecentWebinarDates — returning last 3 events of
+ *  any type makes more comparison sense than filtering to monthly only. */
+export const fetchPreviousMonthlyWorkshopDates = fetchRecentWebinarDates;
 
 /**
  * Promo-window dates for the Meta campaigns table per §9 of the spec.

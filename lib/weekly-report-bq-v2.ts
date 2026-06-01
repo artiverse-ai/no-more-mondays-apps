@@ -39,7 +39,7 @@ export const SQL_AVG_WEBINAR_SHOW_RATE = `WITH last_three AS (
   SELECT unique_attendees, total_registrants
   FROM ${MART_WEBINAR}
   WHERE webinar_date <= DATE(@latest)
-    AND webinar_day IN ('Sunday', 'Wednesday')
+    AND webinar_day IN ('Sunday', 'Wednesday', 'Monthly Workshop')
   ORDER BY webinar_date DESC
   LIMIT 3
 )

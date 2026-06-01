@@ -1364,7 +1364,7 @@ function addDays(iso: string, days: number): string {
  * - Monday (latest Sun): [latest, latest−4 (Wed), latest−7 (Sun)]
  * - Thursday (latest Wed): [latest, latest−3 (Sun), latest−7 (Wed)]
  */
-export function comparisonDatesForMode(latest: string, mode: "weekly_recap" | "midweek_check"): string[] {
+export function comparisonDatesForMode(latest: string, mode: "weekly_recap" | "midweek_check" | "monthly_workshop_recap"): string[] {
   if (mode === "weekly_recap") {
     return [latest, addDays(latest, -4), addDays(latest, -7)];
   }
@@ -1376,7 +1376,7 @@ export function comparisonDatesForMode(latest: string, mode: "weekly_recap" | "m
  * - Sunday webinar: Thu→Sun (4 days ending on latest_sun)
  * - Wednesday webinar: Sun→Wed (4 days ending on latest_wed)
  */
-export function metaPromoWindow(latest: string, mode: "weekly_recap" | "midweek_check"): { start: string; end: string } {
+export function metaPromoWindow(latest: string, mode: "weekly_recap" | "midweek_check" | "monthly_workshop_recap"): { start: string; end: string } {
   return mode === "weekly_recap"
     ? { start: addDays(latest, -3), end: latest }   // Thu→Sun
     : { start: addDays(latest, -3), end: latest };  // Sun→Wed (also 4 days)

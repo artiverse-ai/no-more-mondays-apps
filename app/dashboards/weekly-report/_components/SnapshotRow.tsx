@@ -13,10 +13,14 @@ export function SnapshotRow({
 }: {
   slug: string;
   runOn: string;
-  reportType: "weekly_recap" | "midweek_check";
+  reportType: "weekly_recap" | "midweek_check" | "monthly_workshop_recap";
   weekStart: string;
   weekEnd: string;
 }) {
+  const reportLabel =
+    reportType === "weekly_recap"          ? "Weekly recap" :
+    reportType === "midweek_check"         ? "Midweek check" :
+                                             "Monthly workshop";
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +50,7 @@ export function SnapshotRow({
       >
         <div>
           <div className="font-medium">
-            {runOn} · {reportType === "weekly_recap" ? "Weekly recap" : "Midweek check"}
+            {runOn} · {reportLabel}
           </div>
           <div className="text-xs text-muted-foreground">
             slug=<code className="font-mono">{slug}</code> · week {weekStart} → {weekEnd}

@@ -120,69 +120,61 @@ export default async function Page({
   // Section B needs the KPI strip values (Cash/Booked, Show Rate, CPL) — compute after.
   const sectionB = await fetchSectionBData(kpiStart, kpiEnd, kpiStrip);
 
-  // ── One-off override: 2026-05-25 Monday report covers a Sunday MONTHLY
-  // WORKSHOP rather than the regular Sunday webinar. mart_webinar_events
-  // bakes in weekly-webinar assumptions (registrant source, ad-spend
-  // attribution split). We pull tag-based registrants + raw monthly-
-  // workshop form + actual workshop-window ad spend + sales from
-  // int_calls_enriched and override the latest column end-to-end.
+  // ── Monthly Workshop override — applies when reportType ===
+  // 'monthly_workshop_recap'. Reads workshop config from the snapshot:
+  // workshopTagDate (the workshop day), retargeting tags (pool), and
+  // reactivationCost (manual SMS/Email/WhatsApp spend — not in BQ).
   //
-  // Windows:
-  //  - regWindow: 14-day lookback for workshop registrants (matches the
-  //    documented monthly-stg attribution convention).
-  //  - promoWindow: Wed → Sun (2026-05-20..05-24) per Marek — the actual
-  //    ad campaign window for this workshop.
-  //  - salesWindow: Wed before workshop through following Saturday so
-  //    post-workshop bookings get attributed (calls scheduled by
-  //    workshop attendees over the following week).
+  // Windows derived from workshopTagDate:
+  //  - regWindow:   14 days before workshop → workshop day + 1 (exclusive)
+  //  - promoWindow: Wed before workshop → workshop day (inclusive)
+  //  - salesWindow: promo start → workshop day + 6 (post-workshop bookings)
+  //
+  // Ad spend is queried dynamically from stg_meta_campaigns (no hardcode);
+  // total spend = ad spend + reactivationCost from the snapshot.
   let monthlyWorkshopOverride: MonthlyWorkshopBreakdown | undefined;
   let reactivationNote: string | undefined;
-  if (slug === "2026-05-25") {
+  if (snapshot.reportType === "monthly_workshop_recap" && snapshot.workshopTagDate) {
+    const wsDate = snapshot.workshopTagDate;                  // e.g. "2026-05-24"
+    // Wed before workshop = workshop day - 4 (Sun → Wed). Works for any
+    // workshop day; if Marek lands a workshop on a different DOW, the
+    // promo window just shifts by the same delta.
+    const promoStart  = addDays(wsDate, -4);                  // Wed (default 4d back)
+    const promoEnd    = wsDate;                                // workshop day
+    const regStart    = addDays(wsDate, -14);                  // 14-day reg lookback
+    const regEnd      = addDays(wsDate, 1);                    // exclusive
+    const salesStart  = promoStart;
+    const salesEnd    = addDays(wsDate, 6);                    // 6 days post
+
+    const emailTag = snapshot.retargetingEmailTag ?? `retargeting: email: workshop-${wsDate}`;
+    const smsTag   = snapshot.retargetingSmsTag   ?? `retargeting: sms: workshop-${wsDate}`;
+    const tags = [emailTag, smsTag].filter(Boolean);
+
     monthlyWorkshopOverride = await fetchMonthlyWorkshopBreakdown(
-      "2026-05-24",  // workshop tag date (Sunday, not the Monday slug)
-      "2026-05-10",  // regWindowStart: 14-day reg lookback start
-      "2026-05-25",  // regWindowEnd: exclusive upper (end of workshop day)
-      "2026-05-20",  // promoStart: Wed before workshop
-      "2026-05-24",  // promoEnd: workshop day (inclusive)
-      "2026-05-20",  // salesStart: appointments from start of promo
-      "2026-05-30",  // salesEnd: appointments through following Saturday
-      // Reactivation pool — OR of GHL tags (any channel touched).
-      // Taziem confirmed these as canonical for May 24 + future
-      // workshops (2026-05-26). Currently 0 contacts in BQ for both
-      // tags — Fivetran sync from GHL hasn't caught up yet; funnel
-      // will populate organically once it does.
-      [
-        "retargeting: email: workshop-2026-05-24",
-        "retargeting: sms: workshop-2026-05-24",
-      ],
+      wsDate, regStart, regEnd, promoStart, promoEnd, salesStart, salesEnd, tags,
     ).catch(() => undefined);
-    // Hard-coded workshop cost per Taziem 2026-05-26. Three layers:
-    //   - totalSpend       = $8,487 (drives every cost-per-X metric)
-    //   - reactivationCost = $3,000 (SMS / Email / WhatsApp pushes)
-    //   - totalAdSpend     = $5,487 (Meta ads — displayed as "Ad Spend")
-    //
-    // None of these are derivable from stg_meta_campaigns; reactivation
-    // spend isn't even tracked there. Manual override for this slug only.
+
+    // Layer in the snapshot-provided reactivation cost on top of the
+    // dynamically-computed ad spend. Total spend drives every cost-per
+    // metric.
     if (monthlyWorkshopOverride) {
-      const HARDCODED_TOTAL_SPEND       = 8487;
-      const HARDCODED_REACTIVATION_COST = 3000;
-      const HARDCODED_AD_SPEND          = 5487;
-      const conversions = monthlyWorkshopOverride.metaReportedConversions;
-      monthlyWorkshopOverride.totalSpend       = HARDCODED_TOTAL_SPEND;
-      monthlyWorkshopOverride.reactivationCost = HARDCODED_REACTIVATION_COST;
-      monthlyWorkshopOverride.totalAdSpend     = HARDCODED_AD_SPEND;
-      monthlyWorkshopOverride.regAdSpend       = HARDCODED_TOTAL_SPEND;   // Cost/Reg uses total
-      monthlyWorkshopOverride.hammerAdSpend    = 0;
-      monthlyWorkshopOverride.metaCpl = conversions > 0
-        ? HARDCODED_TOTAL_SPEND / conversions
-        : null;
+      const reactivationCost = snapshot.reactivationCost ?? 0;
+      const adSpend          = monthlyWorkshopOverride.totalAdSpend; // from stg_meta_campaigns
+      const totalSpend       = adSpend + reactivationCost;
+      const conversions      = monthlyWorkshopOverride.metaReportedConversions;
+      monthlyWorkshopOverride.reactivationCost = reactivationCost;
+      monthlyWorkshopOverride.totalSpend       = totalSpend;
+      // Cost/Reg uses regAdSpend in the denominator — for the workshop
+      // we want it driven by the headline total too.
+      monthlyWorkshopOverride.regAdSpend       = totalSpend;
+      monthlyWorkshopOverride.metaCpl          = conversions > 0 ? totalSpend / conversions : null;
     }
     reactivationNote =
-      "Reactivation pool = contacts tagged `retargeting: email: workshop-2026-05-24` " +
-      "OR `retargeting: sms: workshop-2026-05-24` (union — anyone we reached on either " +
-      "channel). Attended uses `status: attended-workshop-2026-05-24`; booked counts " +
-      "live-webinar calls in the May 20-30 window. Channel attribution (which message " +
-      "drove which book) isn't broken out.";
+      `Reactivation pool = contacts tagged \`${emailTag}\` OR \`${smsTag}\` ` +
+      "(union — anyone we reached on either channel). " +
+      `Attended uses \`status: attended-workshop-${wsDate}\`; booked counts ` +
+      `live-webinar calls scheduled ${promoStart} → ${salesEnd}. ` +
+      "Channel attribution (which message drove which book) isn't broken out.";
   }
 
   // Forecast targets (null-safe — returns all nulls if forecast_targets is
@@ -379,7 +371,7 @@ export default async function Page({
 function computeWindows(
   weekStart: string,
   weekEnd: string,
-  reportType: "weekly_recap" | "midweek_check",
+  reportType: "weekly_recap" | "midweek_check" | "monthly_workshop_recap",
 ): { kpiStart: string; kpiEnd: string; latestWebinarDate: string } {
   // For Monday recap: snapshot.weekStart..weekEnd IS the prev Sun-Sat (e.g.,
   // May 3 → May 9 for the May 11 report). latest_sun = weekEnd - 1 (Sun

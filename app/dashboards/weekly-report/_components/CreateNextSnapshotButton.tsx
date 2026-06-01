@@ -8,7 +8,7 @@ type Proposal = {
   runOn: string;
   weekStart: string;
   weekEnd: string;
-  reportType: "weekly_recap" | "midweek_check";
+  reportType: "weekly_recap" | "midweek_check" | "monthly_workshop_recap";
   weekLabel: string;
   badge: string;
   latestWebinar: string;
@@ -24,6 +24,7 @@ export type InitialProposal = Proposal;
 const REPORT_LABEL: Record<Proposal["reportType"], string> = {
   weekly_recap: "Weekly recap",
   midweek_check: "Midweek check",
+  monthly_workshop_recap: "Monthly workshop",
 };
 
 function fmtDayDate(iso: string): string {

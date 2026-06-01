@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import { BQ_DATASET, BQ_PROJECT, bq, table } from "./bq";
 
-export type ReportType = "weekly_recap" | "midweek_check";
+export type ReportType = "weekly_recap" | "midweek_check" | "monthly_workshop_recap";
 export type InsightsGenStatus = "pending" | "generating" | "succeeded" | "failed";
 
 export type Snapshot = {
@@ -26,6 +26,15 @@ export type Snapshot = {
   tab2NarrativeTag: string | null;
   tab2NarrativeTitle: string | null;
   tab2NarrativeBody: string | null;
+  // Workshop-specific config — only populated when reportType ===
+  // 'monthly_workshop_recap'. Tags drive the reactivation funnel pool;
+  // reactivationCost is the manual SMS/Email/WhatsApp spend (not in
+  // stg_meta_campaigns). Ad spend itself is computed dynamically from
+  // stg_meta_campaigns over the promo window.
+  workshopTagDate: string | null;          // YYYY-MM-DD (workshop day)
+  retargetingEmailTag: string | null;
+  retargetingSmsTag: string | null;
+  reactivationCost: number | null;
   insightsGenerationStatus: InsightsGenStatus;
   insightsGeneratedAt: string | null;
   insightsGenerationError: string | null;
@@ -69,6 +78,28 @@ async function ensure(): Promise<void> {
     });
     const names = new Set((existing as { table_name: string }[]).map((r) => r.table_name));
     if (names.has("weekly_report_snapshots") && names.has("weekly_report_insights")) {
+      // Tables exist — also ensure the workshop columns are present.
+      // ALTER TABLE ADD COLUMN IF NOT EXISTS is idempotent and cheap;
+      // BigQuery still counts it against the daily quota though, so we
+      // gate on a metadata check first.
+      const [cols] = await bq().query({
+        query: `SELECT column_name
+                FROM \`${BQ_PROJECT}.${BQ_DATASET}.INFORMATION_SCHEMA.COLUMNS\`
+                WHERE table_name = 'weekly_report_snapshots'`,
+      });
+      const colSet = new Set((cols as { column_name: string }[]).map((r) => r.column_name));
+      const missing = [
+        ["workshop_tag_date",     "DATE"],
+        ["retargeting_email_tag", "STRING"],
+        ["retargeting_sms_tag",   "STRING"],
+        ["reactivation_cost",     "NUMERIC"],
+      ].filter(([col]) => !colSet.has(col));
+      if (missing.length > 0) {
+        await bq().query({
+          query: `ALTER TABLE ${SNAPSHOTS}
+            ${missing.map(([c, t]) => `ADD COLUMN IF NOT EXISTS ${c} ${t}`).join(",\n            ")}`,
+        });
+      }
       _ready = true;
       return;
     }
@@ -95,6 +126,10 @@ async function ensure(): Promise<void> {
       tab2_narrative_tag STRING,
       tab2_narrative_title STRING,
       tab2_narrative_body STRING,
+      workshop_tag_date DATE,
+      retargeting_email_tag STRING,
+      retargeting_sms_tag STRING,
+      reactivation_cost NUMERIC,
       insights_generation_status STRING,
       insights_generated_at TIMESTAMP,
       insights_generation_error STRING,
@@ -232,10 +267,15 @@ type MergeSnapshotInput = Omit<
   | "createdAt" | "updatedAt"
   | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
   | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
+  | "workshopTagDate" | "retargetingEmailTag" | "retargetingSmsTag" | "reactivationCost"
 > & {
   tab2NarrativeTag?: string | null;
   tab2NarrativeTitle?: string | null;
   tab2NarrativeBody?: string | null;
+  workshopTagDate?: string | null;
+  retargetingEmailTag?: string | null;
+  retargetingSmsTag?: string | null;
+  reactivationCost?: number | null;
 };
 
 async function mergeSnapshot(
@@ -250,10 +290,15 @@ async function mergeSnapshot(
               INSERT (slug, run_on, week_start, week_end, report_type, week_label, badge,
                       latest_webinar, context_tag, context_title, context_body,
                       tab2_narrative_tag, tab2_narrative_title, tab2_narrative_body,
+                      workshop_tag_date, retargeting_email_tag, retargeting_sms_tag,
+                      reactivation_cost,
                       insights_generation_status, created_at)
               VALUES (@slug, DATE(@runOn), DATE(@weekStart), DATE(@weekEnd), @reportType,
                       @weekLabel, @badge, @latestWebinar, @contextTag, @contextTitle,
                       @contextBody, @t2Tag, @t2Title, @t2Body,
+                      IF(@workshopTagDate IS NULL, NULL, DATE(@workshopTagDate)),
+                      @retargetingEmailTag, @retargetingSmsTag,
+                      IF(@reactivationCost IS NULL, NULL, CAST(@reactivationCost AS NUMERIC)),
                       @initialStatus, CURRENT_TIMESTAMP())`,
     params: {
       slug: s.slug,
@@ -270,6 +315,10 @@ async function mergeSnapshot(
       t2Tag: s.tab2NarrativeTag ?? null,
       t2Title: s.tab2NarrativeTitle ?? null,
       t2Body: s.tab2NarrativeBody ?? null,
+      workshopTagDate: s.workshopTagDate ?? null,
+      retargetingEmailTag: s.retargetingEmailTag ?? null,
+      retargetingSmsTag: s.retargetingSmsTag ?? null,
+      reactivationCost: s.reactivationCost == null ? null : String(s.reactivationCost),
       initialStatus,
     },
     types: {
@@ -277,6 +326,9 @@ async function mergeSnapshot(
       reportType: "STRING", weekLabel: "STRING", badge: "STRING",
       latestWebinar: "STRING", contextTag: "STRING", contextTitle: "STRING", contextBody: "STRING",
       t2Tag: "STRING", t2Title: "STRING", t2Body: "STRING",
+      workshopTagDate: "STRING",
+      retargetingEmailTag: "STRING", retargetingSmsTag: "STRING",
+      reactivationCost: "STRING",
       initialStatus: "STRING",
     },
   });
@@ -312,6 +364,10 @@ type RawSnap = {
   tab2_narrative_tag: string | null;
   tab2_narrative_title: string | null;
   tab2_narrative_body: string | null;
+  workshop_tag_date: string | { value: string } | null;
+  retargeting_email_tag: string | null;
+  retargeting_sms_tag: string | null;
+  reactivation_cost: string | number | null;
   insights_generation_status: string | null;
   insights_generated_at: string | null;
   insights_generation_error: string | null;
@@ -339,6 +395,12 @@ function rowToSnapshot(r: RawSnap): Snapshot {
     tab2NarrativeTag: r.tab2_narrative_tag,
     tab2NarrativeTitle: r.tab2_narrative_title,
     tab2NarrativeBody: r.tab2_narrative_body,
+    workshopTagDate: r.workshop_tag_date == null
+      ? null
+      : (typeof r.workshop_tag_date === "string" ? r.workshop_tag_date : r.workshop_tag_date.value),
+    retargetingEmailTag: r.retargeting_email_tag,
+    retargetingSmsTag: r.retargeting_sms_tag,
+    reactivationCost: r.reactivation_cost == null ? null : Number(r.reactivation_cost),
     insightsGenerationStatus: (r.insights_generation_status as InsightsGenStatus | null) ?? "pending",
     insightsGeneratedAt: r.insights_generated_at,
     insightsGenerationError: r.insights_generation_error,
@@ -354,6 +416,8 @@ const SNAPSHOT_FIELDS = `slug,
   report_type, week_label, badge, latest_webinar,
   context_tag, context_title, context_body,
   tab2_narrative_tag, tab2_narrative_title, tab2_narrative_body,
+  FORMAT_DATE('%F', workshop_tag_date) AS workshop_tag_date,
+  retargeting_email_tag, retargeting_sms_tag, reactivation_cost,
   insights_generation_status,
   FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', insights_generated_at, 'UTC') AS insights_generated_at,
   insights_generation_error,
@@ -390,10 +454,15 @@ type CreateSnapshotInput = Omit<
   | "createdAt" | "updatedAt"
   | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
   | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
+  | "workshopTagDate" | "retargetingEmailTag" | "retargetingSmsTag" | "reactivationCost"
 > & {
   tab2NarrativeTag?: string | null;
   tab2NarrativeTitle?: string | null;
   tab2NarrativeBody?: string | null;
+  workshopTagDate?: string | null;
+  retargetingEmailTag?: string | null;
+  retargetingSmsTag?: string | null;
+  reactivationCost?: number | null;
 };
 
 export async function createSnapshot(s: CreateSnapshotInput): Promise<void> {
@@ -430,7 +499,7 @@ export async function updateSnapshot(
 ): Promise<void> {
   await ensure();
   const setClauses: string[] = ["updated_at = CURRENT_TIMESTAMP()"];
-  const params: Record<string, string | null> = { slug };
+  const params: Record<string, string | number | null> = { slug };
   const types: Record<string, string> = { slug: "STRING" };
   const map: Record<string, string> = {
     runOn: "run_on", weekStart: "week_start", weekEnd: "week_end",
@@ -440,20 +509,29 @@ export async function updateSnapshot(
     tab2NarrativeTag: "tab2_narrative_tag",
     tab2NarrativeTitle: "tab2_narrative_title",
     tab2NarrativeBody: "tab2_narrative_body",
+    workshopTagDate: "workshop_tag_date",
+    retargetingEmailTag: "retargeting_email_tag",
+    retargetingSmsTag: "retargeting_sms_tag",
+    reactivationCost: "reactivation_cost",
   };
-  const dateFields = new Set(["runOn", "weekStart", "weekEnd"]);
+  const dateFields = new Set(["runOn", "weekStart", "weekEnd", "workshopTagDate"]);
+  const numericFields = new Set(["reactivationCost"]);
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue;
     const col = map[k];
     if (!col) continue;
     const p = `p_${col}`;
     if (dateFields.has(k)) {
-      setClauses.push(`${col} = DATE(@${p})`);
+      setClauses.push(v === null ? `${col} = NULL` : `${col} = DATE(@${p})`);
+    } else if (numericFields.has(k)) {
+      setClauses.push(v === null ? `${col} = NULL` : `${col} = CAST(@${p} AS NUMERIC)`);
     } else {
       setClauses.push(`${col} = @${p}`);
     }
-    params[p] = v as string | null;
-    types[p] = "STRING";
+    if (v !== null) {
+      params[p] = numericFields.has(k) ? String(v) : (v as string);
+      types[p] = "STRING";
+    }
   }
   if (setClauses.length === 1) return;
   await bq().query({

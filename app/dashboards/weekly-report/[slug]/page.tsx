@@ -22,6 +22,7 @@ import {
   fetchSetterByMode,
   fetchBookingModeExtended,
   fetchMonthlyWorkshopBreakdown,
+  fetchPreviousMonthlyWorkshopDates,
   comparisonDatesForMode,
   metaPromoWindow,
   type MonthlyWorkshopBreakdown,
@@ -72,8 +73,13 @@ export default async function Page({
   // before it (the sales-week problem). See computeMarketingWindow below.
   const { mwStart, mwEnd } = computeMarketingWindow(latestWebinarDate);
 
-  // Comparison IN-list per spec §7 — depends on report type.
-  const compDates = comparisonDatesForMode(latestWebinarDate, reportType);
+  // Comparison IN-list per spec §7 — depends on report type. For
+  // monthly workshops the dates aren't on a strict 28-day cadence, so
+  // we look up the actual prior workshop dates from the funnel-sheet
+  // stg instead of date-math.
+  const compDates = reportType === "monthly_workshop_recap"
+    ? await fetchPreviousMonthlyWorkshopDates(latestWebinarDate, 3)
+    : comparisonDatesForMode(latestWebinarDate, reportType);
 
   // Promo window for the Meta campaigns table — 4 days ending on latest.
   const promoWindow = metaPromoWindow(latestWebinarDate, reportType);
@@ -82,9 +88,12 @@ export default async function Page({
   const priorWeekStart = addDays(kpiStart, -7);
   const priorWeekEnd = addDays(kpiEnd, -7);
   const isMonday = reportType === "weekly_recap";
+  // Show the "Last Week's Sales" tab on Monday recaps AND monthly
+  // workshop recaps (both run on a Monday and need the sales view).
+  const showSalesTab = isMonday || reportType === "monthly_workshop_recap";
 
-  // Parallel fetch of every data source the dashboard needs. Monday adds
-  // the Tab 3 fetchers; Thursday skips them.
+  // Parallel fetch of every data source the dashboard needs. Monday +
+  // monthly-workshop pull the Tab 3 fetchers; Thursday skips them.
   const [
     kpiStrip,
     sectionA,
@@ -109,11 +118,11 @@ export default async function Page({
     listInsights(slug),
     listSolutions(slug, "marketing").catch(() => []),
     listSolutions(slug, "sales").catch(() => []),
-    isMonday ? fetchSectionC(priorWeekStart, priorWeekEnd) : Promise.resolve(null),
-    isMonday ? fetchCloserOverallExtended(kpiStart, kpiEnd) : Promise.resolve([]),
-    isMonday ? fetchSetterOverall(kpiStart, kpiEnd) : Promise.resolve([]),
-    isMonday ? fetchSetterByMode(kpiStart, kpiEnd) : Promise.resolve([]),
-    isMonday ? fetchBookingModeExtended(kpiStart, kpiEnd) : Promise.resolve([]),
+    showSalesTab ? fetchSectionC(priorWeekStart, priorWeekEnd) : Promise.resolve(null),
+    showSalesTab ? fetchCloserOverallExtended(kpiStart, kpiEnd) : Promise.resolve([]),
+    showSalesTab ? fetchSetterOverall(kpiStart, kpiEnd) : Promise.resolve([]),
+    showSalesTab ? fetchSetterByMode(kpiStart, kpiEnd) : Promise.resolve([]),
+    showSalesTab ? fetchBookingModeExtended(kpiStart, kpiEnd) : Promise.resolve([]),
     fetchSectionATab3Closer(kpiStart, kpiEnd),   // both report types — needed for AOV everywhere (Fanbasis AOV is meaningless)
   ]);
 
@@ -202,10 +211,14 @@ export default async function Page({
   // Week's Sales — sales for the Wed cycle aren't in yet). Solutions
   // tabs preserved on both per user feedback memory.
   type TabDef = { id: string; label: string };
-  const tabs: TabDef[] = isMonday
+  const latestWebinarLabel =
+    reportType === "midweek_check"          ? "Latest Webinar (Wed)" :
+    reportType === "monthly_workshop_recap" ? "Latest Workshop" :
+                                              "Latest Webinar";
+  const tabs: TabDef[] = showSalesTab
     ? [
         { id: "t1", label: "Overview" },
-        { id: "t2", label: "Latest Webinar" },
+        { id: "t2", label: latestWebinarLabel },
         { id: "t3sales", label: "Last Week's Sales" },
         { id: "t4ai", label: "AI Strategic Insights" },
         { id: "t5", label: "Marketing Solutions" },
@@ -213,7 +226,7 @@ export default async function Page({
       ]
     : [
         { id: "t1", label: "Overview" },
-        { id: "t2", label: "Latest Webinar (Wed)" },
+        { id: "t2", label: latestWebinarLabel },
         { id: "t4ai", label: "AI Strategic Insights" },
         { id: "t5", label: "Marketing Solutions" },
         { id: "t6", label: "Sales Solutions" },
@@ -228,8 +241,8 @@ export default async function Page({
     comparisonDates: compDates,
     promoStart: promoWindow.start,
     promoEnd: promoWindow.end,
-    priorWeekStart: isMonday ? priorWeekStart : undefined,
-    priorWeekEnd: isMonday ? priorWeekEnd : undefined,
+    priorWeekStart: showSalesTab ? priorWeekStart : undefined,
+    priorWeekEnd: showSalesTab ? priorWeekEnd : undefined,
   };
   const sqlBundle = devMode && isAdmin ? getAllResolvedSql(sqlCtx) : "";
   const sqlFilename = `nmm-weekly-${slug}-${kpiStart}_${kpiEnd}.sql`;
@@ -268,11 +281,11 @@ export default async function Page({
     ),
   };
 
-  // Monday-only Tab 3 — Last Week's Sales. Money cards source from
-  // int_calls_enriched (closer-attributed), NOT from the Overview tab's
-  // Fanbasis-sourced sectionA. Same denominator basis as the funnel cards
-  // below, so Cash/AOV/ACV match the deals breakdown.
-  if (isMonday && priorWeekFunnel && sectionATab3) {
+  // Monday + monthly-workshop Tab 3 — Last Week's Sales. Money cards
+  // source from int_calls_enriched (closer-attributed), NOT from the
+  // Overview tab's Fanbasis-sourced sectionA. Same denominator basis as
+  // the funnel cards below, so Cash/AOV/ACV match the deals breakdown.
+  if (showSalesTab && priorWeekFunnel && sectionATab3) {
     panels.t3sales = (
       <Tab3LastWeekSales
         weekLabel={snapshot.weekLabel}

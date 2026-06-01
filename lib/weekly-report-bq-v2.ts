@@ -1368,7 +1368,43 @@ export function comparisonDatesForMode(latest: string, mode: "weekly_recap" | "m
   if (mode === "weekly_recap") {
     return [latest, addDays(latest, -4), addDays(latest, -7)];
   }
+  if (mode === "monthly_workshop_recap") {
+    // Synchronous fallback only — the [slug] page prefers
+    // fetchPreviousMonthlyWorkshopDates() to get the ACTUAL prior
+    // workshop dates (which aren't on a strict 28-day cadence).
+    return [latest, addDays(latest, -28), addDays(latest, -56)];
+  }
   return [latest, addDays(latest, -3), addDays(latest, -7)];
+}
+
+/** Look up the most recent N monthly-workshop dates at or before `latest`,
+ *  from stg_ht_weekly_metrics (the funnel-sheet source of truth). Used by
+ *  the 3-webinar comparison on the monthly-workshop slug so the older two
+ *  columns line up with REAL prior workshops instead of date-math
+ *  approximations.
+ *
+ *  Returns dates newest-first. If fewer than N workshops exist on/before
+ *  `latest`, the array is padded with addDays(latest, -28*i) so the UI
+ *  always renders N columns. */
+export async function fetchPreviousMonthlyWorkshopDates(latest: string, n: number): Promise<string[]> {
+  const sql = `
+    SELECT FORMAT_DATE('%F', week) AS d
+    FROM \`${PROJECT}.dbt_tuddin.stg_ht_weekly_metrics\`
+    WHERE webinar_type = 'Monthly Workshop'
+      AND week <= DATE(@latest)
+    ORDER BY week DESC
+    LIMIT @n
+  `;
+  const [rows] = await bq().query({
+    query: sql,
+    params: { latest, n },
+    types: { latest: "STRING", n: "INT64" },
+  });
+  const dates = (rows as Array<{ d?: string | { value: string } }>)
+    .map((r) => (typeof r.d === "string" ? r.d : r.d?.value ?? ""))
+    .filter(Boolean);
+  while (dates.length < n) dates.push(addDays(latest, -28 * dates.length));
+  return dates;
 }
 
 /**

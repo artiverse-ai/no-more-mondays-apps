@@ -186,6 +186,22 @@ export default async function Page({
 
   if (snapshot.reportType === "monthly_workshop_recap" && snapshot.workshopTagDate) {
     monthlyWorkshopOverride = await fetchWorkshopOverride(snapshot);
+    // When the team uses the regular webinar form for a workshop, the
+    // mart_webinar_events row IS accurate — overlay its registrant
+    // values onto the override so Tab 2's Total Registrants + per-channel
+    // rows match the bottom Channel Mix bar chart (which reads the mart).
+    if (monthlyWorkshopOverride && snapshot.useMartRegistrants) {
+      const m = webinars[0];
+      if (m) {
+        monthlyWorkshopOverride.total        = m.totalRegistrants;
+        monthlyWorkshopOverride.meta         = m.metaRegistrants;
+        monthlyWorkshopOverride.manychat     = m.manychatRegistrants;
+        monthlyWorkshopOverride.setter       = m.setterRegistrants;
+        monthlyWorkshopOverride.otherOrganic = m.otherOrganicRegistrants;
+        monthlyWorkshopOverride.whatsapp     = 0;
+        monthlyWorkshopOverride.email        = 0;
+      }
+    }
     if (monthlyWorkshopOverride) {
       historicalWorkshopOverrides.set(snapshot.workshopTagDate, monthlyWorkshopOverride);
     }
@@ -203,7 +219,23 @@ export default async function Page({
       );
       historicalSnapshots.forEach((s, i) => {
         const ovr = histOverrides[i];
-        if (s?.workshopTagDate && ovr) historicalWorkshopOverrides.set(s.workshopTagDate, ovr);
+        if (!s?.workshopTagDate || !ovr) return;
+        // Match the latest-column behavior: if THIS workshop's snapshot
+        // says useMartRegistrants, replace the override's registrant
+        // values with the matching mart row's so Tab 2 cells line up.
+        if (s.useMartRegistrants) {
+          const m = webinars.find((w) => w.webinarDate === s.workshopTagDate);
+          if (m) {
+            ovr.total        = m.totalRegistrants;
+            ovr.meta         = m.metaRegistrants;
+            ovr.manychat     = m.manychatRegistrants;
+            ovr.setter       = m.setterRegistrants;
+            ovr.otherOrganic = m.otherOrganicRegistrants;
+            ovr.whatsapp     = 0;
+            ovr.email        = 0;
+          }
+        }
+        historicalWorkshopOverrides.set(s.workshopTagDate, ovr);
       });
     }
     const wsDate = snapshot.workshopTagDate;

@@ -40,6 +40,13 @@ export type Snapshot = {
    *  campaign categorization in BQ undercounts the real workshop ad
    *  spend (e.g. May 24's $5,487 actual vs $825 derived). */
   totalAdSpendOverride: number | null;
+  /** When true, skip the workshop-specific registrant breakdown
+   *  (raw_ghl.registrations_monthly_workshop + workshop manychat tag)
+   *  and let the page fall back to mart_webinar_events for total /
+   *  per-channel registrants. Use this on workshops where the team
+   *  registered attendees via the regular weekly-webinar funnel
+   *  (so the mart row IS accurate) instead of the workshop form. */
+  useMartRegistrants: boolean | null;
   insightsGenerationStatus: InsightsGenStatus;
   insightsGeneratedAt: string | null;
   insightsGenerationError: string | null;
@@ -99,6 +106,7 @@ async function ensure(): Promise<void> {
         ["retargeting_sms_tag",      "STRING"],
         ["reactivation_cost",        "NUMERIC"],
         ["total_ad_spend_override",  "NUMERIC"],
+        ["use_mart_registrants",     "BOOL"],
       ].filter(([col]) => !colSet.has(col));
       if (missing.length > 0) {
         await bq().query({
@@ -137,6 +145,7 @@ async function ensure(): Promise<void> {
       retargeting_sms_tag STRING,
       reactivation_cost NUMERIC,
       total_ad_spend_override NUMERIC,
+      use_mart_registrants BOOL,
       insights_generation_status STRING,
       insights_generated_at TIMESTAMP,
       insights_generation_error STRING,
@@ -381,6 +390,7 @@ type RawSnap = {
   retargeting_sms_tag: string | null;
   reactivation_cost: string | number | null;
   total_ad_spend_override: string | number | null;
+  use_mart_registrants: boolean | null;
   insights_generation_status: string | null;
   insights_generated_at: string | null;
   insights_generation_error: string | null;
@@ -415,6 +425,7 @@ function rowToSnapshot(r: RawSnap): Snapshot {
     retargetingSmsTag: r.retargeting_sms_tag,
     reactivationCost: r.reactivation_cost == null ? null : Number(r.reactivation_cost),
     totalAdSpendOverride: r.total_ad_spend_override == null ? null : Number(r.total_ad_spend_override),
+    useMartRegistrants:   r.use_mart_registrants ?? null,
     insightsGenerationStatus: (r.insights_generation_status as InsightsGenStatus | null) ?? "pending",
     insightsGeneratedAt: r.insights_generated_at,
     insightsGenerationError: r.insights_generation_error,
@@ -431,7 +442,7 @@ const SNAPSHOT_FIELDS = `slug,
   context_tag, context_title, context_body,
   tab2_narrative_tag, tab2_narrative_title, tab2_narrative_body,
   FORMAT_DATE('%F', workshop_tag_date) AS workshop_tag_date,
-  retargeting_email_tag, retargeting_sms_tag, reactivation_cost, total_ad_spend_override,
+  retargeting_email_tag, retargeting_sms_tag, reactivation_cost, total_ad_spend_override, use_mart_registrants,
   insights_generation_status,
   FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', insights_generated_at, 'UTC') AS insights_generated_at,
   insights_generation_error,

@@ -27,7 +27,7 @@ import {
   metaPromoWindow,
   type MonthlyWorkshopBreakdown,
 } from "@/lib/weekly-report-bq-v2";
-import { getSnapshot, listInsights, type Insight } from "@/lib/weekly-report-snapshots";
+import { getSnapshot, findWorkshopSnapshotByDate, listInsights, type Insight, type Snapshot } from "@/lib/weekly-report-snapshots";
 import { InsightsEditor, type EditableInsight } from "../_components/InsightsEditor";
 import { PersistentKpiStrip } from "../_components/PersistentKpiStrip";
 import { TopMetrics } from "../_components/TopMetrics";
@@ -129,60 +129,91 @@ export default async function Page({
   // Section B needs the KPI strip values (Cash/Booked, Show Rate, CPL) — compute after.
   const sectionB = await fetchSectionBData(kpiStart, kpiEnd, kpiStrip);
 
-  // ── Monthly Workshop override — applies when reportType ===
-  // 'monthly_workshop_recap'. Reads workshop config from the snapshot:
-  // workshopTagDate (the workshop day), retargeting tags (pool), and
-  // reactivationCost (manual SMS/Email/WhatsApp spend — not in BQ).
+  // ── Monthly Workshop overrides — applies when reportType ===
+  // 'monthly_workshop_recap'. The latest column uses the page snapshot's
+  // workshop config. Historical comparison columns (W-1, W-2) ALSO get
+  // overridden if there's a matching monthly_workshop_recap snapshot in
+  // BQ for that date — so the cost rows + reactivation funnel render
+  // the same numbers those reports' own pages would.
   //
-  // Windows derived from workshopTagDate:
+  // Windows derived from each workshop's workshopTagDate:
   //  - regWindow:   14 days before workshop → workshop day + 1 (exclusive)
   //  - promoWindow: Wed before workshop → workshop day (inclusive)
   //  - salesWindow: promo start → workshop day + 6 (post-workshop bookings)
   //
-  // Ad spend is queried dynamically from stg_meta_campaigns (no hardcode);
-  // total spend = ad spend + reactivationCost from the snapshot.
-  let monthlyWorkshopOverride: MonthlyWorkshopBreakdown | undefined;
-  let reactivationNote: string | undefined;
-  if (snapshot.reportType === "monthly_workshop_recap" && snapshot.workshopTagDate) {
-    const wsDate = snapshot.workshopTagDate;                  // e.g. "2026-05-24"
-    // Wed before workshop = workshop day - 4 (Sun → Wed). Works for any
-    // workshop day; if Marek lands a workshop on a different DOW, the
-    // promo window just shifts by the same delta.
-    const promoStart  = addDays(wsDate, -4);                  // Wed (default 4d back)
-    const promoEnd    = wsDate;                                // workshop day
-    const regStart    = addDays(wsDate, -14);                  // 14-day reg lookback
-    const regEnd      = addDays(wsDate, 1);                    // exclusive
+  // Ad spend is queried dynamically from stg_meta_campaigns unless the
+  // snapshot has total_ad_spend_override set (manual catch-all for when
+  // campaign categorization in BQ undercounts real workshop spend).
+  // total spend = adSpend + reactivationCost from each snapshot.
+  async function fetchWorkshopOverride(s: Snapshot): Promise<MonthlyWorkshopBreakdown | undefined> {
+    if (!s.workshopTagDate) return undefined;
+    const wsDate = s.workshopTagDate;
+    const promoStart  = addDays(wsDate, -4);
+    const promoEnd    = wsDate;
+    const regStart    = addDays(wsDate, -14);
+    const regEnd      = addDays(wsDate, 1);
     const salesStart  = promoStart;
-    const salesEnd    = addDays(wsDate, 6);                    // 6 days post
-
-    const emailTag = snapshot.retargetingEmailTag ?? `retargeting: email: workshop-${wsDate}`;
-    const smsTag   = snapshot.retargetingSmsTag   ?? `retargeting: sms: workshop-${wsDate}`;
+    const salesEnd    = addDays(wsDate, 6);
+    const emailTag = s.retargetingEmailTag ?? `retargeting: email: workshop-${wsDate}`;
+    const smsTag   = s.retargetingSmsTag   ?? `retargeting: sms: workshop-${wsDate}`;
     const tags = [emailTag, smsTag].filter(Boolean);
 
-    monthlyWorkshopOverride = await fetchMonthlyWorkshopBreakdown(
+    const br = await fetchMonthlyWorkshopBreakdown(
       wsDate, regStart, regEnd, promoStart, promoEnd, salesStart, salesEnd, tags,
     ).catch(() => undefined);
+    if (!br) return undefined;
 
-    // Layer in the snapshot-provided reactivation cost on top of the
-    // dynamically-computed ad spend. Total spend drives every cost-per
-    // metric.
+    const reactivationCost = s.reactivationCost ?? 0;
+    // Use manual ad-spend override when set, otherwise the dynamic
+    // stg_meta_campaigns sum.
+    const adSpend          = s.totalAdSpendOverride ?? br.totalAdSpend;
+    const totalSpend       = adSpend + reactivationCost;
+    const conversions      = br.metaReportedConversions;
+    br.reactivationCost = reactivationCost;
+    br.totalAdSpend     = adSpend;
+    br.totalSpend       = totalSpend;
+    br.regAdSpend       = totalSpend;
+    br.metaCpl          = conversions > 0 ? totalSpend / conversions : null;
+    return br;
+  }
+
+  let monthlyWorkshopOverride: MonthlyWorkshopBreakdown | undefined;
+  let reactivationNote: string | undefined;
+  // Map of webinar_date → workshop override. Tab 2 looks up each
+  // comparison column by date; columns without a workshop snapshot
+  // (e.g. Wed/Sun webinars) just use mart_webinar_events.
+  const historicalWorkshopOverrides = new Map<string, MonthlyWorkshopBreakdown>();
+
+  if (snapshot.reportType === "monthly_workshop_recap" && snapshot.workshopTagDate) {
+    monthlyWorkshopOverride = await fetchWorkshopOverride(snapshot);
     if (monthlyWorkshopOverride) {
-      const reactivationCost = snapshot.reactivationCost ?? 0;
-      const adSpend          = monthlyWorkshopOverride.totalAdSpend; // from stg_meta_campaigns
-      const totalSpend       = adSpend + reactivationCost;
-      const conversions      = monthlyWorkshopOverride.metaReportedConversions;
-      monthlyWorkshopOverride.reactivationCost = reactivationCost;
-      monthlyWorkshopOverride.totalSpend       = totalSpend;
-      // Cost/Reg uses regAdSpend in the denominator — for the workshop
-      // we want it driven by the headline total too.
-      monthlyWorkshopOverride.regAdSpend       = totalSpend;
-      monthlyWorkshopOverride.metaCpl          = conversions > 0 ? totalSpend / conversions : null;
+      historicalWorkshopOverrides.set(snapshot.workshopTagDate, monthlyWorkshopOverride);
     }
+    // Also look up historical workshop snapshots for the comparison
+    // columns. The compDates here are webinar_date values from
+    // mart_webinar_events; we cross-reference to weekly_report_snapshots
+    // by workshop_tag_date.
+    const historicalDates = compDates.filter((d) => d !== snapshot.workshopTagDate);
+    if (historicalDates.length > 0) {
+      const historicalSnapshots = await Promise.all(
+        historicalDates.map((d) => findWorkshopSnapshotByDate(d)),
+      );
+      const histOverrides = await Promise.all(
+        historicalSnapshots.map((s) => (s ? fetchWorkshopOverride(s) : Promise.resolve(undefined))),
+      );
+      historicalSnapshots.forEach((s, i) => {
+        const ovr = histOverrides[i];
+        if (s?.workshopTagDate && ovr) historicalWorkshopOverrides.set(s.workshopTagDate, ovr);
+      });
+    }
+    const wsDate = snapshot.workshopTagDate;
+    const emailTag = snapshot.retargetingEmailTag ?? `retargeting: email: workshop-${wsDate}`;
+    const smsTag   = snapshot.retargetingSmsTag   ?? `retargeting: sms: workshop-${wsDate}`;
     reactivationNote =
       `Reactivation pool = contacts tagged \`${emailTag}\` OR \`${smsTag}\` ` +
       "(union — anyone we reached on either channel). " +
       `Attended uses \`status: attended-workshop-${wsDate}\`; booked counts ` +
-      `live-webinar calls scheduled ${promoStart} → ${salesEnd}. ` +
+      `live-webinar calls scheduled ${addDays(wsDate, -4)} → ${addDays(wsDate, 6)}. ` +
       "Channel attribution (which message drove which book) isn't broken out.";
   }
 
@@ -261,6 +292,7 @@ export default async function Page({
         sqlCtx={sqlCtx}
         monthlyWorkshopOverride={monthlyWorkshopOverride}
         reactivationNote={reactivationNote}
+        historicalWorkshopOverrides={Object.fromEntries(historicalWorkshopOverrides)}
       />
     ),
     t4ai: (

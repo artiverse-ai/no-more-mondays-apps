@@ -35,6 +35,11 @@ export type Snapshot = {
   retargetingEmailTag: string | null;
   retargetingSmsTag: string | null;
   reactivationCost: number | null;
+  /** Manual override for ad spend. When set, the workshop report uses
+   *  this instead of the dynamic stg_meta_campaigns sum — useful when
+   *  campaign categorization in BQ undercounts the real workshop ad
+   *  spend (e.g. May 24's $5,487 actual vs $825 derived). */
+  totalAdSpendOverride: number | null;
   insightsGenerationStatus: InsightsGenStatus;
   insightsGeneratedAt: string | null;
   insightsGenerationError: string | null;
@@ -89,10 +94,11 @@ async function ensure(): Promise<void> {
       });
       const colSet = new Set((cols as { column_name: string }[]).map((r) => r.column_name));
       const missing = [
-        ["workshop_tag_date",     "DATE"],
-        ["retargeting_email_tag", "STRING"],
-        ["retargeting_sms_tag",   "STRING"],
-        ["reactivation_cost",     "NUMERIC"],
+        ["workshop_tag_date",        "DATE"],
+        ["retargeting_email_tag",    "STRING"],
+        ["retargeting_sms_tag",      "STRING"],
+        ["reactivation_cost",        "NUMERIC"],
+        ["total_ad_spend_override",  "NUMERIC"],
       ].filter(([col]) => !colSet.has(col));
       if (missing.length > 0) {
         await bq().query({
@@ -130,6 +136,7 @@ async function ensure(): Promise<void> {
       retargeting_email_tag STRING,
       retargeting_sms_tag STRING,
       reactivation_cost NUMERIC,
+      total_ad_spend_override NUMERIC,
       insights_generation_status STRING,
       insights_generated_at TIMESTAMP,
       insights_generation_error STRING,
@@ -268,6 +275,7 @@ type MergeSnapshotInput = Omit<
   | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
   | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
   | "workshopTagDate" | "retargetingEmailTag" | "retargetingSmsTag" | "reactivationCost"
+  | "totalAdSpendOverride"
 > & {
   tab2NarrativeTag?: string | null;
   tab2NarrativeTitle?: string | null;
@@ -276,6 +284,7 @@ type MergeSnapshotInput = Omit<
   retargetingEmailTag?: string | null;
   retargetingSmsTag?: string | null;
   reactivationCost?: number | null;
+  totalAdSpendOverride?: number | null;
 };
 
 async function mergeSnapshot(
@@ -291,7 +300,7 @@ async function mergeSnapshot(
                       latest_webinar, context_tag, context_title, context_body,
                       tab2_narrative_tag, tab2_narrative_title, tab2_narrative_body,
                       workshop_tag_date, retargeting_email_tag, retargeting_sms_tag,
-                      reactivation_cost,
+                      reactivation_cost, total_ad_spend_override,
                       insights_generation_status, created_at)
               VALUES (@slug, DATE(@runOn), DATE(@weekStart), DATE(@weekEnd), @reportType,
                       @weekLabel, @badge, @latestWebinar, @contextTag, @contextTitle,
@@ -299,6 +308,7 @@ async function mergeSnapshot(
                       IF(@workshopTagDate IS NULL, NULL, DATE(@workshopTagDate)),
                       @retargetingEmailTag, @retargetingSmsTag,
                       IF(@reactivationCost IS NULL, NULL, CAST(@reactivationCost AS NUMERIC)),
+                      IF(@adSpendOverride  IS NULL, NULL, CAST(@adSpendOverride  AS NUMERIC)),
                       @initialStatus, CURRENT_TIMESTAMP())`,
     params: {
       slug: s.slug,
@@ -319,6 +329,7 @@ async function mergeSnapshot(
       retargetingEmailTag: s.retargetingEmailTag ?? null,
       retargetingSmsTag: s.retargetingSmsTag ?? null,
       reactivationCost: s.reactivationCost == null ? null : String(s.reactivationCost),
+      adSpendOverride: s.totalAdSpendOverride == null ? null : String(s.totalAdSpendOverride),
       initialStatus,
     },
     types: {
@@ -329,6 +340,7 @@ async function mergeSnapshot(
       workshopTagDate: "STRING",
       retargetingEmailTag: "STRING", retargetingSmsTag: "STRING",
       reactivationCost: "STRING",
+      adSpendOverride: "STRING",
       initialStatus: "STRING",
     },
   });
@@ -368,6 +380,7 @@ type RawSnap = {
   retargeting_email_tag: string | null;
   retargeting_sms_tag: string | null;
   reactivation_cost: string | number | null;
+  total_ad_spend_override: string | number | null;
   insights_generation_status: string | null;
   insights_generated_at: string | null;
   insights_generation_error: string | null;
@@ -401,6 +414,7 @@ function rowToSnapshot(r: RawSnap): Snapshot {
     retargetingEmailTag: r.retargeting_email_tag,
     retargetingSmsTag: r.retargeting_sms_tag,
     reactivationCost: r.reactivation_cost == null ? null : Number(r.reactivation_cost),
+    totalAdSpendOverride: r.total_ad_spend_override == null ? null : Number(r.total_ad_spend_override),
     insightsGenerationStatus: (r.insights_generation_status as InsightsGenStatus | null) ?? "pending",
     insightsGeneratedAt: r.insights_generated_at,
     insightsGenerationError: r.insights_generation_error,
@@ -417,7 +431,7 @@ const SNAPSHOT_FIELDS = `slug,
   context_tag, context_title, context_body,
   tab2_narrative_tag, tab2_narrative_title, tab2_narrative_body,
   FORMAT_DATE('%F', workshop_tag_date) AS workshop_tag_date,
-  retargeting_email_tag, retargeting_sms_tag, reactivation_cost,
+  retargeting_email_tag, retargeting_sms_tag, reactivation_cost, total_ad_spend_override,
   insights_generation_status,
   FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', insights_generated_at, 'UTC') AS insights_generated_at,
   insights_generation_error,
@@ -446,6 +460,25 @@ export async function getSnapshot(slug: string): Promise<Snapshot | null> {
   return r ? rowToSnapshot(r) : null;
 }
 
+/** Find a monthly-workshop snapshot whose workshop_tag_date matches the
+ *  given date. Used by the comparison columns on a monthly_workshop_recap
+ *  page so historical workshop columns can reuse the SAME cost +
+ *  retargeting config that their own report pages would use. */
+export async function findWorkshopSnapshotByDate(date: string): Promise<Snapshot | null> {
+  await ensure();
+  const [rows] = await bq().query({
+    query: `SELECT ${SNAPSHOT_FIELDS} FROM ${SNAPSHOTS}
+            WHERE workshop_tag_date = DATE(@date)
+              AND report_type = 'monthly_workshop_recap'
+              AND deleted_at IS NULL
+            ORDER BY created_at DESC LIMIT 1`,
+    params: { date },
+    types: { date: "STRING" },
+  });
+  const r = (rows as RawSnap[])[0];
+  return r ? rowToSnapshot(r) : null;
+}
+
 // The tab2 narrative + context_* fields are *optional* at create time — the
 // VM cron fills them in from Claude's response. Callers can omit; we default
 // to null so the INSERT has every column.
@@ -455,6 +488,7 @@ type CreateSnapshotInput = Omit<
   | "insightsGenerationStatus" | "insightsGeneratedAt" | "insightsGenerationError"
   | "tab2NarrativeTag" | "tab2NarrativeTitle" | "tab2NarrativeBody"
   | "workshopTagDate" | "retargetingEmailTag" | "retargetingSmsTag" | "reactivationCost"
+  | "totalAdSpendOverride"
 > & {
   tab2NarrativeTag?: string | null;
   tab2NarrativeTitle?: string | null;
@@ -463,6 +497,7 @@ type CreateSnapshotInput = Omit<
   retargetingEmailTag?: string | null;
   retargetingSmsTag?: string | null;
   reactivationCost?: number | null;
+  totalAdSpendOverride?: number | null;
 };
 
 export async function createSnapshot(s: CreateSnapshotInput): Promise<void> {
@@ -513,9 +548,10 @@ export async function updateSnapshot(
     retargetingEmailTag: "retargeting_email_tag",
     retargetingSmsTag: "retargeting_sms_tag",
     reactivationCost: "reactivation_cost",
+    totalAdSpendOverride: "total_ad_spend_override",
   };
   const dateFields = new Set(["runOn", "weekStart", "weekEnd", "workshopTagDate"]);
-  const numericFields = new Set(["reactivationCost"]);
+  const numericFields = new Set(["reactivationCost", "totalAdSpendOverride"]);
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue;
     const col = map[k];

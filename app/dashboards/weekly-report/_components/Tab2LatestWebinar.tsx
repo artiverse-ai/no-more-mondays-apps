@@ -29,13 +29,17 @@ export type Tab2LatestWebinarProps = {
   contextBanner: { tag: string; title: string; body: string };
   devMode?: boolean;
   sqlCtx?: SqlCtx;
-  /** Override for the 2026-05-25 monthly-workshop report. When present,
-   *  replaces the latest-column registrant breakdown with these tag-based
-   *  + raw-form numbers and shows WhatsApp/Email rows. */
+  /** Workshop override for the LATEST column (any monthly_workshop_recap
+   *  report). Replaces the latest column's registrant breakdown with
+   *  tag-based + raw-form numbers and shows WhatsApp/Email rows. */
   monthlyWorkshopOverride?: MonthlyWorkshopBreakdown;
-  /** Reactivation funnel note rendered ABOVE the table when set. Used for
-   *  one-off reports (like the 2026-05-25 workshop) where the reactivation
-   *  push happened outside our normal tracked channels. */
+  /** Workshop overrides for HISTORICAL comparison columns, keyed by the
+   *  webinar_date (matches WebinarComparisonRowV2.webinarDate). When a
+   *  comparison column matches one of these, the cost rows + reactivation
+   *  funnel row render the workshop's own snapshot values instead of the
+   *  mart_webinar_events defaults. */
+  historicalWorkshopOverrides?: Record<string, MonthlyWorkshopBreakdown>;
+  /** Reactivation funnel note rendered ABOVE the table when set. */
   reactivationNote?: string;
 };
 
@@ -49,8 +53,18 @@ export function Tab2LatestWebinar({
   devMode = false,
   sqlCtx,
   monthlyWorkshopOverride,
+  historicalWorkshopOverrides,
   reactivationNote,
 }: Tab2LatestWebinarProps) {
+  /** Look up the workshop override that applies to a given column. Index
+   *  0 uses monthlyWorkshopOverride (the page's own snapshot); other
+   *  columns look up by webinar_date in historicalWorkshopOverrides. */
+  const colOvr = (i: number): MonthlyWorkshopBreakdown | undefined => {
+    if (i === 0 && monthlyWorkshopOverride) return monthlyWorkshopOverride;
+    const date = webinars[i]?.webinarDate;
+    return date && historicalWorkshopOverrides ? historicalWorkshopOverrides[date] : undefined;
+  };
+  const anyWorkshopCol = webinars.some((_, i) => colOvr(i) !== undefined);
   // For the 2026-05-25 monthly-workshop report we override the latest
   // column's registrant slice, ad spend, Meta funnel, sales, and all
   // derived rates. Historical columns (W-1, W-2) keep their normal mart
@@ -121,13 +135,34 @@ export function Tab2LatestWebinar({
             </thead>
             <tbody>
               <DivRow>Registration</DivRow>
-              {ovr ? (
+              {anyWorkshopCol ? (
                 <>
-                  <DataRow label="Total Spend"        values={[fmtUsd(ovr.totalSpend),       "—", "—"]} tip={"Ad spend + reactivation push (SMS/Email/WhatsApp).\nDrives every cost-per metric below."} />
-                  <DataRow label="↳ Reactivation Cost" values={[fmtUsd(ovr.reactivationCost), "—", "—"]} tip={"Cost of the SMS/Email/WhatsApp reactivation pushes. Manual entry — not in stg_meta_campaigns."} />
+                  <DataRow
+                    label="Total Spend"
+                    values={webinars.map((_, i) => {
+                      const co = colOvr(i);
+                      return co ? fmtUsd(co.totalSpend) : "—";
+                    })}
+                    tip={"Ad spend + reactivation push (SMS/Email/WhatsApp).\nDrives every cost-per metric below."}
+                  />
+                  <DataRow
+                    label="↳ Reactivation Cost"
+                    values={webinars.map((_, i) => {
+                      const co = colOvr(i);
+                      return co ? fmtUsd(co.reactivationCost) : "—";
+                    })}
+                    tip={"Cost of the SMS/Email/WhatsApp reactivation pushes. Manual entry — not in stg_meta_campaigns."}
+                  />
                 </>
               ) : null}
-              <DataRow label={ovr ? "↳ Ad Spend" : "Ad Spend"} values={overrideUsd((o) => o.totalAdSpend, (w) => w.totalWebinarAdSpend)} tip={TIP.adSpendMart} />
+              <DataRow
+                label={anyWorkshopCol ? "↳ Ad Spend" : "Ad Spend"}
+                values={webinars.map((w, i) => {
+                  const co = colOvr(i);
+                  return co ? fmtUsd(co.totalAdSpend) : fmtUsd(w.totalWebinarAdSpend);
+                })}
+                tip={TIP.adSpendMart}
+              />
               <DataRow label="LP Page Views" values={webinars.map((w) => fmtInt(w.lpPageViews))} tip={TIP.lpPageViews} />
               <DataRow label="LP Opt-Ins" values={webinars.map((w) => fmtInt(w.lpOptIns))} tip={TIP.lpOptIns} />
               <DataRow label="LP Opt-in Rate" values={webinars.map((w) => fmtPct(w.lpOptInRate))} tip={TIP.lpOptInRate} trafficKey="lpOptInRate" rawValues={webinars.map((w) => w.lpOptInRate)} highlight />
@@ -352,15 +387,14 @@ export function Tab2LatestWebinar({
         webinars={webinars}
         headers={headers}
         note={reactivationNote}
-        latestOverride={
-          monthlyWorkshopOverride
-            ? {
-                poolSize: monthlyWorkshopOverride.reactivationPoolSize,
-                attended: monthlyWorkshopOverride.reactivationsAttended,
-                booked:   monthlyWorkshopOverride.reactivationsBooked,
-              }
-            : undefined
-        }
+        columnOverrides={webinars.map((_, i) => {
+          const co = colOvr(i);
+          return co ? {
+            poolSize: co.reactivationPoolSize,
+            attended: co.reactivationsAttended,
+            booked:   co.reactivationsBooked,
+          } : undefined;
+        })}
       />
 
       {/* 8. Warning banner — ad-spend cutoff */}
@@ -560,15 +594,16 @@ function ReactivationFunnel({
   webinars,
   headers,
   note,
-  latestOverride,
+  columnOverrides,
 }: {
   webinars: WebinarComparisonRowV2[];
   headers: string[];
   note?: string;
-  /** When set, overrides the latest column's reactivation numbers with
-   *  values computed from custom tag membership (workshop slug). Older
-   *  columns continue to read from mart_webinar_events. */
-  latestOverride?: { poolSize: number; attended: number; booked: number };
+  /** Per-column overrides keyed by column index. Each entry, if set,
+   *  replaces that column's mart_webinar_events reactivation numbers
+   *  with tag-based + workshop-snapshot values (used for both the
+   *  latest column AND historical workshop columns). */
+  columnOverrides?: Array<{ poolSize: number; attended: number; booked: number } | undefined>;
 }) {
   return (
     <section className={styles.section}>
@@ -593,9 +628,10 @@ function ReactivationFunnel({
           </thead>
           <tbody>
             {webinars.map((w, i) => {
-              const poolSize = (i === 0 && latestOverride) ? latestOverride.poolSize : w.reactivationPoolSize;
-              const attended = (i === 0 && latestOverride) ? latestOverride.attended : w.reactivationsAttended;
-              const booked   = (i === 0 && latestOverride) ? latestOverride.booked   : w.reactivationsBooked;
+              const ovr = columnOverrides?.[i];
+              const poolSize = ovr ? ovr.poolSize : w.reactivationPoolSize;
+              const attended = ovr ? ovr.attended : w.reactivationsAttended;
+              const booked   = ovr ? ovr.booked   : w.reactivationsBooked;
               const attendRate = poolSize > 0 ? attended / poolSize : null;
               const bookRate   = attended > 0 ? booked / attended : null;
               return (

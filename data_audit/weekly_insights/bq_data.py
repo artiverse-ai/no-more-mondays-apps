@@ -93,16 +93,28 @@ def reset_stuck_generating(stale_minutes: int = 10) -> int:
     return int(job.num_dml_affected_rows or 0)
 
 
+def _should_self_heal() -> bool:
+    """Gate the stuck-row reset so the idle path doesn't fire a DML UPDATE on
+    every poll. True at most ~once per 10 min (cron ticks at :00,:10,…).
+
+    Cost context: the queue is empty on the vast majority of polls. Running
+    reset_stuck_generating() (a DML UPDATE) on every tick was ~half of this
+    worker's ~17k BigQuery jobs/day. A row crashed in 'generating' now waits
+    ≤10 min to be rescued — acceptable for a rare error-recovery path.
+    """
+    return dt.datetime.now(dt.timezone.utc).minute % 10 == 0
+
+
 def claim_pending() -> dict[str, Any] | None:
     """
     Atomically pick one 'pending' snapshot, flip it to 'generating', and
     return it. Returns None if the queue is empty.
 
-    Calls reset_stuck_generating() first so rows abandoned in 'generating'
-    (e.g., from a VM crash or hard-killed Claude subprocess) get rescued
-    automatically.
+    Cost note: the cheap SELECT runs first. reset_stuck_generating() (a DML
+    UPDATE) only runs on the idle path and only ~once per 10 min (see
+    _should_self_heal), so an empty queue costs a single SELECT per poll
+    instead of UPDATE+SELECT on every poll.
     """
-    reset_stuck_generating()
     cli = _client()
     pick_sql = f"""
       SELECT slug FROM {SNAPSHOTS}
@@ -112,6 +124,10 @@ def claim_pending() -> dict[str, Any] | None:
     """
     rows = list(cli.query(pick_sql).result())
     if not rows:
+        # Idle: nothing pending. Self-heal rows stuck in 'generating' only
+        # occasionally so an empty queue doesn't cost a DML write every poll.
+        if _should_self_heal():
+            reset_stuck_generating()
         return None
     slug = rows[0]["slug"]
 

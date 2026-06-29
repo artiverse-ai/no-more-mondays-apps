@@ -2,10 +2,9 @@
 # Wrapper for the weekly-insights generator. Sources secrets, uses the
 # venv python, logs to ~/data_audit/logs/weekly_insights.log.
 #
-# Cron-launched every minute (* * * * *). Inside each minute, the wrapper
-# polls BQ every 10 seconds for up to ~55 seconds so a snapshot created at
-# t=03s is picked up by t≤13s instead of waiting up to 60s for the next
-# cron tick. flock guards against parallel runs across cron ticks.
+# Cron-launched every minute (* * * * *). Runs the generator once per tick
+# (a snapshot is picked up within ~60s). flock guards against parallel runs
+# across cron ticks when a generation spans more than a minute.
 #
 # Cron entry:
 #   * * * * * /home/$USER/nmm-insights/data_audit/weekly_insights/generate_insights_wrapper.sh
@@ -44,20 +43,15 @@ if [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
   exit 3
 fi
 
-# Poll for the rest of this cron minute. Each iteration calls the
-# Python script which itself returns within seconds when nothing is
-# pending. If Claude is invoked, the iteration can take 30-180s; in that
-# case the loop naturally exits at the next bound check.
-END=$((SECONDS + 55))
-while [ "$SECONDS" -lt "$END" ]; do
-  echo "$(date -u +%FT%TZ) START weekly_insights" >> "$LOG"
-  set +e
-  "$VENV_PYTHON" "$SCRIPT" >> "$LOG" 2>&1
-  RC=$?
-  set -e
-  echo "$(date -u +%FT%TZ) END   weekly_insights rc=$RC" >> "$LOG"
-  # Sleep 10s between checks unless we're past the budget.
-  if [ "$SECONDS" -lt "$END" ]; then
-    sleep 10
-  fi
-done
+# One generation attempt per cron tick. (Previously this polled BigQuery every
+# 10s for ~55s — ~6 queue-poll round-trips per minute — which, on an
+# almost-always-empty queue, was the single largest source of BigQuery jobs on
+# the project. Insight generation is admin-triggered and takes minutes, so up
+# to ~60s pickup latency is irrelevant.) flock above still prevents overlap
+# with a long-running generation that spans the next cron tick.
+echo "$(date -u +%FT%TZ) START weekly_insights" >> "$LOG"
+set +e
+"$VENV_PYTHON" "$SCRIPT" >> "$LOG" 2>&1
+RC=$?
+set -e
+echo "$(date -u +%FT%TZ) END   weekly_insights rc=$RC" >> "$LOG"
